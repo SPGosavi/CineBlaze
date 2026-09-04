@@ -3,7 +3,7 @@ import { GROQ_API_KEY, TMDB_API_KEY } from "../config.js";
 import { getLanguageCode, getGenreIds } from "../utils/languageMap.js";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "openai/gpt-oss-20b";
+const MODEL = "openai/gpt-oss-120b";
 
 // ─── Structured Parameter Extraction ────────────────────────────────────────
 
