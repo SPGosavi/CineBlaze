@@ -33,7 +33,6 @@ export const getTrendingAll = async (req, res) => {
           imdb_rating: ratings.imdb ?? null,
           rotten_tomatoes: ratings.rt ?? null,
         };
-  
       })
     );
 
@@ -69,14 +68,14 @@ export const getTrendingIndian = async (req, res) => {
         const extra = await fetchEnrichedDataById(item.id, item.media_type);
         const ratings = await fetchRatings(
           item.title,
-          item.release_date?.split('-')[0]
+          item.release_date?.split("-")[0]
         );
 
         return {
           ...item,
           ...extra,
           imdb_rating: ratings.imdb ?? null,
-          rotten_tomatoes: ratings.rt ?? null
+          rotten_tomatoes: ratings.rt ?? null,
         };
       })
     );
@@ -85,7 +84,7 @@ export const getTrendingIndian = async (req, res) => {
 
     const response = { results: finalResults };
 
-    cache.set(cacheKey, response, 21600); // 6 hours
+    cache.set("trending_indian", response, 21600); // 6 hours
     res.json(response);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -112,14 +111,14 @@ export const getTrendingPlatform = async (req, res) => {
         const extra = await fetchEnrichedDataById(item.id, item.media_type);
         const ratings = await fetchRatings(
           item.title,
-          item.release_date?.split('-')[0]
+          item.release_date?.split("-")[0]
         );
 
         return {
           ...item,
           ...extra,
           imdb_rating: ratings.imdb ?? null,
-          rotten_tomatoes: ratings.rt ?? null
+          rotten_tomatoes: ratings.rt ?? null,
         };
       })
     );
