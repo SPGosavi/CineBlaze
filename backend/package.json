@@ -2,11 +2,13 @@
   "name": "movie-finder-backend",
   "version": "1.0.0",
   "description": "Backend server for the Movie Finder app.",
-  "main": "server.js",
+  "main": "dist/server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "tsx --watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -14,5 +16,12 @@
     "express": "^4.19.2",
     "node-cache": "^5.1.2",
     "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   }
 }
