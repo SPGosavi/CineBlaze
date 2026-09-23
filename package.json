@@ -1,5 +1,43 @@
 {
-  "dependencies": {
-    "curl": "^0.1.4"
+  "name": "movie-finder",
+  "version": "1.0.0",
+  "description": "<h1 align=\"center\">🔥CineBlaze</h1>",
+  "main": "index.js",
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.9.8"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
+    "lint": "npm run lint --prefix frontend",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SPGosavi/CineBlaze-movie-finder-web-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/SPGosavi/CineBlaze-movie-finder-web-app/issues"
+  },
+  "homepage": "https://github.com/SPGosavi/CineBlaze-movie-finder-web-app#readme",
+  "lint-staged": {
+    "frontend/**/*.{js,jsx}": [
+      "eslint --fix --no-warn-ignored"
+    ],
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
   }
 }
