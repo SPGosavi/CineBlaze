@@ -17,7 +17,7 @@ export const GROQ_API_URL =
 export const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 // Used when the primary model is rate-limited, decommissioned, or returns 5xx errors.
 export const GROQ_FALLBACK_MODEL =
-  process.env.GROQ_FALLBACK_MODEL || "llama-3.3-70b-versatile";
+  process.env.GROQ_FALLBACK_MODEL || "openai/gpt-oss-20b";
 export const GROQ_MAX_RETRIES = Number(process.env.GROQ_MAX_RETRIES) || 3;
 
 export const PROVIDERS = {
