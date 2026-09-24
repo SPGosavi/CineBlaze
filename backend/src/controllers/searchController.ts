@@ -22,8 +22,6 @@ import {
   AiSuggestion,
   StructuredParams,
   MoviesResponse,
-  SimilarResponse,
-  Providers,
   EnrichedMedia,
 } from "../types/index.js";
 
@@ -359,8 +357,6 @@ export const findMovies = async (
     // 3. Normal AI Flow — resolve AI suggestions against TMDB
     // Determine media type preferences from structured params or description
     const userWantsTV = /show|series|season/i.test(description);
-    const allowedMediaTypes =
-      structuredParams?.media_types || (userWantsTV ? ["tv"] : ["movie", "tv"]);
 
     console.log(`[Search] AI Results:`, JSON.stringify(aiResults));
     const results = await Promise.all(

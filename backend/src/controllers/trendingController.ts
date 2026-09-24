@@ -10,7 +10,7 @@ import {
 import { TrendingResponse, EnrichedMedia } from "../types/index.js";
 
 export const getTrendingAll = async (
-  req: Request,
+  _req: Request,
   res: Response
 ): Promise<void> => {
   const cached = cache.get<TrendingResponse>("trending_all");
@@ -56,7 +56,7 @@ export const getTrendingAll = async (
 };
 
 export const getTrendingIndian = async (
-  req: Request,
+  _req: Request,
   res: Response
 ): Promise<void> => {
   const cached = cache.get<TrendingResponse>("trending_indian");

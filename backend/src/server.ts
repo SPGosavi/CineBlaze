@@ -19,7 +19,7 @@ app.use("/api", apiRoutes);
 
 const PORT: number = Number(process.env.PORT) || 8000;
 
-app.get("/health", (req: Request, res: Response): void => {
+app.get("/health", (_req: Request, res: Response): void => {
   res.status(200).send("OK");
 });
 
