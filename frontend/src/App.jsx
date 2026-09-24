@@ -14,7 +14,7 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, doc, setDoc, updateDoc, 
-  arrayUnion, arrayRemove, onSnapshot, getDoc 
+  arrayUnion, arrayRemove, onSnapshot 
 } from 'firebase/firestore';
 
 // --- CONFIG ---
@@ -433,7 +433,9 @@ const MovieDetailsModal = ({ item, onClose, onAddToWatchlist, onRemoveFromWatchl
   const [similarMovies, setSimilarMovies] = useState([]);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  // Tracked but not yet surfaced in the UI -- no loading indicator is
+  // rendered for the details fetch, so only the setter is bound.
+  const [, setLoadingDetails] = useState(false);
 
   // Initialize
   useEffect(() => {
@@ -752,8 +754,7 @@ const DiscoverView = ({ searchQuery, setSearchQuery, handleSearch, isSearching, 
 
 const WatchlistView = ({ watchlist, watchlistType, setWatchlistType, onDrop, onDragOver, onDragStart, firebaseInitialized, onExpand, onReorder }) => {
     const [filterGenre, setFilterGenre] = useState("All");
-    if (!firebaseInitialized) return <div className="h-full flex flex-col items-center justify-center text-center p-8 text-gray-400"><AlertTriangle size={48} className="mb-4 text-orange-500" /><h2 className="text-xl font-bold text-white mb-2">Feature Unavailable</h2><p>Add Firebase config to use Watchlist.</p></div>;
-    
+
     const safeWatchlist = Array.isArray(watchlist) ? watchlist.filter(item => item && item.id).map(i => sanitizeItem(i)) : [];
     
     // Filter out duplicates (just in case DB has them)
@@ -768,6 +769,10 @@ const WatchlistView = ({ watchlist, watchlistType, setWatchlistType, onDrop, onD
         });
         return ["All", ...Array.from(genres).sort()];
     }, [typeFiltered]);
+
+    // Must come after every hook call, otherwise the hook order changes
+    // between renders and React throws.
+    if (!firebaseInitialized) return <div className="h-full flex flex-col items-center justify-center text-center p-8 text-gray-400"><AlertTriangle size={48} className="mb-4 text-orange-500" /><h2 className="text-xl font-bold text-white mb-2">Feature Unavailable</h2><p>Add Firebase config to use Watchlist.</p></div>;
     
     const finalFiltered = filterGenre === "All" ? typeFiltered : typeFiltered.filter(i => Array.isArray(i.genres) && i.genres.includes(filterGenre));
     
