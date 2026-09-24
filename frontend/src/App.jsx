@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import api from './api';
+import api from './services/api';
 
 import { 
   Search, Film, Tv, List, Settings, User, 
@@ -7,42 +7,21 @@ import {
   ChevronLeft, ChevronRight, LogOut, Lock, Mail, 
   ChevronDown, Check, Flame, MonitorPlay
 } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, signInAnonymously, signInWithEmailAndPassword, 
+  signInAnonymously, signInWithEmailAndPassword, 
   onAuthStateChanged, signOut, createUserWithEmailAndPassword 
 } from 'firebase/auth';
 import { 
-  getFirestore, doc, setDoc, updateDoc, 
+  doc, setDoc, updateDoc, 
   arrayUnion, arrayRemove, onSnapshot 
 } from 'firebase/firestore';
+import { auth, db, firebaseInitialized } from './services/firebase';
 
 // --- CONFIG ---
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const TMDB_LOGO_BASE_URL = 'https://image.tmdb.org/t/p/original';
 const PLACEHOLDER_IMAGE = 'https://placehold.co/500x750/171717/7f1d1d?text=No+Poster';
-
-// --- FIREBASE ---
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
-};
-
-let app, auth, db;
-let firebaseInitialized = false;
-try {
-  if (firebaseConfig.apiKey !== "YOUR_API_KEY_HERE") {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-    firebaseInitialized = true;
-  }
-} catch (error) { console.error("Firebase Init Error:", error); }
 
 // --- GLOBAL STYLES ---
 const GlobalStyles = () => (
