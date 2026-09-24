@@ -1,8 +1,22 @@
 import fetch from "node-fetch";
 import cache from "../utils/cache.js";
 import { TMDB_API_KEY, OMDB_API_KEY } from "../config.js";
+import {
+  MediaType,
+  BasicTmdbResult,
+  WatchProvider,
+  Ratings,
+  TmdbDetails,
+  EnrichedMedia,
+  PartialEnrichedMedia,
+  TmdbRawResult,
+  TmdbPaginatedResponse,
+  TmdbDetailResponse,
+  TmdbWatchProvidersResponse,
+  OmdbResponse,
+} from "../types/index.js";
 
-const GENRE_MAP = {
+const GENRE_MAP: Record<number, string> = {
   28: "Action",
   12: "Adventure",
   16: "Animation",
@@ -32,7 +46,10 @@ const GENRE_MAP = {
   10768: "War & Politics",
 };
 
-export async function fetchEnrichedDataById(id, mediaType) {
+export async function fetchEnrichedDataById(
+  id: number,
+  mediaType: MediaType
+): Promise<PartialEnrichedMedia | null> {
   if (!id || !mediaType) return null;
 
   const [details, providers] = await Promise.all([
@@ -50,7 +67,16 @@ export async function fetchEnrichedDataById(id, mediaType) {
   };
 }
 
-export async function fetchFastDetailsById(id, mediaType) {
+export async function fetchFastDetailsById(
+  id: number,
+  mediaType: MediaType
+): Promise<{
+  id: number;
+  media_type: MediaType;
+  genres: string[];
+  director: string;
+  cast: string[];
+} | null> {
   if (!id || !mediaType) return null;
 
   const details = await fetchTmdbDetails(id, mediaType);
@@ -64,9 +90,12 @@ export async function fetchFastDetailsById(id, mediaType) {
   };
 }
 
-export async function fetchRatings(title, year) {
+export async function fetchRatings(
+  title: string,
+  year: string | undefined
+): Promise<Ratings> {
   const cacheKey = `ratings_${title}_${year}`;
-  const cached = cache.get(cacheKey);
+  const cached = cache.get(cacheKey) as Ratings | undefined;
   if (cached) return cached;
 
   try {
@@ -74,21 +103,24 @@ export async function fetchRatings(title, year) {
     cache.set(cacheKey, ratings, 86400); // 24 hours
     return ratings;
   } catch {
-    return { imdb: null, rt: null };
+    return { imdb: null, rt: null } as unknown as Ratings;
   }
 }
 
-export async function fetchTmdb(url) {
+export async function fetchTmdb(url: string): Promise<TmdbPaginatedResponse> {
   const res = await fetch(url);
   if (!res.ok) throw new Error("TMDB Error");
-  return await res.json();
+  return (await res.json()) as TmdbPaginatedResponse;
 }
 
 /**
  * Fallback: Direct Keyword Search
  * Used when AI is rate-limited. Searches Movies and TV.
  */
-export function formatBasicTmdbResult(item, mediaType) {
+export function formatBasicTmdbResult(
+  item: TmdbRawResult,
+  mediaType?: string
+): BasicTmdbResult | null {
   if (!item) return null;
 
   // Map genre_ids to strings immediately
@@ -98,17 +130,21 @@ export function formatBasicTmdbResult(item, mediaType) {
 
   return {
     id: item.id,
-    title: item.title || item.name,
-    release_date: item.release_date || item.first_air_date,
-    overview: item.overview,
-    poster_path: item.poster_path,
-    vote_average: item.vote_average,
-    media_type: mediaType || item.media_type || (item.title ? "movie" : "tv"),
+    title: item.title || item.name || "",
+    release_date: item.release_date || item.first_air_date || "",
+    overview: item.overview || "",
+    poster_path: item.poster_path || "",
+    vote_average: item.vote_average || 0,
+    media_type: (mediaType ||
+      item.media_type ||
+      (item.title ? "movie" : "tv")) as MediaType,
     genres: genres,
   };
 }
 
-export async function searchTmdbDirect(query) {
+export async function searchTmdbDirect(
+  query: string
+): Promise<BasicTmdbResult[]> {
   try {
     console.log(`[TMDB] Direct Search for: "${query}"`);
 
@@ -129,16 +165,16 @@ export async function searchTmdbDirect(query) {
     // Use Multi-Search to handle Actors + Titles + Keywords in one go
     const url = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(searchQuery)}&language=en-US&page=1`;
     const res = await fetch(url);
-    const data = await res.json();
+    const data = (await res.json()) as TmdbPaginatedResponse;
 
-    let combined = [];
+    let combined: TmdbRawResult[] = [];
     if (data.results && data.results.length > 0) {
       for (const item of data.results) {
         if (item.media_type === "movie" || item.media_type === "tv") {
           combined.push(item);
-        } else if (item.media_type === "person" && item.known_for) {
+        } else if (item.media_type === "person" && (item as any).known_for) {
           combined.push(
-            ...item.known_for.map((m) => ({
+            ...((item as any).known_for as any[]).map((m: any) => ({
               ...m,
               media_type: m.title ? "movie" : "tv",
             }))
@@ -164,13 +200,13 @@ export async function searchTmdbDirect(query) {
         );
         const actorUrl = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(names[0])}&language=en-US&page=1`;
         const actorRes = await fetch(actorUrl);
-        const actorData = await actorRes.json();
+        const actorData = (await actorRes.json()) as TmdbPaginatedResponse;
 
         if (actorData.results) {
           for (const item of actorData.results) {
-            if (item.media_type === "person" && item.known_for) {
+            if (item.media_type === "person" && (item as any).known_for) {
               combined.push(
-                ...item.known_for.map((m) => ({
+                ...((item as any).known_for as any[]).map((m: any) => ({
                   ...m,
                   media_type: m.title ? "movie" : "tv",
                 }))
@@ -192,14 +228,19 @@ export async function searchTmdbDirect(query) {
 
     return unique
       .slice(0, 10)
-      .map((item) => formatTmdbResult(item, item.media_type));
+      .map((item) => formatTmdbResult(item, item.media_type as MediaType))
+      .filter((item): item is BasicTmdbResult => item !== null);
   } catch (e) {
     console.error("Direct Search Failed:", e);
     return [];
   }
 }
 
-export async function getNativeTmdbRecommendations(title, year, mediaType) {
+export async function getNativeTmdbRecommendations(
+  title: string,
+  year: string | undefined,
+  mediaType: MediaType
+): Promise<BasicTmdbResult[]> {
   if (!title || !mediaType) return [];
   const cleanTitle = String(title)
     .replace(/\(\d{4}\)/g, "")
@@ -215,17 +256,21 @@ export async function getNativeTmdbRecommendations(title, year, mediaType) {
 
   try {
     const res = await fetch(url);
-    const data = await res.json();
+    const data = (await res.json()) as TmdbPaginatedResponse;
     if (!data.results || data.results.length === 0) return [];
     return data.results
       .slice(0, 10)
-      .map((item) => formatTmdbResult(item, mediaType));
+      .map((item) => formatTmdbResult(item, mediaType))
+      .filter((item): item is BasicTmdbResult => item !== null);
   } catch (e) {
     return [];
   }
 }
 
-export async function enrichWithDeepData(items, limit = 20) {
+export async function enrichWithDeepData(
+  items: BasicTmdbResult[],
+  limit: number = 20
+): Promise<EnrichedMedia[]> {
   if (!items || !Array.isArray(items)) return [];
 
   // Ensure we don't exceed array bounds
@@ -236,12 +281,12 @@ export async function enrichWithDeepData(items, limit = 20) {
 
   const enriched = await Promise.all(
     topItems.map(async (item) => {
-      const year = (item.release_date || item.first_air_date)?.split("-")[0];
-      const title = item.title || item.name;
-      const type = item.media_type || (item.title ? "movie" : "tv");
+      const year = item.release_date?.split("-")[0];
+      const title = item.title;
+      const type = item.media_type;
 
       const [ratings, details, providers] = await Promise.all([
-        fetchOmdbRatings(title, year, type),
+        fetchOmdbRatings(title, year),
         fetchTmdbDetails(item.id, type),
         fetchWatchProviders(item.id, type),
       ]);
@@ -249,8 +294,8 @@ export async function enrichWithDeepData(items, limit = 20) {
       return {
         ...item,
         media_type: type,
-        imdb_rating: ratings.imdb,
-        rotten_tomatoes: ratings.rotten,
+        imdb_rating: (ratings as any).imdb,
+        rotten_tomatoes: (ratings as any).rotten,
         director: details.director,
         cast: details.cast,
         genres: details.genres,
@@ -259,22 +304,25 @@ export async function enrichWithDeepData(items, limit = 20) {
     })
   );
 
-  return [...enriched, ...remaining];
+  return [...enriched, ...remaining] as EnrichedMedia[];
 }
 
-export async function fetchEnrichedData(title, year, preferredType) {
+export async function fetchEnrichedData(
+  title: string,
+  year: string | undefined,
+  preferredType: MediaType
+): Promise<EnrichedMedia | null> {
   if (!title) return null;
   const searchResult = await fetchTmdbRobust(title, year, preferredType);
   if (!searchResult) return null;
 
   const [details, omdbData, providers] = await Promise.all([
-    fetchTmdbDetails(searchResult.id, searchResult.media_type),
+    fetchTmdbDetails(searchResult.id, searchResult.media_type as MediaType),
     fetchOmdbRatings(
       searchResult.title,
-      searchResult.release_date?.split("-")[0] || year,
-      searchResult.media_type
+      searchResult.release_date?.split("-")[0] || year
     ),
-    fetchWatchProviders(searchResult.id, searchResult.media_type),
+    fetchWatchProviders(searchResult.id, searchResult.media_type as MediaType),
   ]);
 
   return {
@@ -282,13 +330,17 @@ export async function fetchEnrichedData(title, year, preferredType) {
     genres: details.genres,
     director: details.director,
     cast: details.cast,
-    imdb_rating: omdbData.imdb,
-    rotten_tomatoes: omdbData.rotten,
+    imdb_rating: (omdbData as any).imdb,
+    rotten_tomatoes: (omdbData as any).rotten,
     providers: providers,
-  };
+  } as EnrichedMedia;
 }
 
-async function fetchTmdbRobust(title, year, preferredType) {
+async function fetchTmdbRobust(
+  title: string,
+  year: string | undefined,
+  preferredType: MediaType
+): Promise<BasicTmdbResult | null> {
   if (!title) return null;
 
   // Aggressive cleaning: remove (YYYY), YYYY at end, "The movie X", "X movie"
@@ -301,12 +353,12 @@ async function fetchTmdbRobust(title, year, preferredType) {
 
   let result = await performTmdbSearch(cleanTitle, year, preferredType);
   if (result) return result;
-  const fallbackType = preferredType === "movie" ? "tv" : "movie";
+  const fallbackType: MediaType = preferredType === "movie" ? "tv" : "movie";
   return await performTmdbSearch(cleanTitle, year, fallbackType);
 }
 
 /** Levenshtein-distance based similarity, normalized to [0, 1] (1 = identical). Case/punctuation-insensitive. */
-function calculateSimilarity(str1, str2) {
+function calculateSimilarity(str1: string, str2: string): number {
   if (!str1 || !str2) return 0;
   const s1 = str1.toLowerCase().replace(/[^a-z0-9]/g, "");
   const s2 = str2.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -335,6 +387,10 @@ function calculateSimilarity(str1, str2) {
   return (maxLength - distance) / maxLength;
 }
 
+interface ScoredTmdbResult extends TmdbRawResult {
+  _similarityScore: number;
+}
+
 /**
  * Searches TMDB for a single best-matching title, with a multi-stage fallback
  * chain to handle misspellings/transliteration variance in AI-suggested or
@@ -349,14 +405,18 @@ function calculateSimilarity(str1, str2) {
  * Once a result set exists, ranking prefers (in order): exact title + year match,
  * exact title match (any year), year match only, then top-popularity fallback.
  */
-async function performTmdbSearch(queryTitle, year, mediaType) {
+async function performTmdbSearch(
+  queryTitle: string,
+  year: string | null | undefined,
+  mediaType: MediaType
+): Promise<BasicTmdbResult | null> {
   const endpoint = mediaType === "tv" ? "tv" : "movie";
   const baseUrl = `https://api.themoviedb.org/3/search/${endpoint}?api_key=${TMDB_API_KEY}&language=en-US&page=1`;
 
   try {
     let res = await fetch(`${baseUrl}&query=${encodeURIComponent(queryTitle)}`);
     if (!res.ok) return null;
-    let data = await res.json();
+    let data = (await res.json()) as TmdbPaginatedResponse;
 
     // Relaxed search if no results and query has multiple words
     if (
@@ -375,7 +435,8 @@ async function performTmdbSearch(queryTitle, year, mediaType) {
           `${baseUrl}&query=${encodeURIComponent(relaxedQuery)}`
         );
         if (relaxedRes.ok) {
-          const relaxedData = await relaxedRes.json();
+          const relaxedData =
+            (await relaxedRes.json()) as TmdbPaginatedResponse;
           if (relaxedData.results && relaxedData.results.length > 0) {
             data = relaxedData;
           }
@@ -386,7 +447,7 @@ async function performTmdbSearch(queryTitle, year, mediaType) {
         // e.g. "Ti Sadhya Kay Karte" → "Sadhya Kay Karte" → "Kay Karte"
         // This ensures we eventually skip past the misspelled word(s).
         if (!data.results || data.results.length === 0) {
-          let bestCandidates = null;
+          let bestCandidates: ScoredTmdbResult[] | null = null;
 
           for (let drop = 1; drop < words.length - 1; drop++) {
             const subQuery = words.slice(drop).join(" ");
@@ -400,19 +461,21 @@ async function performTmdbSearch(queryTitle, year, mediaType) {
             );
 
             if (subRes.ok) {
-              const subData = await subRes.json();
+              const subData = (await subRes.json()) as TmdbPaginatedResponse;
               if (subData.results && subData.results.length > 0) {
                 // Score every candidate against the original full query title
-                const candidates = subData.results.map((item) => {
-                  const t = item.title || item.name || "";
-                  const ot = item.original_title || item.original_name || "";
-                  const score1 = calculateSimilarity(queryTitle, t);
-                  const score2 = calculateSimilarity(queryTitle, ot);
-                  return {
-                    ...item,
-                    _similarityScore: Math.max(score1, score2),
-                  };
-                });
+                const candidates: ScoredTmdbResult[] = subData.results.map(
+                  (item) => {
+                    const t = item.title || item.name || "";
+                    const ot = item.original_title || item.original_name || "";
+                    const score1 = calculateSimilarity(queryTitle, t);
+                    const score2 = calculateSimilarity(queryTitle, ot);
+                    return {
+                      ...item,
+                      _similarityScore: Math.max(score1, score2),
+                    };
+                  }
+                );
 
                 candidates.sort(
                   (a, b) => b._similarityScore - a._similarityScore
@@ -448,7 +511,7 @@ async function performTmdbSearch(queryTitle, year, mediaType) {
     const normalizedQuery = queryTitle.toLowerCase().trim();
     const yearStr = year ? String(year) : null;
 
-    const exactTitle = (item) => {
+    const exactTitle = (item: TmdbRawResult) => {
       const t = (item.title || item.name || "").toLowerCase().trim();
       const ot = (item.original_title || item.original_name || "")
         .toLowerCase()
@@ -458,9 +521,9 @@ async function performTmdbSearch(queryTitle, year, mediaType) {
         console.log(`[TMDB] Title Match: "${t}" === "${normalizedQuery}"`);
       return match;
     };
-    const matchesYear = (item) => {
+    const matchesYear = (item: TmdbRawResult) => {
       const d = item.release_date || item.first_air_date;
-      const match = d && yearStr && d.startsWith(yearStr);
+      const match = !!(d && yearStr && d.startsWith(yearStr));
       if (match)
         console.log(`[TMDB] Year Match: "${d}" starts with "${yearStr}"`);
       return match;
@@ -494,43 +557,53 @@ async function performTmdbSearch(queryTitle, year, mediaType) {
   }
 }
 
-async function fetchTmdbDetails(id, mediaType) {
+async function fetchTmdbDetails(
+  id: number,
+  mediaType: MediaType
+): Promise<TmdbDetails> {
   const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
   try {
     const res = await fetch(url);
-    const data = await res.json();
+    const data = (await res.json()) as TmdbDetailResponse;
     const genres = data.genres
-      ? data.genres.map((g) => g.name).slice(0, 3)
+      ? data.genres.map((g: any) => g.name).slice(0, 3)
       : [];
     let director = "Unknown";
     if (mediaType === "movie") {
-      const d = data.credits?.crew?.find((p) => p.job === "Director");
+      const d = data.credits?.crew?.find((p: any) => p.job === "Director");
       if (d) director = d.name;
     } else {
-      if (data.created_by?.length > 0)
-        director = data.created_by.map((c) => c.name).join(", ");
+      if (data.created_by && data.created_by.length > 0)
+        director = data.created_by.map((c: any) => c.name).join(", ");
       else {
         const exec = data.credits?.crew?.find(
-          (p) => p.job === "Executive Producer"
+          (p: any) => p.job === "Executive Producer"
         );
         if (exec) director = exec.name;
       }
     }
-    const cast = data.credits?.cast?.slice(0, 3).map((c) => c.name) || [];
-    return { genres, director, cast };
+    const cast = data.credits?.cast?.slice(0, 3).map((c: any) => c.name) || [];
+    return { genres, director, cast } as TmdbDetails;
   } catch (e) {
-    return { genres: [], director: "Unknown", cast: [] };
+    return {
+      genres: [],
+      director: "Unknown",
+      cast: [],
+    } as unknown as TmdbDetails;
   }
 }
 
-export async function fetchWatchProviders(id, mediaType) {
+export async function fetchWatchProviders(
+  id: number,
+  mediaType: MediaType
+): Promise<WatchProvider[]> {
   const url = `https://api.themoviedb.org/3/${mediaType}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
   try {
     const res = await fetch(url);
-    const data = await res.json();
+    const data = (await res.json()) as TmdbWatchProvidersResponse;
     const countryData = data.results?.IN || data.results?.US;
     return (
-      countryData?.flatrate?.map((p) => ({
+      countryData?.flatrate?.map((p: any) => ({
         name: p.provider_name,
         logo: p.logo_path,
       })) || []
@@ -540,37 +613,43 @@ export async function fetchWatchProviders(id, mediaType) {
   }
 }
 
-export async function fetchOmdbRatings(title, year) {
+export async function fetchOmdbRatings(
+  title: string,
+  year: string | undefined
+): Promise<Ratings> {
   const url = `https://www.omdbapi.com/?t=${encodeURIComponent(title)}&y=${year}&apikey=${OMDB_API_KEY}`;
   const res = await fetch(url);
-  const data = await res.json();
+  const data = (await res.json()) as OmdbResponse;
 
-  let imdb = null;
-  let rt = null;
+  let imdb: string | null = null;
+  let rt: string | null = null;
 
   if (Array.isArray(data.Ratings)) {
     for (const r of data.Ratings) {
       if (r.Source === "Internet Movie Database") {
-        imdb = r.Value?.split("/")[0];
+        imdb = r.Value?.split("/")[0] || null;
       }
       if (r.Source === "Rotten Tomatoes") {
-        rt = r.Value?.replace("%", "");
+        rt = r.Value?.replace("%", "") || null;
       }
     }
   }
 
-  return { imdb, rt };
+  return { imdb, rt } as unknown as Ratings;
 }
 
-function formatTmdbResult(result, mediaType) {
+function formatTmdbResult(
+  result: TmdbRawResult,
+  mediaType: MediaType
+): BasicTmdbResult | null {
   if (!result) return null;
   return {
     id: result.id,
-    title: result.title || result.name,
-    release_date: result.release_date || result.first_air_date,
-    overview: result.overview,
-    poster_path: result.poster_path,
-    vote_average: result.vote_average,
+    title: result.title || result.name || "",
+    release_date: result.release_date || result.first_air_date || "",
+    overview: result.overview || "",
+    poster_path: result.poster_path || "",
+    vote_average: result.vote_average || 0,
     media_type: mediaType,
   };
 }

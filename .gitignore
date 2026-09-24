@@ -25,5 +25,4 @@ yarn-error.log*
 
 Prompt.txt
 .replit
-Plan.md
-ARCHITECTURE.md
+private/

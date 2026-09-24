@@ -1,4 +1,4 @@
-import fetch from "node-fetch";
+import fetch, { Response } from "node-fetch";
 import {
   GROQ_API_KEY,
   GROQ_API_URL,
@@ -8,20 +8,32 @@ import {
   TMDB_API_KEY,
 } from "../config.js";
 import { getLanguageCode, getGenreIds } from "../utils/languageMap.js";
+import type {
+  ChatMessage,
+  GroqChatOptions,
+  StructuredParams,
+  AiSuggestion,
+  GroqApiResponse,
+  GroqApiError,
+  MediaType,
+  WikiSearchResponse,
+  TmdbPaginatedResponse,
+} from "../types/index.js";
 
 // ─── Groq Request Helper (retry + backoff + fallback model) ────────────────
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Exponential backoff with jitter: ~500ms, ~1s, ~2s (+/- up to 100ms). */
-function backoffDelay(attempt) {
+function backoffDelay(attempt: number): number {
   const base = 500 * 2 ** (attempt - 1);
   const jitter = Math.random() * 100;
   return base + jitter;
 }
 
 /** Cheap non-cryptographic hash (djb2) used only to correlate log lines for the same query. */
-function hashString(str) {
+function hashString(str: string): string {
   let hash = 5381;
   for (let i = 0; i < str.length; i++) {
     hash = (hash * 33) ^ str.charCodeAt(i);
@@ -29,7 +41,7 @@ function hashString(str) {
   return (hash >>> 0).toString(16);
 }
 
-function logGroqCall(info) {
+function logGroqCall(info: Record<string, unknown>): void {
   console.log(`[Groq]`, JSON.stringify(info));
 }
 
@@ -43,12 +55,15 @@ function logGroqCall(info) {
  *   `GROQ_FALLBACK_MODEL` and retries there before giving up.
  * - Logs one structured line per attempt: { label, model, attempt, latencyMs, status, tokens, queryHash }.
  *
- * @param {Array<{role: string, content: string}>} messages
- * @param {{ temperature?: number, maxTokens?: number, responseFormat?: object|null, label?: string }} opts
- * @returns {Promise<string>} raw text content of the model's reply
- * @throws {Error} if every model/attempt combination fails
+ * @param messages
+ * @param opts
+ * @returns raw text content of the model's reply
+ * @throws if every model/attempt combination fails
  */
-async function groqChat(messages, opts = {}) {
+async function groqChat(
+  messages: ChatMessage[],
+  opts: GroqChatOptions = {}
+): Promise<string> {
   const {
     temperature = 0.1,
     maxTokens = 800,
@@ -60,14 +75,16 @@ async function groqChat(messages, opts = {}) {
     [...messages].reverse().find((m) => m.role === "user")?.content || "";
   const queryHash = hashString(lastUserMessage);
 
-  const models = [GROQ_MODEL, GROQ_FALLBACK_MODEL].filter(Boolean);
-  let lastError;
+  const models: string[] = [GROQ_MODEL, GROQ_FALLBACK_MODEL].filter(
+    Boolean
+  ) as string[];
+  let lastError: Error | undefined;
 
   for (const model of models) {
     for (let attempt = 1; attempt <= GROQ_MAX_RETRIES; attempt++) {
       const start = Date.now();
       try {
-        const body = {
+        const body: any = {
           model,
           messages,
           temperature,
@@ -110,7 +127,9 @@ async function groqChat(messages, opts = {}) {
         }
 
         if (!response.ok) {
-          const errorBody = await response.json().catch(() => ({}));
+          const errorBody = (await response
+            .json()
+            .catch(() => ({}))) as GroqApiError;
           const message =
             errorBody.error?.message || `Groq API error: ${response.status}`;
           logGroqCall({
@@ -132,7 +151,7 @@ async function groqChat(messages, opts = {}) {
           break; // move to fallback model
         }
 
-        const data = await response.json();
+        const data = (await response.json()) as GroqApiResponse;
         const usage = data.usage || {};
         logGroqCall({
           label,
@@ -151,7 +170,7 @@ async function groqChat(messages, opts = {}) {
           break;
         }
         return content;
-      } catch (e) {
+      } catch (e: any) {
         const latencyMs = Date.now() - start;
         logGroqCall({
           label,
@@ -179,7 +198,9 @@ async function groqChat(messages, opts = {}) {
  * Decomposes a user's natural-language description into structured fields
  * so downstream search can apply hard constraints (language, actor, genre, etc.)
  */
-export async function extractStructuredParams(query) {
+export async function extractStructuredParams(
+  query: string
+): Promise<StructuredParams> {
   const prompt = `You are a movie/TV query parser. Extract structured parameters from the user's description.
 
 Rules:
@@ -204,27 +225,29 @@ Query: "${query}"`;
       label: "extractStructuredParams",
     });
 
-    const parsed = JSON.parse(content.replace(/```json|```/g, "").trim());
+    const parsed = JSON.parse(
+      content.replace(/```json|```/g, "").trim()
+    ) as Record<string, unknown>;
     console.log(`[AI] Structured Params:`, JSON.stringify(parsed));
     return {
-      language: parsed.language || null,
+      language: (parsed.language as string) || null,
       genres: Array.isArray(parsed.genres) ? parsed.genres : [],
       actors: Array.isArray(parsed.actors) ? parsed.actors : [],
       directors: Array.isArray(parsed.directors) ? parsed.directors : [],
-      plot_keywords: parsed.plot_keywords || null,
+      plot_keywords: (parsed.plot_keywords as string) || null,
       media_types: Array.isArray(parsed.media_types)
-        ? parsed.media_types
-        : ["movie", "tv"],
-      era: parsed.era || null,
+        ? (parsed.media_types as MediaType[])
+        : (["movie", "tv"] as MediaType[]),
+      era: (parsed.era as string) || null,
       is_generic: !!parsed.is_generic,
     };
-  } catch (e) {
+  } catch (e: any) {
     console.warn("[AI] Structured param extraction failed:", e.message);
     return getDefaultParams();
   }
 }
 
-function getDefaultParams() {
+function getDefaultParams(): StructuredParams {
   return {
     language: null,
     genres: [],
@@ -239,14 +262,17 @@ function getDefaultParams() {
 
 // ─── Main AI Search (Single-Pass) ───────────────────────────────────────────
 
-export async function callGroqWithFallback(userQuery, structuredParams) {
+export async function callGroqWithFallback(
+  userQuery: string,
+  structuredParams: StructuredParams | null
+): Promise<AiSuggestion[]> {
   console.log(
     `[AI] Processing Single-Pass Search: "${userQuery.substring(0, 50)}..."`
   );
   try {
     const results = await makeGroqRequest(userQuery, structuredParams);
     return results || [];
-  } catch (e) {
+  } catch (e: any) {
     console.error("[AI] Single-Pass Request failed:", e.message);
     throw e;
   }
@@ -254,7 +280,7 @@ export async function callGroqWithFallback(userQuery, structuredParams) {
 
 // ─── Keyword Extraction (Fallback) ──────────────────────────────────────────
 
-export async function extractKeywords(query) {
+export async function extractKeywords(query: string): Promise<string> {
   const extractPrompt = `You are a search engine optimization expert.
     Task: Convert a user's movie description into 3-4 specific search terms for TMDB/Wikipedia.
     Focus on: Plot hooks, actors, and genre. Correct misspellings.
@@ -269,7 +295,7 @@ export async function extractKeywords(query) {
       label: "extractKeywords",
     });
     return content.trim() || query;
-  } catch (e) {
+  } catch (e: any) {
     console.warn(
       "[AI] Keyword extraction failed, falling back to raw query:",
       e.message
@@ -280,7 +306,7 @@ export async function extractKeywords(query) {
 
 // ─── DuckDuckGo Lite Search ─────────────────────────────────────────────────
 
-async function fetchDDGLite(query) {
+async function fetchDDGLite(query: string): Promise<string> {
   try {
     const res = await fetch("https://lite.duckduckgo.com/lite/", {
       method: "POST",
@@ -293,7 +319,7 @@ async function fetchDDGLite(query) {
     });
     const html = await res.text();
 
-    const results = [];
+    const results: string[] = [];
     const titleRegex = /class='result-link'>([^<]+)<\/a>/g;
     const snippetRegex = /class='result-snippet'>([\s\S]*?)<\/td>/g;
 
@@ -309,7 +335,7 @@ async function fetchDDGLite(query) {
       }
     }
     return results.slice(0, 3).join("\n");
-  } catch (e) {
+  } catch (e: any) {
     console.warn("[Search] DDG Lite fetch failed:", e.message);
     return "";
   }
@@ -317,12 +343,16 @@ async function fetchDDGLite(query) {
 
 // ─── TMDB Actor Filmography Fetch ───────────────────────────────────────────
 
-async function fetchActorFilmography(actorName, languageCode, mediaTypes) {
+async function fetchActorFilmography(
+  actorName: string,
+  languageCode: string | null,
+  mediaTypes: MediaType[]
+): Promise<string> {
   try {
     // Step 1: Find the actor on TMDB
     const searchUrl = `https://api.themoviedb.org/3/search/person?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(actorName)}&language=en-US&page=1`;
     const searchRes = await fetch(searchUrl);
-    const searchData = await searchRes.json();
+    const searchData = (await searchRes.json()) as any;
 
     const person = searchData.results?.[0];
     if (!person) return "";
@@ -333,14 +363,14 @@ async function fetchActorFilmography(actorName, languageCode, mediaTypes) {
     // Step 2: Get combined credits
     const creditsUrl = `https://api.themoviedb.org/3/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=en-US`;
     const creditsRes = await fetch(creditsUrl);
-    const creditsData = await creditsRes.json();
+    const creditsData = (await creditsRes.json()) as any;
 
     let castCredits = creditsData.cast || [];
 
     // Filter by language if specified
     if (languageCode) {
       const langFiltered = castCredits.filter(
-        (c) => c.original_language === languageCode
+        (c: any) => c.original_language === languageCode
       );
       // If language filter yields results, use them; otherwise keep all (AI will filter)
       if (langFiltered.length > 0) castCredits = langFiltered;
@@ -354,22 +384,26 @@ async function fetchActorFilmography(actorName, languageCode, mediaTypes) {
     ) {
       // no valid filter, keep all
     } else if (mediaTypes && mediaTypes.length === 1) {
-      castCredits = castCredits.filter((c) => c.media_type === mediaTypes[0]);
+      castCredits = castCredits.filter(
+        (c: any) => c.media_type === mediaTypes[0]
+      );
     }
 
     // Sort by popularity and take top entries
-    castCredits.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    castCredits.sort(
+      (a: any, b: any) => (b.popularity || 0) - (a.popularity || 0)
+    );
     const top = castCredits.slice(0, 15);
 
     return top
-      .map((c) => {
+      .map((c: any) => {
         const title = c.title || c.name;
         const year = (c.release_date || c.first_air_date || "").substring(0, 4);
         const overview = (c.overview || "").substring(0, 120);
         return `[Actor Filmography] ${title} (${year}) [${c.media_type}]: ${overview}`;
       })
       .join("\n");
-  } catch (e) {
+  } catch (e: any) {
     console.warn(
       `[Context] Actor filmography fetch failed for "${actorName}":`,
       e.message
@@ -381,10 +415,10 @@ async function fetchActorFilmography(actorName, languageCode, mediaTypes) {
 // ─── TMDB Language-Filtered Discover ────────────────────────────────────────
 
 async function fetchLanguageFilteredDiscover(
-  languageCode,
-  genreIds,
-  mediaType = "movie"
-) {
+  languageCode: string,
+  genreIds: number[],
+  mediaType: MediaType = "movie"
+): Promise<string> {
   try {
     const genreParam =
       genreIds.length > 0 ? `&with_genres=${genreIds.join(",")}` : "";
@@ -394,17 +428,17 @@ async function fetchLanguageFilteredDiscover(
       `[Context] Language-filtered discover: lang=${languageCode}, genres=${genreIds.join(",")}, type=${mediaType}`
     );
     const res = await fetch(url);
-    const data = await res.json();
+    const data = (await res.json()) as any;
 
     return (data.results || [])
       .slice(0, 5)
-      .map((r) => {
+      .map((r: any) => {
         const title = r.title || r.name;
         const year = (r.release_date || r.first_air_date || "").substring(0, 4);
         return `[TMDB Discover] ${title} (${year}): ${(r.overview || "").substring(0, 120)}`;
       })
       .join("\n");
-  } catch (e) {
+  } catch (e: any) {
     console.warn("[Context] Language-filtered discover failed:", e.message);
     return "";
   }
@@ -416,30 +450,18 @@ async function fetchLanguageFilteredDiscover(
  * Assembles grounding context for the main identification prompt (`makeGroqRequest`).
  * Fires several lookups in parallel and concatenates their text into one block that
  * gets injected into the system prompt as "REAL-WORLD DATABASE HINTS".
- *
- * Fetch order (indices matter for parsing below):
- *   0. Wikipedia search using structured keywords (language/actor/plot/genre distilled from `structuredParams`)
- *   1. TMDB multi-search using the same structured keywords
- *   2. DuckDuckGo Lite web search using the raw, unmodified user query (best for specific plot phrasing)
- *   3. A second Wikipedia search using the raw user query (broader net than #0)
- *   4+. Optional, appended conditionally:
- *        - actor filmography (if actors were extracted)
- *        - language-filtered TMDB discover, one call per media type (if a language was detected)
- *        - plot-specific TMDB search (if both plot keywords and a language are present)
- *
- * Results 0-3 are fixed-position fetch Responses; everything from index 4 onward is
- * either a pre-resolved string (filmography/discover helpers already return text) or
- * a fetch Response that still needs `.json()` (the plot-specific TMDB search) — see the
- * `additionalContext` loop below which branches on `typeof result`.
  */
-async function getStableContext(userQuery, structuredParams = null) {
+async function getStableContext(
+  userQuery: string,
+  structuredParams: StructuredParams | null = null
+): Promise<string> {
   try {
     const params = structuredParams || getDefaultParams();
-    const languageCode = getLanguageCode(params.language);
+    const languageCode = getLanguageCode(params.language || "");
     const genreIds = getGenreIds(params.genres);
 
     // Build a smarter keyword string from structured params
-    const keywordParts = [];
+    const keywordParts: string[] = [];
     if (params.language) keywordParts.push(params.language);
     if (params.actors.length > 0) keywordParts.push(params.actors[0]);
     if (params.plot_keywords) keywordParts.push(params.plot_keywords);
@@ -448,7 +470,7 @@ async function getStableContext(userQuery, structuredParams = null) {
       keywordParts.length > 0 ? keywordParts.join(" ") : userQuery;
 
     // Build parallel context fetches
-    const contextPromises = [
+    const contextPromises: Promise<Response | string>[] = [
       // Wiki search with structured keywords
       fetch(
         `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(keywords)}&format=json&origin=*&srlimit=3`
@@ -470,7 +492,7 @@ async function getStableContext(userQuery, structuredParams = null) {
       contextPromises.push(
         fetchActorFilmography(
           params.actors[0],
-          languageCode,
+          languageCode || null,
           params.media_types
         )
       );
@@ -494,25 +516,35 @@ async function getStableContext(userQuery, structuredParams = null) {
     const contextResults = await Promise.all(contextPromises);
 
     // Parse standard results
-    const wikiData = await contextResults[0].json();
-    const tmdbData = await contextResults[1].json();
-    const webRes = contextResults[2];
-    const wiki2Data = await contextResults[3].json();
+    const wikiData = (await (
+      contextResults[0] as Response
+    ).json()) as WikiSearchResponse;
+    const tmdbData = (await (
+      contextResults[1] as Response
+    ).json()) as TmdbPaginatedResponse;
+    const webRes = contextResults[2] as string;
+    const wiki2Data = (await (
+      contextResults[3] as Response
+    ).json()) as WikiSearchResponse;
 
     const wikiContext = (wikiData.query?.search || [])
-      .map((s) => `[Wiki] ${s.title}: ${s.snippet.replace(/<[^>]*>?/gm, "")}`)
+      .map(
+        (s: any) => `[Wiki] ${s.title}: ${s.snippet.replace(/<[^>]*>?/gm, "")}`
+      )
       .join("\n");
 
     // Second wiki search results (from raw user query)
     const wiki2Context = (wiki2Data.query?.search || [])
-      .map((s) => `[Wiki] ${s.title}: ${s.snippet.replace(/<[^>]*>?/gm, "")}`)
+      .map(
+        (s: any) => `[Wiki] ${s.title}: ${s.snippet.replace(/<[^>]*>?/gm, "")}`
+      )
       .join("\n");
 
     const tmdbContext = (tmdbData.results || [])
-      .filter((r) => r.media_type === "movie" || r.media_type === "tv")
+      .filter((r: any) => r.media_type === "movie" || r.media_type === "tv")
       .slice(0, 5)
       .map(
-        (r) =>
+        (r: any) =>
           `[TMDB Candidate] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}) [${r.media_type}]: ${r.overview}`
       )
       .join("\n");
@@ -523,15 +555,15 @@ async function getStableContext(userQuery, structuredParams = null) {
       const result = contextResults[i];
       if (typeof result === "string") {
         additionalContext += result + "\n";
-      } else if (result && typeof result.json === "function") {
+      } else if (result && typeof (result as Response).json === "function") {
         // This is a fetch Response (e.g. plot-specific TMDB search)
         try {
-          const plotData = await result.json();
+          const plotData = (await (result as Response).json()) as any;
           if (plotData.results) {
             const plotContext = plotData.results
               .slice(0, 5)
               .map(
-                (r) =>
+                (r: any) =>
                   `[TMDB Plot Match] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}): ${r.overview}`
               )
               .join("\n");
@@ -544,7 +576,7 @@ async function getStableContext(userQuery, structuredParams = null) {
     }
 
     return `--- REAL-WORLD DATABASE & WEB HINTS ---\n${webRes}\n${wikiContext}\n${wiki2Context}\n${tmdbContext}\n${additionalContext}`;
-  } catch (e) {
+  } catch (e: any) {
     console.error("[Search] Context fetch failed:", e.message);
     return "No external context available.";
   }
@@ -553,11 +585,16 @@ async function getStableContext(userQuery, structuredParams = null) {
 // ─── Find Similar (AI-Powered) ──────────────────────────────────────────────
 
 export async function callGroqSimilar(
-  title,
-  mediaType,
-  year,
-  enrichedData = {}
-) {
+  title: string,
+  mediaType: MediaType,
+  year: string | undefined,
+  enrichedData: {
+    genres?: string[];
+    overview?: string;
+    cast?: string[];
+    director?: string;
+  } = {}
+): Promise<AiSuggestion[]> {
   const {
     genres = [],
     overview = "",
@@ -587,7 +624,7 @@ export async function callGroqSimilar(
     5. JSON Array ONLY. No markdown, no commentary.
     Format: [{"title": "Title", "year": "YYYY", "media_type": "${mediaType}"}]`;
 
-  const messages = [
+  const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: `Find similar to ${title}` },
   ];
@@ -599,7 +636,7 @@ export async function callGroqSimilar(
       label: "callGroqSimilar",
     });
     return parseJsonSafe(content);
-  } catch (e) {
+  } catch (e: any) {
     console.error("[AI Similar] Error:", e.message);
     throw e;
   }
@@ -607,7 +644,10 @@ export async function callGroqSimilar(
 
 // ─── Core AI Identification Request ─────────────────────────────────────────
 
-async function makeGroqRequest(userQuery, structuredParams = null) {
+async function makeGroqRequest(
+  userQuery: string,
+  structuredParams: StructuredParams | null = null
+): Promise<AiSuggestion[]> {
   const params = structuredParams || getDefaultParams();
   const externalContext = await getStableContext(userQuery, params);
 
@@ -661,7 +701,7 @@ async function makeGroqRequest(userQuery, structuredParams = null) {
     Output Requirement: Provide a valid JSON object with a "results" key containing the array of matches. Do not include markdown wraps or extra commentary.
     Format: {"results": [{"title": "Exact Title", "year": "YYYY", "media_type": "movie or tv"}]}`;
 
-  const messages = [
+  const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
     {
       role: "user",
@@ -684,34 +724,25 @@ async function makeGroqRequest(userQuery, structuredParams = null) {
 
 /**
  * Extracts an array of result objects out of an LLM's raw text reply.
- *
- * The model is asked to return either a bare JSON array, or an object with a
- * single well-known array key (`results`, `movies`, or — defensively — any
- * single-key object whose value is an array, in case the model invents a
- * different key name). Anything else is treated as "no matches" rather than
- * an error, since a well-formed-but-empty response is a normal outcome.
- *
- * On a genuine parse failure, the raw payload is logged (truncated) so the
- * failure is debuggable — as opposed to silently returning `[]`, which made
- * "the model found nothing" and "the response was malformed" indistinguishable.
  */
-function parseJsonSafe(text) {
+function parseJsonSafe(text: string | null | undefined): AiSuggestion[] {
   if (!text) {
     console.warn("[AI] parseJsonSafe called with empty content");
     return [];
   }
   const cleaned = text.replace(/```json|```/g, "").trim();
   try {
-    const jsonParsed = JSON.parse(cleaned);
-    if (Array.isArray(jsonParsed)) return jsonParsed.slice(0, 5);
+    const jsonParsed = JSON.parse(cleaned) as any;
+    if (Array.isArray(jsonParsed))
+      return jsonParsed.slice(0, 5) as AiSuggestion[];
     if (jsonParsed.movies && Array.isArray(jsonParsed.movies))
-      return jsonParsed.movies.slice(0, 5);
+      return jsonParsed.movies.slice(0, 5) as AiSuggestion[];
     if (jsonParsed.results && Array.isArray(jsonParsed.results))
-      return jsonParsed.results.slice(0, 5);
+      return jsonParsed.results.slice(0, 5) as AiSuggestion[];
     if (typeof jsonParsed === "object") {
       const keys = Object.keys(jsonParsed);
       if (keys.length === 1 && Array.isArray(jsonParsed[keys[0]]))
-        return jsonParsed[keys[0]].slice(0, 5);
+        return jsonParsed[keys[0]].slice(0, 5) as AiSuggestion[];
     }
     // Valid JSON, but not a shape we recognize — treat as "no matches", not an error.
     console.warn(
@@ -719,7 +750,7 @@ function parseJsonSafe(text) {
       cleaned.substring(0, 200)
     );
     return [];
-  } catch (e) {
+  } catch (e: any) {
     console.warn(
       "[AI] parseJsonSafe: malformed JSON from model:",
       cleaned.substring(0, 200)

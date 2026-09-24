@@ -1,3 +1,4 @@
+import { Request, Response } from "express";
 import cache from "../utils/cache.js";
 import { TMDB_API_KEY, PROVIDERS } from "../config.js";
 import {
@@ -6,18 +7,25 @@ import {
   fetchEnrichedDataById,
   fetchRatings,
 } from "../services/tmdbService.js"; // Import formatter
+import { TrendingResponse, EnrichedMedia } from "../types/index.js";
 
-export const getTrendingAll = async (req, res) => {
-  const cached = cache.get("trending_all");
-  if (cached) return res.json(cached);
+export const getTrendingAll = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const cached = cache.get<TrendingResponse>("trending_all");
+  if (cached) {
+    res.json(cached);
+    return;
+  }
 
   try {
     const url = `https://api.themoviedb.org/3/trending/all/week?api_key=${TMDB_API_KEY}&language=en-US`;
     const data = await fetchTmdb(url);
 
-    const basicResults = data.results.map((item) =>
-      formatBasicTmdbResult(item)
-    );
+    const basicResults = data.results
+      .map((item) => formatBasicTmdbResult(item))
+      .filter((item): item is NonNullable<typeof item> => item !== null);
 
     const enrichedResults = await Promise.all(
       basicResults.slice(0, 12).map(async (item) => {
@@ -32,22 +40,30 @@ export const getTrendingAll = async (req, res) => {
           ...extra,
           imdb_rating: ratings.imdb ?? null,
           rotten_tomatoes: ratings.rt ?? null,
-        };
+        } as EnrichedMedia;
       })
     );
 
-    data.results = enrichedResults.filter(Boolean);
+    const response: TrendingResponse = {
+      results: enrichedResults.filter(Boolean) as EnrichedMedia[],
+    };
 
-    cache.set("trending_all", data, 21600);
-    res.json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    cache.set("trending_all", response, 21600);
+    res.json(response);
+  } catch (e: unknown) {
+    res.status(500).json({ error: (e as Error).message });
   }
 };
 
-export const getTrendingIndian = async (req, res) => {
-  const cached = cache.get("trending_indian");
-  if (cached) return res.json(cached);
+export const getTrendingIndian = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const cached = cache.get<TrendingResponse>("trending_indian");
+  if (cached) {
+    res.json(cached);
+    return;
+  }
   try {
     const movieUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&region=IN&sort_by=popularity.desc&with_original_language=hi|te|ta|ml`;
     const tvUrl = `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_API_KEY}&watch_region=IN&sort_by=popularity.desc&with_original_language=hi|te|ta|ml`;
@@ -61,7 +77,9 @@ export const getTrendingIndian = async (req, res) => {
         .slice(0, 10)
         .map((m) => formatBasicTmdbResult(m, "movie")),
       ...tv.results.slice(0, 10).map((t) => formatBasicTmdbResult(t, "tv")),
-    ].sort(() => Math.random() - 0.5);
+    ]
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort(() => Math.random() - 0.5);
 
     const enrichedResults = await Promise.all(
       basicResults.slice(0, 12).map(async (item) => {
@@ -76,35 +94,41 @@ export const getTrendingIndian = async (req, res) => {
           ...extra,
           imdb_rating: ratings.imdb ?? null,
           rotten_tomatoes: ratings.rt ?? null,
-        };
+        } as EnrichedMedia;
       })
     );
 
-    const finalResults = enrichedResults.filter(Boolean);
+    const finalResults = enrichedResults.filter(Boolean) as EnrichedMedia[];
 
-    const response = { results: finalResults };
+    const response: TrendingResponse = { results: finalResults };
 
     cache.set("trending_indian", response, 21600); // 6 hours
     res.json(response);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  } catch (e: unknown) {
+    res.status(500).json({ error: (e as Error).message });
   }
 };
 
-export const getTrendingPlatform = async (req, res) => {
+export const getTrendingPlatform = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   const { platform } = req.params;
-  const providerId = PROVIDERS[platform];
+  const providerId = PROVIDERS[platform as keyof typeof PROVIDERS];
   const cacheKey = `trending_${platform}`;
-  const cached = cache.get(cacheKey);
-  if (cached) return res.json(cached);
+  const cached = cache.get<TrendingResponse>(cacheKey);
+  if (cached) {
+    res.json(cached);
+    return;
+  }
 
   try {
     const url = `https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_API_KEY}&watch_region=IN&with_watch_providers=${providerId}&sort_by=popularity.desc`;
     const data = await fetchTmdb(url);
 
-    const basicResults = data.results.map((tv) =>
-      formatBasicTmdbResult(tv, "tv")
-    );
+    const basicResults = data.results
+      .map((tv) => formatBasicTmdbResult(tv, "tv"))
+      .filter((item): item is NonNullable<typeof item> => item !== null);
 
     const enrichedResults = await Promise.all(
       basicResults.slice(0, 12).map(async (item) => {
@@ -119,15 +143,17 @@ export const getTrendingPlatform = async (req, res) => {
           ...extra,
           imdb_rating: ratings.imdb ?? null,
           rotten_tomatoes: ratings.rt ?? null,
-        };
+        } as EnrichedMedia;
       })
     );
 
-    data.results = enrichedResults.filter(Boolean);
+    const response: TrendingResponse = {
+      results: enrichedResults.filter(Boolean) as EnrichedMedia[],
+    };
 
-    cache.set(cacheKey, data, 21600); // 6 hours
-    res.json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+    cache.set(cacheKey, response, 21600); // 6 hours
+    res.json(response);
+  } catch (e: unknown) {
+    res.status(500).json({ error: (e as Error).message });
   }
 };

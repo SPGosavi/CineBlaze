@@ -1,3 +1,4 @@
+import { Request, Response } from "express";
 import cache from "../utils/cache.js";
 import {
   callGroqWithFallback,
@@ -13,23 +14,41 @@ import {
   searchTmdbDirect,
   fetchWatchProviders,
 } from "../services/tmdbService.js";
+import {
+  MediaDetailsRequest,
+  FindMoviesRequest,
+  GetSimilarRequest,
+  MediaExtrasRequest,
+  AiSuggestion,
+  StructuredParams,
+  MoviesResponse,
+  SimilarResponse,
+  Providers,
+  EnrichedMedia,
+} from "../types/index.js";
 
-export const getMediaDetails = async (req, res) => {
-  const { id, title, year, media_type } = req.body;
+export const getMediaDetails = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { id, title, year, media_type } = req.body as MediaDetailsRequest;
 
   // Check cache for details to save API calls
   const cacheKey = id
     ? `details_${media_type}_${id}`
     : `details_${title}_${year}_${media_type}`;
   const cached = cache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) {
+    res.json(cached);
+    return;
+  }
 
   try {
     let data;
 
     if (id) {
       data = await fetchEnrichedDataById(id, media_type);
-    } else {
+    } else if (title) {
       data = await fetchEnrichedData(title, year, media_type);
     }
 
@@ -57,7 +76,7 @@ export const getMediaDetails = async (req, res) => {
  *  2. It's longer than 4 words — real movie/show titles are almost always short;
  *     anything longer is more likely a sentence describing the plot.
  */
-function isLikelyTitleQuery(query) {
+function isLikelyTitleQuery(query: string): boolean {
   if (!query) return false;
 
   const q = query.toLowerCase().trim();
@@ -106,7 +125,7 @@ function isLikelyTitleQuery(query) {
  *  - "shah rukh khan films"
  *  - "recent thriller movies"
  */
-function isGenericBrowsingQuery(query) {
+function isGenericBrowsingQuery(query: string): boolean {
   if (!query) return false;
   const q = query.toLowerCase().trim();
 
@@ -121,7 +140,7 @@ function isGenericBrowsingQuery(query) {
   if (genericSuffixPattern.test(q)) {
     // Check that the prefix part doesn't contain plot words
     const match = q.match(genericSuffixPattern);
-    const prefix = match[1];
+    const prefix = match![1];
     const plotWords = [
       "about",
       "where",
@@ -144,7 +163,7 @@ function isGenericBrowsingQuery(query) {
 
   if (genericPrefixPattern.test(q)) {
     const match = q.match(genericPrefixPattern);
-    const middle = match[2];
+    const middle = match![2];
     const plotWords = ["about", "where", "who", "story", "based on", "set in"];
     if (!plotWords.some((pw) => middle.includes(pw))) {
       console.log(
@@ -193,22 +212,28 @@ function isGenericBrowsingQuery(query) {
  * (1hr for direct-search fast paths, 5min for the short-query keyword fallback,
  * 24hr for a fully resolved AI result — the most expensive path to reproduce).
  */
-export const findMovies = async (req, res) => {
-  const { description } = req.body;
-  if (!description)
-    return res.status(400).json({ error: "Description required" });
+export const findMovies = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { description } = req.body as FindMoviesRequest;
+  if (!description) {
+    res.status(400).json({ error: "Description required" });
+    return;
+  }
 
   const cacheKey = `search_${description?.toLowerCase().trim()}`;
-  const cached = cache.get(cacheKey);
+  const cached = cache.get<MoviesResponse>(cacheKey);
   if (cached) {
     console.log(`[Cache] Hit: "${description.substring(0, 20)}..."`);
-    return res.json(cached);
+    res.json(cached);
+    return;
   }
 
   try {
     console.log(`[Search] Processing: "${description.substring(0, 50)}..."`);
 
-    let aiResults = [];
+    let aiResults: AiSuggestion[] = [];
     const isTitle = isLikelyTitleQuery(description);
     const isGeneric = isGenericBrowsingQuery(description);
 
@@ -220,10 +245,11 @@ export const findMovies = async (req, res) => {
 
       if (directResults.length > 0) {
         const enriched = await enrichWithDeepData(directResults);
-        const response = { movies: enriched };
+        const response: MoviesResponse = { movies: enriched };
 
         cache.set(cacheKey, response, 3600); // cache for 1 hour
-        return res.json(response);
+        res.json(response);
+        return;
       }
     }
 
@@ -237,30 +263,32 @@ export const findMovies = async (req, res) => {
 
       if (directResults.length > 0) {
         const enriched = await enrichWithDeepData(directResults);
-        const response = { movies: enriched };
+        const response: MoviesResponse = { movies: enriched };
 
         cache.set(cacheKey, response, 3600);
-        return res.json(response);
+        res.json(response);
+        return;
       }
       // If direct search fails for generic query, fall through to AI
     }
 
     // ─── AI Path: Extract structured params first ───────────────
-    let structuredParams = null;
+    let structuredParams: StructuredParams | null = null;
     try {
       structuredParams = await extractStructuredParams(description);
 
       // Double-check: if AI says it's generic but our regex missed it
-      if (structuredParams.is_generic && !structuredParams.plot_keywords) {
+      if (structuredParams?.is_generic && !structuredParams.plot_keywords) {
         console.log(
           "[Search] AI flagged query as generic. Using TMDB direct search."
         );
         const directResults = await searchTmdbDirect(description);
         if (directResults.length > 0) {
           const enriched = await enrichWithDeepData(directResults);
-          const response = { movies: enriched };
+          const response: MoviesResponse = { movies: enriched };
           cache.set(cacheKey, response, 3600);
-          return res.json(response);
+          res.json(response);
+          return;
         }
       }
     } catch (e) {
@@ -270,9 +298,12 @@ export const findMovies = async (req, res) => {
     }
 
     // ─── AI Search with structured context ──────────────────────
-    let aiKeywords = description;
+    let aiKeywords: string = description;
     try {
-      const aiData = await callGroqWithFallback(description, structuredParams);
+      const aiData: AiSuggestion[] | any = await callGroqWithFallback(
+        description,
+        structuredParams
+      );
       // Handle both old {results, keywords} and new [results] formats
       if (Array.isArray(aiData)) {
         aiResults = aiData;
@@ -281,12 +312,14 @@ export const findMovies = async (req, res) => {
         aiResults = aiData.results || [];
         aiKeywords = aiData.keywords || description;
       }
-    } catch (e) {
-      if (e.status === 429) {
-        return res.status(429).json({
+    } catch (e: unknown) {
+      const err = e as { status?: number; message?: string };
+      if (err.status === 429) {
+        res.status(429).json({
           error: "AI service rate limit exceeded. Please try again later.",
           status: 429,
         });
+        return;
       }
       console.warn("[Search] AI Service Failed. Switching to Fallback.");
     }
@@ -310,15 +343,17 @@ export const findMovies = async (req, res) => {
 
       if (directResults.length > 0) {
         const enriched = await enrichWithDeepData(directResults);
-        const response = { movies: enriched };
+        const response: MoviesResponse = { movies: enriched };
         cache.set(cacheKey, response, 300);
-        return res.json(response);
+        res.json(response);
+        return;
       }
     }
 
     // If it's a long description and AI returned nothing, we stop here rather than showing irrelevant TMDB results
     if (!aiResults || aiResults.length === 0) {
-      return res.json({ movies: [] });
+      res.json({ movies: [] });
+      return;
     }
 
     // 3. Normal AI Flow — resolve AI suggestions against TMDB
@@ -337,11 +372,15 @@ export const findMovies = async (req, res) => {
         console.log(
           `[Search] Fetching: "${item.title}" (${item.year}) [${effectiveType}]`
         );
-        return fetchEnrichedData(item.title, item.year, effectiveType);
+        return fetchEnrichedData(
+          item.title,
+          item.year?.toString() || "",
+          effectiveType
+        );
       })
     );
 
-    const foundMovies = results.filter(Boolean);
+    const foundMovies = results.filter(Boolean) as EnrichedMedia[];
 
     if (foundMovies.length === 0) {
       // If AI gave titles but TMDB found nothing, try Direct Search with keywords as last resort
@@ -350,10 +389,12 @@ export const findMovies = async (req, res) => {
       );
       const directResults = await searchTmdbDirect(aiKeywords);
       const enriched = await enrichWithDeepData(directResults);
-      return res.json({ movies: enriched });
+      res.json({ movies: enriched });
+      return;
     } else {
       cache.set(cacheKey, { movies: foundMovies }, 86400);
       res.json({ movies: foundMovies });
+      return;
     }
   } catch (error) {
     console.error("[Search Controller]", error);
@@ -372,14 +413,19 @@ export const findMovies = async (req, res) => {
  *    quality (no thematic reasoning, just TMDB's own similarity graph) but always
  *    available and doesn't depend on the LLM being up.
  */
-export const getSimilar = async (req, res) => {
+export const getSimilar = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   const { title, media_type, year, genres, overview, cast, director } =
-    req.body;
-  if (!title || !media_type)
-    return res.status(400).json({ error: "Title/Type required" });
+    req.body as GetSimilarRequest;
+  if (!title || !media_type) {
+    res.status(400).json({ error: "Title/Type required" });
+    return;
+  }
 
   try {
-    let finalResults = [];
+    let finalResults: EnrichedMedia[] = [];
 
     // 1. Try AI with enriched context
     try {
@@ -393,17 +439,23 @@ export const getSimilar = async (req, res) => {
       if (recommendations && recommendations.length > 0) {
         const enriched = await Promise.all(
           recommendations.map((item) =>
-            fetchEnrichedData(item.title, item.year, item.media_type)
+            fetchEnrichedData(
+              item.title,
+              item.year?.toString() || "",
+              item.media_type || media_type
+            )
           )
         );
-        finalResults = enriched.filter(Boolean);
+        finalResults = enriched.filter(Boolean) as EnrichedMedia[];
       }
-    } catch (e) {
-      if (e.status === 429) {
-        return res.status(429).json({
+    } catch (e: unknown) {
+      const err = e as { status?: number; message?: string };
+      if (err.status === 429) {
+        res.status(429).json({
           error: "AI service rate limit exceeded. Please try again later.",
           status: 429,
         });
+        return;
       }
       console.warn("[Similar] AI Service Failed. Falling back to native.");
     }
@@ -413,7 +465,7 @@ export const getSimilar = async (req, res) => {
       console.log(`[Similar] Fallback to Native for: ${title} (${media_type})`);
       const nativeRecs = await getNativeTmdbRecommendations(
         title,
-        year,
+        year || "",
         media_type
       );
       if (nativeRecs.length > 0) {
@@ -428,9 +480,15 @@ export const getSimilar = async (req, res) => {
   }
 };
 
-export const getMediaExtras = async (req, res) => {
-  const { id, media_type } = req.body;
-  if (!id || !media_type) return res.json({});
+export const getMediaExtras = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { id, media_type } = req.body as MediaExtrasRequest;
+  if (!id || !media_type) {
+    res.json({});
+    return;
+  }
 
   try {
     const providers = await fetchWatchProviders(id, media_type);
