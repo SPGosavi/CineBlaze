@@ -12,6 +12,8 @@
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
     "lint": "npm run lint --prefix frontend",
+    "typecheck": "npm run typecheck --prefix backend",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",
@@ -28,16 +30,5 @@
   "bugs": {
     "url": "https://github.com/SPGosavi/CineBlaze-movie-finder-web-app/issues"
   },
-  "homepage": "https://github.com/SPGosavi/CineBlaze-movie-finder-web-app#readme",
-  "lint-staged": {
-    "frontend/**/*.{js,jsx}": [
-      "eslint --fix --no-warn-ignored"
-    ],
-    "*.{js,jsx,ts,tsx}": [
-      "prettier --write"
-    ],
-    "*.{json,md,css}": [
-      "prettier --write"
-    ]
-  }
+  "homepage": "https://github.com/SPGosavi/CineBlaze-movie-finder-web-app#readme"
 }
