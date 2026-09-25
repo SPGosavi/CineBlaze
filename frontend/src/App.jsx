@@ -4,7 +4,7 @@ import api from './services/api';
 import { 
   Search, Film, Tv, List, Settings, User, 
   Plus, AlertTriangle, X, Zap, Trash2, Filter, 
-  ChevronLeft, ChevronRight, LogOut, Lock, Mail, 
+  LogOut, Lock, Mail, 
   ChevronDown, Check, Flame, MonitorPlay
 } from 'lucide-react';
 import { 
@@ -16,77 +16,19 @@ import {
   arrayUnion, arrayRemove, onSnapshot 
 } from 'firebase/firestore';
 import { auth, db, firebaseInitialized } from './services/firebase';
-
-// --- CONFIG ---
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
-const TMDB_LOGO_BASE_URL = 'https://image.tmdb.org/t/p/original';
-const PLACEHOLDER_IMAGE = 'https://placehold.co/500x750/171717/7f1d1d?text=No+Poster';
-
-// --- GLOBAL STYLES ---
-const GlobalStyles = () => (
-  <style>{`
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #0a0a0a; }
-    ::-webkit-scrollbar-thumb { background: #262626; border-radius: 4px; border: 1px solid #0a0a0a; }
-    ::-webkit-scrollbar-thumb:hover { background: #dc2626; }
-    * { scrollbar-width: thin; scrollbar-color: #262626 #0a0a0a; }
-    .scrollbar-hide::-webkit-scrollbar { display: none; }
-    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-  `}</style>
-);
-
-const sanitizeItem = (item) => {
-    if (!item) return null;
-    return {
-        ...item,
-        id: item.id,
-        // Backend guarantees strings, but safe fallback to []
-        genres: Array.isArray(item.genres) ? item.genres : [],
-        cast: Array.isArray(item.cast) ? item.cast : [],
-        providers: Array.isArray(item.providers) ? item.providers : [],
-        director: item.director || "Unknown",
-        release_date: item.release_date || item.first_air_date || "",
-        media_type: item.media_type || "movie",
-        title: item.title || item.name || "Untitled",
-        status: item.status || "want",
-        poster_path: item.poster_path || null,
-        vote_average: typeof item.vote_average === 'number' ? item.vote_average : 0,
-        imdb_rating: item.imdb_rating || null,
-        rotten_tomatoes: item.rotten_tomatoes || null,
-        addedAt: item.addedAt || 0
-    };
-};
+import {
+  API_BASE_URL,
+  TMDB_IMAGE_BASE_URL,
+  TMDB_LOGO_BASE_URL,
+  PLACEHOLDER_IMAGE,
+} from './constants';
+import { sanitizeItem } from './utils/sanitize';
+import GlobalStyles from './components/layout/GlobalStyles';
+import TrendingSkeleton from './components/ui/Skeleton';
+import Poster from './components/ui/Poster';
+import HorizontalScrollContainer from './components/ui/HorizontalScroll';
 
 // --- COMPONENTS ---
-
-const TrendingSkeleton = () => (
-  <div className="space-y-3">
-    <div className="flex items-center gap-2 px-1">
-      <div className="w-1 h-5 bg-red-600 rounded-full"></div>
-      <div className="h-5 w-40 bg-white/10 rounded animate-pulse"></div>
-    </div>
-
-    <div className="flex gap-4 overflow-hidden px-1">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          key={i}
-          className="min-w-[140px] md:min-w-[160px] h-[240px] bg-white/5 rounded-xl animate-pulse"
-        />
-      ))}
-    </div>
-  </div>
-);
-
-
-const Poster = ({ path, alt, className = "" }) => (
-  <img 
-    src={path ? `${TMDB_IMAGE_BASE_URL}${path}` : PLACEHOLDER_IMAGE} 
-    alt={alt || "Media Poster"}
-    className={`object-cover ${className}`}
-    onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMAGE; }}
-  />
-);
 
 const SimilarCard = ({ item, onClick }) => {
   const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL}${item.poster_path}` : PLACEHOLDER_IMAGE;
@@ -120,48 +62,6 @@ const SimilarCard = ({ item, onClick }) => {
       </div>
     </div>
   );
-};
-
-const HorizontalScrollContainer = ({ children, className = "" }) => {
-    const scrollRef = useRef(null);
-    const [showLeft, setShowLeft] = useState(false);
-    const [showRight, setShowRight] = useState(true);
-
-    const checkScroll = () => {
-        if (scrollRef.current) {
-            const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-            setShowLeft(scrollLeft > 0);
-            setShowRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth);
-        }
-    };
-
-    useEffect(() => {
-        checkScroll();
-        window.addEventListener('resize', checkScroll);
-        return () => window.removeEventListener('resize', checkScroll);
-    }, [children]);
-
-    const scroll = (direction) => {
-        if (scrollRef.current) {
-            const { clientWidth } = scrollRef.current;
-            const scrollAmount = direction === 'left' ? -clientWidth * 0.75 : clientWidth * 0.75;
-            scrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-        }
-    };
-
-    return (
-        <div className={`relative group/scroll ${className}`}>
-            <button onClick={() => scroll('left')} className={`absolute left-0 top-0 bottom-0 z-20 w-8 md:w-12 bg-gradient-to-r from-black via-black/70 to-transparent flex items-center justify-center transition-opacity duration-300 ${showLeft ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                <ChevronLeft size={32} className="text-white drop-shadow-lg hover:text-red-500 transition-colors" />
-            </button>
-            <div ref={scrollRef} onScroll={checkScroll} className="flex overflow-x-auto gap-4 pb-4 scroll-smooth scrollbar-hide">
-                {children}
-            </div>
-            <button onClick={() => scroll('right')} className={`absolute right-0 top-0 bottom-0 z-20 w-8 md:w-12 bg-gradient-to-l from-black via-black/70 to-transparent flex items-center justify-center transition-opacity duration-300 ${showRight ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                <ChevronRight size={32} className="text-white drop-shadow-lg hover:text-red-500 transition-colors" />
-            </button>
-        </div>
-    );
 };
 
 // --- BLENDED GENRE DROPDOWN ---
