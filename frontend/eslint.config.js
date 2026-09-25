@@ -29,6 +29,10 @@ export default defineConfig([
       // component received as a prop (e.g. `{ icon: Icon }` rendered as
       // `<Icon />`) is reported as unused. This rule marks them as used.
       "react/jsx-uses-vars": "error",
+      // Core no-undef does not check JSX element names, so a component used as
+      // `<Foo />` without an import builds cleanly and only fails at runtime.
+      // Essential while components are being extracted out of App.jsx.
+      "react/jsx-no-undef": "error",
       "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
     },
   },

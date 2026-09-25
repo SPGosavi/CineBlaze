@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import api from './services/api';
 
 import { 
   Search, Film, Tv, List, Settings, User, 
   Plus, AlertTriangle, X, Zap, Trash2, Filter, 
   LogOut, Lock, Mail, 
-  ChevronDown, Check, Flame, MonitorPlay
+  Flame, MonitorPlay
 } from 'lucide-react';
 import { 
   signInAnonymously, signInWithEmailAndPassword, 
@@ -16,296 +16,20 @@ import {
   arrayUnion, arrayRemove, onSnapshot 
 } from 'firebase/firestore';
 import { auth, db, firebaseInitialized } from './services/firebase';
-import {
-  API_BASE_URL,
-  TMDB_IMAGE_BASE_URL,
-  TMDB_LOGO_BASE_URL,
-  PLACEHOLDER_IMAGE,
-} from './constants';
+import { API_BASE_URL, TMDB_LOGO_BASE_URL } from './constants';
 import { sanitizeItem } from './utils/sanitize';
 import GlobalStyles from './components/layout/GlobalStyles';
+import NavButton from './components/layout/NavButton';
 import TrendingSkeleton from './components/ui/Skeleton';
 import Poster from './components/ui/Poster';
 import HorizontalScrollContainer from './components/ui/HorizontalScroll';
+import MediaCard from './components/media/MediaCard';
+import SimilarCard from './components/media/SimilarCard';
+import GenreFilter from './components/watchlist/GenreFilter';
+import KanbanColumn from './components/watchlist/KanbanColumn';
+import TrendingRow from './components/trending/TrendingRow';
 
 // --- COMPONENTS ---
-
-const SimilarCard = ({ item, onClick }) => {
-  const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL}${item.poster_path}` : PLACEHOLDER_IMAGE;
-  const year = (item.release_date || item.first_air_date)?.split('-')[0] || 'N/A';
-
-  return (
-    <div 
-        onClick={() => onClick(item)}
-        className="min-w-[120px] w-[120px] bg-neutral-800 rounded-lg overflow-hidden shadow-md hover:scale-105 transition-transform cursor-pointer border border-neutral-700 flex-shrink-0 group"
-    >
-      <div className="relative h-40">
-        <img src={posterUrl} alt={item.title} className="w-full h-full object-cover" onError={(e) => { e.target.onerror = null; e.target.src = PLACEHOLDER_IMAGE; }} />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
-      </div>
-      <div className="p-2 border-t border-neutral-700 space-y-1">
-        <h4 className="text-xs font-bold text-gray-200 truncate">{item.title}</h4>
-        <p className="text-[10px] text-orange-500 font-medium">{year}</p>
-
-        <div className="flex gap-2">
-          {item.imdb_rating && (
-            <span className="text-[9px] font-bold text-yellow-500">
-              IMDb {item.imdb_rating}
-            </span>
-          )}
-          {item.rotten_tomatoes && (
-            <span className="text-[9px] font-bold text-red-400">
-              RT {item.rotten_tomatoes}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- BLENDED GENRE DROPDOWN ---
-const GenreFilter = ({ genres, selected, onChange }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const dropdownRef = useRef(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setIsOpen(false);
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    return (
-        <div className="relative z-[60]" ref={dropdownRef}>
-            <button 
-                onClick={() => setIsOpen(!isOpen)}
-                className={`
-                    flex items-center gap-2 px-4 py-2 rounded-xl transition-all shadow-sm text-sm font-medium min-w-[140px] justify-between group
-                    ${isOpen ? 'bg-neutral-800 text-white ring-1 ring-white/10' : 'bg-transparent text-gray-300 hover:text-white hover:bg-white/5'}
-                `}
-            >
-                <div className="flex items-center gap-2">
-                    <Filter size={14} className={selected === 'All' ? 'text-gray-500' : 'text-orange-500'} />
-                    <span>{selected}</span>
-                </div>
-                <ChevronDown size={14} className={`text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {isOpen && (
-                <div className="absolute left-0 top-full md:top-full mt-2 w-56 max-h-[60vh] overflow-y-auto bg-neutral-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-fade-in z-[9999]">
-                    <div className="max-h-64 overflow-y-auto scrollbar-thin p-1.5 space-y-0.5">
-                        {genres.map((genre) => (
-                            <button
-                                key={genre}
-                                onClick={() => { onChange(genre); setIsOpen(false); }}
-                                className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-all flex items-center justify-between ${
-                                    selected === genre 
-                                        ? 'bg-gradient-to-r from-red-600/20 to-orange-600/20 text-white font-semibold' 
-                                        : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
-                                }`}
-                            >
-                                {genre}
-                                {selected === genre && <Check size={14} className="text-orange-500" />}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-const MediaCard = ({ item, onAddToWatchlist, onExpand }) => {
-  if (!item) return null;
-  const safeItem = sanitizeItem(item);
-  const year = safeItem.release_date.split('-')[0] || 'N/A';
-  const isTv = safeItem.media_type === 'tv';
-  const typeName = isTv ? 'TV' : 'MOVIE';
-  const typeBadgeColor = isTv ? 'bg-orange-600' : 'bg-red-600';
-  
-  const imdbRating = safeItem.imdb_rating && safeItem.imdb_rating !== 'N/A' ? safeItem.imdb_rating : null;
-  const rtRating = safeItem.rotten_tomatoes && safeItem.rotten_tomatoes !== 'N/A' ? safeItem.rotten_tomatoes : null;
-
-  return (
-    <div 
-      className="bg-neutral-800 rounded-xl overflow-hidden shadow-lg border border-neutral-700/50 active:scale-95 md:hover:scale-[1.02] hover:border-red-500/30 transition-all duration-200 flex flex-col h-full cursor-pointer group"
-      onClick={() => onExpand(safeItem)}
-    >
-      <div className="relative aspect-[2/3] overflow-hidden">
-        <Poster path={safeItem.poster_path} alt={safeItem.title} className="w-full h-full transition-transform duration-500 group-hover:scale-105" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60"></div>
-        <span className={`absolute top-2 left-2 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-sm text-white tracking-wider ${typeBadgeColor}`}>
-          {typeName}
-        </span>
-        <button 
-          onClick={(e) => { e.stopPropagation(); onAddToWatchlist(safeItem); }}
-          className="absolute top-2 right-2 p-2 bg-red-600 hover:bg-red-500 rounded-full text-white transition-all shadow-lg shadow-red-900/20 md:opacity-0 group-hover:opacity-100 opacity-100 transform translate-y-0 group-hover:translate-y-0"
-          title="Add to Watchlist"
-        >
-          <Plus size={16} strokeWidth={3} />
-        </button>
-      </div>
-      <div className="p-3 flex flex-col flex-grow bg-neutral-800 relative z-10">
-        <h3 className="font-bold text-gray-100 leading-tight mb-1 line-clamp-1 group-hover:text-red-400 transition-colors" title={safeItem.title}>{safeItem.title}</h3>
-        <div className="flex justify-between items-center text-xs text-gray-400 mb-2">
-          <span className="font-mono text-gray-500">{year}</span>
-          {safeItem.director && safeItem.director !== "Unknown" && <span className="truncate max-w-[80px] md:max-w-[100px] text-gray-500" title={safeItem.director}>{safeItem.director}</span>}
-        </div>
-        
-        <div className="flex flex-wrap gap-1 mb-2 min-h-[20px]">
-            {safeItem.genres.slice(0,2).map((g, i) => (
-                <span key={i} className="text-[9px] uppercase tracking-wider font-semibold text-gray-400 border border-neutral-600 px-1.5 py-0.5 rounded-sm">
-                    {g}
-                </span>
-            ))}
-        </div>
-
-        <div className="mt-auto pt-2 flex gap-2 border-t border-neutral-700/50">
-            {imdbRating ? (
-                <span className="text-[10px] font-bold text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">IMDb {imdbRating}</span>
-            ) : <span className="text-[10px] text-gray-600">No Rating</span>}
-            
-            {rtRating && (
-                <span className="text-[10px] font-bold text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded border border-red-400/20">RT {rtRating}</span>
-            )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const WatchlistCard = ({ item, onDragStart, onDropItem, onExpand }) => {
-    const [isOver, setIsOver] = useState(false);
-    const [isDragging, setIsDragging] = useState(false);
-
-    if (!item || !item.id) return null;
-    const safeItem = sanitizeItem(item);
-
-    const handleDragStart = (e) => {
-        e.dataTransfer.setData("text/plain", safeItem.id);
-        e.dataTransfer.effectAllowed = "move";
-        setIsDragging(true);
-        onDragStart(e, safeItem.id);
-    };
-
-    const handleDragEnd = () => {
-        setIsDragging(false);
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault();
-        setIsOver(true);
-    };
-
-    const handleDragLeave = () => {
-        setIsOver(false);
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsOver(false);
-        onDropItem(safeItem.id); 
-    };
-
-    const year = safeItem.release_date.split('-')[0] || "N/A";
-
-    return (
-        <div 
-          draggable 
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => onExpand(safeItem)}
-          className={`
-            bg-neutral-800 p-2.5 rounded-xl mb-3 cursor-grab active:cursor-grabbing 
-            flex gap-3 hover:bg-neutral-750 transition-all shadow-sm border 
-            ${isOver ? 'border-blue-500 scale-[1.02] ring-2 ring-blue-500/20 z-10' : 'border-neutral-700 hover:border-red-500/30'}
-            ${isDragging ? 'opacity-50 border-dashed border-gray-500' : 'opacity-100'}
-            group touch-manipulation relative
-          `}
-        >
-          <Poster path={safeItem.poster_path} alt={safeItem.title} className="w-14 h-20 rounded-lg object-cover flex-shrink-0 shadow-md" />
-          <div className="flex flex-col justify-center overflow-hidden flex-1 min-w-0">
-            <h4 className="font-bold text-gray-200 text-sm truncate leading-snug group-hover:text-red-400 transition-colors">{safeItem.title || "Untitled"}</h4>
-            <span className="text-xs text-orange-500 font-medium mb-1.5">{year}</span>
-            <div className="flex flex-wrap gap-1">
-                {Array.isArray(safeItem.genres) && safeItem.genres.length > 0 ? (
-                    safeItem.genres.slice(0, 2).map((g, i) => (
-                        <span key={i} className="text-[8px] bg-neutral-900 text-gray-500 px-1.5 py-0.5 rounded border border-neutral-800 uppercase tracking-wide">
-                            {typeof g === 'object' ? g.name : g}
-                        </span>
-                    ))
-                ) : (
-                    <span className="text-[8px] text-gray-600">No Genre</span>
-                )}
-            </div>
-          </div>
-        </div>
-    );
-};
-
-const Column = ({ title, status, items, onDropColumn, onDragOver, onDragStart, onDropItem, onExpand }) => (
-    <div 
-        className="flex-1 bg-neutral-900/50 rounded-xl p-4 min-w-full md:min-w-[280px] flex flex-col border border-neutral-800/50 md:h-full h-auto" 
-        onDragOver={onDragOver} 
-        onDrop={(e) => onDropColumn(e, status)}
-    >
-      <h3 className="font-bold text-gray-400 mb-4 flex items-center justify-between uppercase tracking-wider text-xs sticky top-0 bg-neutral-900/90 p-2 rounded-lg backdrop-blur-sm z-10 border-b border-neutral-800">
-          {title} 
-          <span className="bg-red-600 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">{items.length}</span>
-      </h3>
-      <div className="flex-1 md:overflow-y-auto md:min-h-[200px] scrollbar-thin pr-1 pb-4">
-        {items.map((item, index) => (
-            <WatchlistCard 
-                key={`${item?.id || 'missing-' + index}`} 
-                item={item} 
-                onDragStart={onDragStart} 
-                onDropItem={onDropItem} 
-                onExpand={onExpand} 
-            />
-        ))}
-        {items.length === 0 && <div className="h-24 md:h-32 flex items-center justify-center border-2 border-dashed border-neutral-800 rounded-xl text-neutral-600 text-sm bg-neutral-900/30">Drag & Drop Here</div>}
-      </div>
-    </div>
-);
-
-const TrendingRow = ({ title, items, onAdd, onExpand }) => (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 px-1">
-          <div className="w-1 h-5 bg-red-600 rounded-full"></div>
-          <h2 className="text-lg font-bold text-gray-200">{title}</h2>
-      </div>
-      <HorizontalScrollContainer>
-        {items.map(item => {
-            const safeItem = sanitizeItem(item);
-            const imdbRating = safeItem.imdb_rating && safeItem.imdb_rating !== 'N/A' ? safeItem.imdb_rating : null;
-            const rtRating = safeItem.rotten_tomatoes && safeItem.rotten_tomatoes !== 'N/A' ? safeItem.rotten_tomatoes : null;
-            return (
-              <div key={item.id} className="min-w-[140px] md:min-w-[160px] w-[140px] md:w-[160px] flex-shrink-0 relative group cursor-pointer" onClick={() => onExpand(safeItem)}>
-                <div className="relative aspect-[2/3] mb-2 rounded-lg overflow-hidden shadow-lg">
-                    <Poster path={safeItem.poster_path} alt={safeItem.title} className="w-full h-full hover:scale-110 transition-transform duration-500" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-4">
-                        <button onClick={(e) => { e.stopPropagation(); onAdd(safeItem); }} className="bg-red-600 p-2 rounded-full text-white hover:bg-red-500 transform hover:scale-110 transition-all shadow-xl">
-                          <Plus size={20} />
-                        </button>
-                    </div>
-                </div>
-                <p className="text-sm font-bold text-gray-300 truncate group-hover:text-red-500 transition-colors">{safeItem.title}</p>
-                <div className="flex gap-2 mt-1 h-4">
-                    {imdbRating && <span className="text-[9px] font-bold text-yellow-500 border border-yellow-500/20 px-1 rounded bg-yellow-500/5">IMDb {imdbRating}</span>}
-                    {rtRating && <span className="text-[9px] font-bold text-red-400 border border-red-400/20 px-1 rounded bg-red-400/5">RT {rtRating}</span>}
-                </div>
-              </div>
-            );
-        })}
-      </HorizontalScrollContainer>
-    </div>
-);
 
 const MovieDetailsModal = ({ item, onClose, onAddToWatchlist, onRemoveFromWatchlist, isInWatchlist, onExpand }) => {
   const [detailedItem, setDetailedItem] = useState(item);
@@ -530,7 +254,7 @@ const LoginView = ({ onLogin, onGuest, loading, error }) => {
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Password</label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-3.5 text-gray-500" size={18} />
-                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/50 text-white pl-10 p-3 rounded-xl border border-neutral-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-all placeholder-gray-600" placeholder="••••••••" required />
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/50 text-white pl-10 p-3 rounded-xl border border-neutral-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-all placeholder-gray-600" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -546,13 +270,6 @@ const LoginView = ({ onLogin, onGuest, loading, error }) => {
         </div>
     );
 };
-
-const NavButton = ({ icon: Icon, label, active, onClick }) => (
-  <button onClick={onClick} className={`w-full flex md:justify-start justify-center flex-col md:flex-row items-center gap-1 md:gap-3 px-2 md:px-4 py-2 md:py-3 rounded-xl transition-all duration-200 font-medium ${active ? 'md:bg-red-600/10 md:text-red-500 md:border md:border-red-600/20 text-red-500' : 'text-gray-500 hover:text-gray-200 hover:bg-white/5'}`}>
-    <Icon size={24} className="md:w-5 md:h-5" strokeWidth={active ? 2.5 : 2} />
-    <span className="text-[10px] md:text-sm">{label}</span>
-  </button>
-);
 
 const DiscoverView = ({ searchQuery, setSearchQuery, handleSearch, isSearching, searchResults, trendingAll, trendingNetflix, trendingPrime, loadingTrending, loadingNetflix, loadingPrime, onAddToWatchlist, clearResults, onExpand, searchError }) => (
     <div className="space-y-10 animate-fade-in pb-24 md:pb-10">
@@ -678,7 +395,7 @@ const WatchlistView = ({ watchlist, watchlistType, setWatchlistType, onDrop, onD
 
         <div className="flex-1 flex flex-col md:flex-row gap-6 overflow-hidden">
           {watchlistType === 'tv' && (
-            <Column 
+            <KanbanColumn 
                 title="Watching Now" 
                 status="watching" 
                 items={watching} 
@@ -689,7 +406,7 @@ const WatchlistView = ({ watchlist, watchlistType, setWatchlistType, onDrop, onD
                 onDropItem={onReorder} 
             />
           )}
-          <Column 
+          <KanbanColumn 
               title="Want to Watch" 
               status="want" 
               items={want} 
@@ -699,7 +416,7 @@ const WatchlistView = ({ watchlist, watchlistType, setWatchlistType, onDrop, onD
               onExpand={onExpand} 
               onDropItem={onReorder} 
           />
-          <Column 
+          <KanbanColumn 
               title="Watched" 
               status="watched" 
               items={watched} 
