@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import api from "../services/api";
 
 /** Tags results so downstream code can tell trending items from search hits. */
@@ -40,12 +40,22 @@ export const useTrending = () => {
       .finally(() => setLoadingPrime(false));
   }, []);
 
-  return {
-    trendingAll,
-    trendingNetflix,
-    trendingPrime,
-    loadingTrending,
-    loadingNetflix,
-    loadingPrime,
-  };
+  return useMemo(
+    () => ({
+      trendingAll,
+      trendingNetflix,
+      trendingPrime,
+      loadingTrending,
+      loadingNetflix,
+      loadingPrime,
+    }),
+    [
+      trendingAll,
+      trendingNetflix,
+      trendingPrime,
+      loadingTrending,
+      loadingNetflix,
+      loadingPrime,
+    ]
+  );
 };

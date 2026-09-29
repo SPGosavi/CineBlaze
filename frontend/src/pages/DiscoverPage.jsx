@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { Search, AlertTriangle, Zap } from "lucide-react";
 import { useTrending } from "../hooks/useTrending";
 import { useSearchContext } from "../contexts/SearchContext";
@@ -30,7 +31,12 @@ const DiscoverPage = () => {
   const { addToWatchlist } = useWatchlistContext();
   const { openMedia } = useModalContext();
 
-  const onAddToWatchlist = (item) => addToWatchlist(item, "want");
+  // Stable identity, otherwise the memoised cards re-render on every
+  // keystroke in the search box.
+  const onAddToWatchlist = useCallback(
+    (item) => addToWatchlist(item, "want"),
+    [addToWatchlist]
+  );
 
   return (
     <div className="space-y-10 animate-fade-in pb-24 md:pb-10">

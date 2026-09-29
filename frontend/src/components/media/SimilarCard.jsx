@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_IMAGE } from "../../constants";
 
 /** Compact poster card used in the "similar titles" row inside the details modal. */
@@ -49,4 +50,4 @@ const SimilarCard = ({ item, onClick }) => {
   );
 };
 
-export default SimilarCard;
+export default memo(SimilarCard);

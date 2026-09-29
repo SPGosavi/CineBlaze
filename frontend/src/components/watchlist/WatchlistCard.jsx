@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import Poster from "../ui/Poster";
 import { sanitizeItem } from "../../utils/sanitize";
 
@@ -87,4 +87,4 @@ const WatchlistCard = ({ item, onDragStart, onDropItem, onExpand }) => {
   );
 };
 
-export default WatchlistCard;
+export default memo(WatchlistCard);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   doc,
   setDoc,
@@ -24,6 +24,10 @@ const watchlistDocRef = (uid) =>
  * Status changes and reordering write optimistically to local state before
  * hitting Firestore, so the drag interaction stays responsive. The snapshot
  * listener then reconciles with the server copy.
+ *
+ * Every handler is wrapped in useCallback and the returned object in
+ * useMemo, so the memoised cards downstream are not re-rendered by new
+ * function identities on each render.
  */
 export const useWatchlist = (user) => {
   const [watchlist, setWatchlist] = useState([]);
@@ -46,96 +50,125 @@ export const useWatchlist = (user) => {
     return () => unsubscribe();
   }, [user]);
 
-  const addToWatchlist = async (item, status = "want") => {
-    if (!firebaseInitialized || !user) return;
-    const newItem = {
-      id: item.id,
-      title: item.title || item.name,
-      poster_path: item.poster_path,
-      release_date: item.release_date || item.first_air_date,
-      media_type: item.media_type,
-      status: status,
-      genres: item.genres || [],
-      director: item.director || "Unknown",
-      cast: item.cast || [],
-      overview: item.overview || "",
-      vote_average: item.vote_average || 0,
-      imdb_rating: item.imdb_rating || null,
-      rotten_tomatoes: item.rotten_tomatoes || null,
-      providers: item.providers || [],
-      addedAt: Date.now(),
-    };
-    if (watchlist.some((i) => i.id === newItem.id)) return;
-    const userRef = watchlistDocRef(user.uid);
-    try {
-      await setDoc(userRef, { items: arrayUnion(newItem) }, { merge: true });
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  const addToWatchlist = useCallback(
+    async (item, status = "want") => {
+      if (!firebaseInitialized || !user) return;
+      const newItem = {
+        id: item.id,
+        title: item.title || item.name,
+        poster_path: item.poster_path,
+        release_date: item.release_date || item.first_air_date,
+        media_type: item.media_type,
+        status: status,
+        genres: item.genres || [],
+        director: item.director || "Unknown",
+        cast: item.cast || [],
+        overview: item.overview || "",
+        vote_average: item.vote_average || 0,
+        imdb_rating: item.imdb_rating || null,
+        rotten_tomatoes: item.rotten_tomatoes || null,
+        providers: item.providers || [],
+        addedAt: Date.now(),
+      };
+      if (watchlist.some((i) => i.id === newItem.id)) return;
+      const userRef = watchlistDocRef(user.uid);
+      try {
+        await setDoc(userRef, { items: arrayUnion(newItem) }, { merge: true });
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    [user, watchlist]
+  );
 
-  const removeFromWatchlist = async (itemId) => {
-    if (!firebaseInitialized || !user) return;
-    const item = watchlist.find((i) => i.id === itemId);
-    if (!item) return;
-    const userRef = watchlistDocRef(user.uid);
-    await updateDoc(userRef, { items: arrayRemove(item) });
-  };
+  const removeFromWatchlist = useCallback(
+    async (itemId) => {
+      if (!firebaseInitialized || !user) return;
+      const item = watchlist.find((i) => i.id === itemId);
+      if (!item) return;
+      const userRef = watchlistDocRef(user.uid);
+      await updateDoc(userRef, { items: arrayRemove(item) });
+    },
+    [user, watchlist]
+  );
 
-  const updateWatchlistStatus = async (id, status) => {
-    if (!firebaseInitialized || !user) return;
-    const updated = watchlist.map((i) => (i.id === id ? { ...i, status } : i));
-    setWatchlist(updated);
-    const userRef = watchlistDocRef(user.uid);
-    await updateDoc(userRef, { items: updated });
-  };
+  const updateWatchlistStatus = useCallback(
+    async (id, status) => {
+      if (!firebaseInitialized || !user) return;
+      const updated = watchlist.map((i) =>
+        i.id === id ? { ...i, status } : i
+      );
+      setWatchlist(updated);
+      const userRef = watchlistDocRef(user.uid);
+      await updateDoc(userRef, { items: updated });
+    },
+    [user, watchlist]
+  );
 
-  const handleReorder = async (targetId) => {
-    if (!firebaseInitialized || !user) return;
-    const sourceId = dragItem.current;
-    if (!sourceId || sourceId === targetId) return;
+  const handleReorder = useCallback(
+    async (targetId) => {
+      if (!firebaseInitialized || !user) return;
+      const sourceId = dragItem.current;
+      if (!sourceId || sourceId === targetId) return;
 
-    const sourceIndex = watchlist.findIndex((i) => i.id === sourceId);
-    const targetIndex = watchlist.findIndex((i) => i.id === targetId);
+      const sourceIndex = watchlist.findIndex((i) => i.id === sourceId);
+      const targetIndex = watchlist.findIndex((i) => i.id === targetId);
 
-    if (sourceIndex === -1 || targetIndex === -1) return;
+      if (sourceIndex === -1 || targetIndex === -1) return;
 
-    const newList = [...watchlist];
-    const [movedItem] = newList.splice(sourceIndex, 1);
-    newList.splice(targetIndex, 0, movedItem);
+      const newList = [...watchlist];
+      const [movedItem] = newList.splice(sourceIndex, 1);
+      newList.splice(targetIndex, 0, movedItem);
 
-    setWatchlist(newList);
+      setWatchlist(newList);
 
-    const userRef = watchlistDocRef(user.uid);
-    await updateDoc(userRef, { items: newList });
-  };
+      const userRef = watchlistDocRef(user.uid);
+      await updateDoc(userRef, { items: newList });
+    },
+    [user, watchlist]
+  );
 
-  const onDragStart = (e, id) => {
+  const onDragStart = useCallback((e, id) => {
     dragItem.current = id;
     e.dataTransfer.effectAllowed = "move";
-  };
+  }, []);
 
-  const onDragOver = (e) => {
+  const onDragOver = useCallback((e) => {
     e.preventDefault();
-  };
+  }, []);
 
-  const onDrop = (e, status) => {
-    e.preventDefault();
-    const id = dragItem.current;
-    if (id) {
-      updateWatchlistStatus(id, status);
-      dragItem.current = null;
-    }
-  };
+  const onDrop = useCallback(
+    (e, status) => {
+      e.preventDefault();
+      const id = dragItem.current;
+      if (id) {
+        updateWatchlistStatus(id, status);
+        dragItem.current = null;
+      }
+    },
+    [updateWatchlistStatus]
+  );
 
-  return {
-    watchlist,
-    addToWatchlist,
-    removeFromWatchlist,
-    updateWatchlistStatus,
-    handleReorder,
-    onDragStart,
-    onDragOver,
-    onDrop,
-  };
+  return useMemo(
+    () => ({
+      watchlist,
+      addToWatchlist,
+      removeFromWatchlist,
+      updateWatchlistStatus,
+      handleReorder,
+      onDragStart,
+      onDragOver,
+      onDrop,
+    }),
+    [
+      watchlist,
+      addToWatchlist,
+      removeFromWatchlist,
+      updateWatchlistStatus,
+      handleReorder,
+      onDragStart,
+      onDragOver,
+      onDrop,
+    ]
+  );
 };

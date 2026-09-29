@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_IMAGE } from "../../constants";
 
 /** Media poster with a placeholder fallback for missing or broken images. */
@@ -14,4 +15,4 @@ const Poster = ({ path, alt, className = "" }) => (
   />
 );
 
-export default Poster;
+export default memo(Poster);

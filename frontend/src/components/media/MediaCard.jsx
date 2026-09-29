@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Plus } from "lucide-react";
 import Poster from "../ui/Poster";
 import { sanitizeItem } from "../../utils/sanitize";
@@ -98,4 +99,4 @@ const MediaCard = ({ item, onAddToWatchlist, onExpand }) => {
   );
 };
 
-export default MediaCard;
+export default memo(MediaCard);

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Plus } from "lucide-react";
 import Poster from "../ui/Poster";
 import HorizontalScrollContainer from "../ui/HorizontalScroll";
@@ -67,4 +68,4 @@ const TrendingRow = ({ title, items, onAdd, onExpand }) => (
   </div>
 );
 
-export default TrendingRow;
+export default memo(TrendingRow);

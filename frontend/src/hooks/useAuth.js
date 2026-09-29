@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   signInAnonymously,
   signInWithEmailAndPassword,
@@ -31,7 +31,7 @@ export const useAuth = () => {
     return () => unsub();
   }, []);
 
-  const handleLogin = async (email, password, isDemo) => {
+  const handleLogin = useCallback(async (email, password, isDemo) => {
     setLoading(true);
     setLoginError("");
     try {
@@ -54,9 +54,9 @@ export const useAuth = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleGuest = async () => {
+  const handleGuest = useCallback(async () => {
     setLoading(true);
     setLoginError("");
     try {
@@ -65,22 +65,25 @@ export const useAuth = () => {
       setLoginError(e.message);
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await signOut(auth);
     } catch (e) {
       console.error(e);
     }
-  };
+  }, []);
 
-  return {
-    user,
-    loading,
-    loginError,
-    handleLogin,
-    handleGuest,
-    handleLogout,
-  };
+  return useMemo(
+    () => ({
+      user,
+      loading,
+      loginError,
+      handleLogin,
+      handleGuest,
+      handleLogout,
+    }),
+    [user, loading, loginError, handleLogin, handleGuest, handleLogout]
+  );
 };
