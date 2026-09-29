@@ -72,7 +72,7 @@ const LoginView = ({ onLogin, onGuest, loading, error }) => {
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Password</label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-3.5 text-gray-500" size={18} />
-                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/50 text-white pl-10 p-3 rounded-xl border border-neutral-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-all placeholder-gray-600" placeholder="ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢" required />
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/50 text-white pl-10 p-3 rounded-xl border border-neutral-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-all placeholder-gray-600" placeholder="••••••••" required />
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
