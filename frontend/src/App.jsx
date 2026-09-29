@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import api from './services/api';
+import React, { useState, useMemo } from 'react';
 
 import { 
   Search, List, Settings, User, 
@@ -7,17 +6,12 @@ import {
   LogOut, Lock, Mail, 
   Flame
 } from 'lucide-react';
-import { 
-  signInAnonymously, signInWithEmailAndPassword, 
-  onAuthStateChanged, signOut, createUserWithEmailAndPassword 
-} from 'firebase/auth';
-import { 
-  doc, setDoc, updateDoc, 
-  arrayUnion, arrayRemove, onSnapshot 
-} from 'firebase/firestore';
-import { auth, db, firebaseInitialized } from './services/firebase';
-import { API_BASE_URL } from './constants';
+import { firebaseInitialized } from './services/firebase';
 import { sanitizeItem } from './utils/sanitize';
+import { useAuth } from './hooks/useAuth';
+import { useTrending } from './hooks/useTrending';
+import { useSearch } from './hooks/useSearch';
+import { useWatchlist } from './hooks/useWatchlist';
 import GlobalStyles from './components/layout/GlobalStyles';
 import NavButton from './components/layout/NavButton';
 import TrendingSkeleton from './components/ui/Skeleton';
@@ -73,7 +67,7 @@ const LoginView = ({ onLogin, onGuest, loading, error }) => {
                             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Password</label>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-3.5 text-gray-500" size={18} />
-                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/50 text-white pl-10 p-3 rounded-xl border border-neutral-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-all placeholder-gray-600" placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢" required />
+                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black/50 text-white pl-10 p-3 rounded-xl border border-neutral-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 focus:outline-none transition-all placeholder-gray-600" placeholder="ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢" required />
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -252,154 +246,37 @@ const WatchlistView = ({ watchlist, watchlistType, setWatchlistType, onDrop, onD
 
 const MainLayout = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('discover');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [trendingAll, setTrendingAll] = useState([]);
-  const [trendingNetflix, setTrendingNetflix] = useState([]);
-  const [trendingPrime, setTrendingPrime] = useState([]);
-
-  const [loadingTrending, setLoadingTrendingAll] = useState(true);
-  const [loadingNetflix, setLoadingNetflix] = useState(true);
-  const [loadingPrime, setLoadingPrime] = useState(true);
-
-  const [watchlist, setWatchlist] = useState([]);
   const [watchlistType, setWatchlistType] = useState('movie');
   const [selectedMovie, setSelectedMovie] = useState(null);
-  const [searchError, setSearchError] = useState(null);
-  const dragItem = useRef(null);
 
-  useEffect(() => {
-    api.get('/trending/all')
-        .then(res => {
-        setTrendingAll(
-            res.data.results.map(item => ({
-            ...item,
-            __source: 'trending'
-            }))
-        );
-        })
-        .catch(() => setTrendingAll([]))
-        .finally(() => setLoadingTrendingAll(false));
+  const {
+    trendingAll,
+    trendingNetflix,
+    trendingPrime,
+    loadingTrending,
+    loadingNetflix,
+    loadingPrime,
+  } = useTrending();
 
-    api.get('/trending/platform/netflix')
-        .then(res => {
-        setTrendingNetflix(
-            res.data.results.map(item => ({
-            ...item,
-            __source: 'trending'
-            }))
-        );
-        })
-        .catch(() => setTrendingNetflix([]))
-        .finally(() => setLoadingNetflix(false));
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    isSearching,
+    searchError,
+    handleSearch,
+    clearResults,
+  } = useSearch();
 
-    api.get('/trending/platform/prime')
-        .then(res => {
-        setTrendingPrime(
-            res.data.results.map(item => ({
-            ...item,
-            __source: 'trending'
-            }))
-        );
-        })
-        .catch(() => setTrendingPrime([]))
-        .finally(() => setLoadingPrime(false));
-}, []);
-
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    setIsSearching(true);
-    setSearchResults([]);
-    setSearchError(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/find-movies`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ description: searchQuery }) });
-      const data = await res.json();
-      if (res.status === 429) setSearchError("Daily Limit Exceeded. Try again tomorrow! Or You can Try Searching Actual Title");
-      else if (!res.ok) setSearchError("Search failed. Please try again.");
-      else setSearchResults(data.movies || []);
-    } catch (e) { console.error(e); setSearchError("Connection Error"); } finally { setIsSearching(false); }
-  };
-
-  const addToWatchlist = async (item, status = 'want') => {
-    const newItem = { 
-        id: item.id, title: item.title || item.name, poster_path: item.poster_path, 
-        release_date: item.release_date || item.first_air_date, media_type: item.media_type, status: status,
-        genres: item.genres || [], director: item.director || "Unknown", cast: item.cast || [],
-        overview: item.overview || "", vote_average: item.vote_average || 0,
-        imdb_rating: item.imdb_rating || null, rotten_tomatoes: item.rotten_tomatoes || null,
-        providers: item.providers || [],
-        addedAt: Date.now()
-    };
-    if (watchlist.some(i => i.id === newItem.id)) return;
-    const userRef = doc(db, 'artifacts', 'default-app-id', 'users', user.uid, 'data', 'watchlist');
-    try { await setDoc(userRef, { items: arrayUnion(newItem) }, { merge: true }); } catch(e) { console.error(e); }
-  };
-
-  const removeFromWatchlist = async (itemId) => {
-    const item = watchlist.find(i => i.id === itemId);
-    if (!item) return;
-    const userRef = doc(db, 'artifacts', 'default-app-id', 'users', user.uid, 'data', 'watchlist');
-    await updateDoc(userRef, { items: arrayRemove(item) });
-  };
-
-  const updateWatchlistStatus = async (id, status) => {
-    if (!firebaseInitialized || !user) return;
-    const updated = watchlist.map(i => i.id === id ? { ...i, status } : i);
-    setWatchlist(updated);
-    const userRef = doc(db, 'artifacts', 'default-app-id', 'users', user.uid, 'data', 'watchlist');
-    await updateDoc(userRef, { items: updated });
-  };
-
-  const handleReorder = async (targetId) => {
-      const sourceId = dragItem.current;
-      if (!sourceId || sourceId === targetId) return;
-
-      const sourceIndex = watchlist.findIndex(i => i.id === sourceId);
-      const targetIndex = watchlist.findIndex(i => i.id === targetId);
-
-      if (sourceIndex === -1 || targetIndex === -1) return;
-
-      const newList = [...watchlist];
-      const [movedItem] = newList.splice(sourceIndex, 1);
-      newList.splice(targetIndex, 0, movedItem);
-
-      setWatchlist(newList); 
-      
-      const userRef = doc(db, 'artifacts', 'default-app-id', 'users', user.uid, 'data', 'watchlist');
-      await updateDoc(userRef, { items: newList });
-  };
-
-  const onDragStart = (e, id) => { dragItem.current = id; e.dataTransfer.effectAllowed = "move"; };
-  const onDragOver = (e) => { e.preventDefault(); };
-  const onDrop = (e, status) => { e.preventDefault(); const id = dragItem.current; if (id) { updateWatchlistStatus(id, status); dragItem.current = null; }};
-
-  useEffect(() => {
-    if (!firebaseInitialized || !user) return;
-
-    const userRef = doc(
-      db,
-      'artifacts',
-      'default-app-id',
-      'users',
-      user.uid,
-      'data',
-      'watchlist'
-    );
-
-    const unsubscribe = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setWatchlist(Array.isArray(data.items) ? data.items : []);
-      } else {
-        setWatchlist([]);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [user]);
+  const {
+    watchlist,
+    addToWatchlist,
+    removeFromWatchlist,
+    handleReorder,
+    onDragStart,
+    onDragOver,
+    onDrop,
+  } = useWatchlist(user);
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-black text-gray-100 font-sans overflow-hidden">
@@ -442,7 +319,7 @@ const MainLayout = ({ user, onLogout }) => {
             loadingNetflix={loadingNetflix}
             loadingPrime={loadingPrime}
             onAddToWatchlist={(i) => addToWatchlist(i, 'want')}
-            clearResults={() => setSearchResults([])}
+            clearResults={clearResults}
             onExpand={setSelectedMovie}
             searchError={searchError}/>
             }
@@ -462,36 +339,8 @@ const MainLayout = ({ user, onLogout }) => {
 };
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loginError, setLoginError] = useState('');
-
-  useEffect(() => {
-    if (!firebaseInitialized) { setLoading(false); return; }
-    const unsub = onAuthStateChanged(auth, (currentUser) => { setUser(currentUser); setLoading(false); });
-    return () => unsub();
-  }, []);
-
-  const handleLogin = async (email, password, isDemo) => {
-      setLoading(true); setLoginError('');
-      try { 
-          await signInWithEmailAndPassword(auth, email, password); 
-      } catch(e) { 
-          if (isDemo && (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential')) {
-              try { await createUserWithEmailAndPassword(auth, email, password); } 
-              catch(createErr) { setLoginError(createErr.message); }
-          } else {
-              setLoginError(e.message); 
-          }
-      } finally { setLoading(false); }
-  };
-
-  const handleGuest = async () => {
-      setLoading(true); setLoginError('');
-      try { await signInAnonymously(auth); } catch(e) { setLoginError(e.message); setLoading(false); }
-  };
-
-  const handleLogout = async () => { try { await signOut(auth); } catch(e) { console.error(e); } };
+  const { user, loading, loginError, handleLogin, handleGuest, handleLogout } =
+    useAuth();
 
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-red-600"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-current"></div></div>;
 
