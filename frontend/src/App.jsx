@@ -8,10 +8,15 @@ import {
 } from 'lucide-react';
 import { firebaseInitialized } from './services/firebase';
 import { sanitizeItem } from './utils/sanitize';
-import { useAuth } from './hooks/useAuth';
 import { useTrending } from './hooks/useTrending';
-import { useSearch } from './hooks/useSearch';
-import { useWatchlist } from './hooks/useWatchlist';
+import { AuthProvider } from './contexts/AuthProvider';
+import { useAuthContext } from './contexts/AuthContext';
+import { SearchProvider } from './contexts/SearchProvider';
+import { useSearchContext } from './contexts/SearchContext';
+import { WatchlistProvider } from './contexts/WatchlistProvider';
+import { useWatchlistContext } from './contexts/WatchlistContext';
+import { ModalProvider } from './contexts/ModalProvider';
+import { useModalContext } from './contexts/ModalContext';
 import GlobalStyles from './components/layout/GlobalStyles';
 import NavButton from './components/layout/NavButton';
 import TrendingSkeleton from './components/ui/Skeleton';
@@ -244,10 +249,12 @@ const WatchlistView = ({ watchlist, watchlistType, setWatchlistType, onDrop, onD
     );
 };
 
-const MainLayout = ({ user, onLogout }) => {
+const MainLayout = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('discover');
   const [watchlistType, setWatchlistType] = useState('movie');
-  const [selectedMovie, setSelectedMovie] = useState(null);
+
+  const { user } = useAuthContext();
+  const { selectedMovie, openMedia, closeMedia } = useModalContext();
 
   const {
     trendingAll,
@@ -266,7 +273,7 @@ const MainLayout = ({ user, onLogout }) => {
     searchError,
     handleSearch,
     clearResults,
-  } = useSearch();
+  } = useSearchContext();
 
   const {
     watchlist,
@@ -276,7 +283,7 @@ const MainLayout = ({ user, onLogout }) => {
     onDragStart,
     onDragOver,
     onDrop,
-  } = useWatchlist(user);
+  } = useWatchlistContext();
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-black text-gray-100 font-sans overflow-hidden">
@@ -320,11 +327,11 @@ const MainLayout = ({ user, onLogout }) => {
             loadingPrime={loadingPrime}
             onAddToWatchlist={(i) => addToWatchlist(i, 'want')}
             clearResults={clearResults}
-            onExpand={setSelectedMovie}
+            onExpand={openMedia}
             searchError={searchError}/>
             }
 
-          {activeTab === 'watchlist' && <WatchlistView watchlist={watchlist} watchlistType={watchlistType} setWatchlistType={setWatchlistType} onDrop={onDrop} onDragOver={onDragOver} onDragStart={onDragStart} firebaseInitialized={firebaseInitialized} onExpand={setSelectedMovie} onReorder={handleReorder} />}
+          {activeTab === 'watchlist' && <WatchlistView watchlist={watchlist} watchlistType={watchlistType} setWatchlistType={setWatchlistType} onDrop={onDrop} onDragOver={onDragOver} onDragStart={onDragStart} firebaseInitialized={firebaseInitialized} onExpand={openMedia} onReorder={handleReorder} />}
           {activeTab === 'settings' && <div className="text-center py-20 text-gray-500"><Settings size={48} className="mx-auto mb-4 opacity-50" /><h2 className="text-xl font-bold text-gray-300">Settings</h2><p>Preferences coming soon...</p><button onClick={onLogout} className="mt-4 text-red-400 text-sm md:hidden">Logout</button></div>}
         </div>
       </main>
@@ -333,18 +340,39 @@ const MainLayout = ({ user, onLogout }) => {
           <NavButton icon={List} label="Watchlist" active={activeTab === 'watchlist'} onClick={() => setActiveTab('watchlist')} />
           <NavButton icon={Settings} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
       </div>
-      {selectedMovie && <MovieDetailsModal item={selectedMovie} onClose={() => setSelectedMovie(null)} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} isInWatchlist={watchlist.some(i => i.id === selectedMovie.id)} onExpand={setSelectedMovie} />}
+      {selectedMovie && <MovieDetailsModal item={selectedMovie} onClose={closeMedia} onAddToWatchlist={addToWatchlist} onRemoveFromWatchlist={removeFromWatchlist} isInWatchlist={watchlist.some(i => i.id === selectedMovie.id)} onExpand={openMedia} />}
     </div>
   );
 };
 
-export default function App() {
+/**
+ * Auth gate. The feature providers mount only once a user is present, so
+ * the Firestore subscription in WatchlistProvider is created on sign-in and
+ * torn down on sign-out by unmounting.
+ */
+function AppContent() {
   const { user, loading, loginError, handleLogin, handleGuest, handleLogout } =
-    useAuth();
+    useAuthContext();
 
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-red-600"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-current"></div></div>;
 
   if (!user) return <LoginView onLogin={handleLogin} onGuest={handleGuest} loading={loading} error={loginError} />;
 
-  return <MainLayout user={user} onLogout={handleLogout} />;
+  return (
+    <SearchProvider>
+      <WatchlistProvider>
+        <ModalProvider>
+          <MainLayout onLogout={handleLogout} />
+        </ModalProvider>
+      </WatchlistProvider>
+    </SearchProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
