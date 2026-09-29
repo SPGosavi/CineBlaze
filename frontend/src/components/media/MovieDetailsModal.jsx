@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Trash2, Plus, Zap, Film, MonitorPlay } from "lucide-react";
 import api from "../../services/api";
-import { TMDB_LOGO_BASE_URL } from "../../constants";
+import { TMDB_LOGO_BASE_URL, AI_REQUEST_TIMEOUT } from "../../constants";
 import { sanitizeItem } from "../../utils/sanitize";
 import Poster from "../ui/Poster";
 import HorizontalScrollContainer from "../ui/HorizontalScroll";
@@ -25,9 +25,7 @@ const MovieDetailsModal = ({
   const [similarMovies, setSimilarMovies] = useState([]);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
-  // Tracked but not yet surfaced in the UI -- no loading indicator is
-  // rendered for the details fetch, so only the setter is bound.
-  const [, setLoadingDetails] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Initialize
   useEffect(() => {
@@ -103,15 +101,19 @@ const MovieDetailsModal = ({
     if (similarMovies.length > 0) return;
     setLoadingSimilar(true);
     try {
-      const { data } = await api.post("/get-similar", {
-        title: safeItem.title,
-        media_type: safeItem.media_type,
-        year: year,
-        genres: safeItem.genres || [],
-        overview: safeItem.overview || "",
-        cast: safeItem.cast || [],
-        director: safeItem.director || "Unknown",
-      });
+      const { data } = await api.post(
+        "/get-similar",
+        {
+          title: safeItem.title,
+          media_type: safeItem.media_type,
+          year: year,
+          genres: safeItem.genres || [],
+          overview: safeItem.overview || "",
+          cast: safeItem.cast || [],
+          director: safeItem.director || "Unknown",
+        },
+        { timeout: AI_REQUEST_TIMEOUT }
+      );
       setSimilarMovies(data.similar || []);
     } catch (e) {
       console.error(e);
@@ -196,7 +198,7 @@ const MovieDetailsModal = ({
             )}
           </div>
 
-          {safeItem.cast.length > 0 && (
+          {safeItem.cast.length > 0 ? (
             <div className="mb-6">
               <h3 className="text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest">
                 Starring
@@ -212,6 +214,22 @@ const MovieDetailsModal = ({
                 ))}
               </div>
             </div>
+          ) : (
+            loadingDetails && (
+              <div className="mb-6">
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase mb-2 tracking-widest">
+                  Starring
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {[...Array(3)].map((_, i) => (
+                    <span
+                      key={i}
+                      className="h-7 w-28 bg-white/5 rounded-full animate-pulse"
+                    />
+                  ))}
+                </div>
+              </div>
+            )
           )}
 
           <div className="mb-6">
@@ -223,7 +241,7 @@ const MovieDetailsModal = ({
             </p>
           </div>
 
-          {safeItem.providers.length > 0 && (
+          {safeItem.providers.length > 0 ? (
             <div className="mb-6 border-t border-neutral-800 pt-4">
               <h3 className="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest flex items-center gap-2">
                 <MonitorPlay size={14} /> Streaming On
@@ -248,6 +266,22 @@ const MovieDetailsModal = ({
                 ))}
               </div>
             </div>
+          ) : (
+            loadingDetails && (
+              <div className="mb-6 border-t border-neutral-800 pt-4">
+                <h3 className="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest flex items-center gap-2">
+                  <MonitorPlay size={14} /> Streaming On
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {[...Array(2)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-10 w-32 bg-white/5 rounded-lg animate-pulse"
+                    />
+                  ))}
+                </div>
+              </div>
+            )
           )}
 
           <div className="flex flex-col sm:flex-row gap-3 mt-auto pt-6 border-t border-neutral-800">
