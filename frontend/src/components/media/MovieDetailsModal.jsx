@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Trash2, Plus, Zap, Film, MonitorPlay } from "lucide-react";
 import api from "../../services/api";
-import { API_BASE_URL, TMDB_LOGO_BASE_URL } from "../../constants";
+import { TMDB_LOGO_BASE_URL } from "../../constants";
 import { sanitizeItem } from "../../utils/sanitize";
 import Poster from "../ui/Poster";
 import HorizontalScrollContainer from "../ui/HorizontalScroll";
@@ -42,18 +42,14 @@ const MovieDetailsModal = ({
 
     if (needsFetch) {
       setLoadingDetails(true);
-      fetch(`${API_BASE_URL}/api/media-details`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      api
+        .post("/media-details", {
           id: item.id,
           title: item.title || item.name,
           year: (item.release_date || item.first_air_date)?.split("-")[0],
           media_type: item.media_type || "movie",
-        }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
+        })
+        .then(({ data }) => {
           if (data && data.id) {
             // Merge and sanitize
             const newItem = { ...item, ...data };
@@ -107,20 +103,15 @@ const MovieDetailsModal = ({
     if (similarMovies.length > 0) return;
     setLoadingSimilar(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/get-similar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: safeItem.title,
-          media_type: safeItem.media_type,
-          year: year,
-          genres: safeItem.genres || [],
-          overview: safeItem.overview || "",
-          cast: safeItem.cast || [],
-          director: safeItem.director || "Unknown",
-        }),
+      const { data } = await api.post("/get-similar", {
+        title: safeItem.title,
+        media_type: safeItem.media_type,
+        year: year,
+        genres: safeItem.genres || [],
+        overview: safeItem.overview || "",
+        cast: safeItem.cast || [],
+        director: safeItem.director || "Unknown",
       });
-      const data = await response.json();
       setSimilarMovies(data.similar || []);
     } catch (e) {
       console.error(e);
