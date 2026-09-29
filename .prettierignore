@@ -1,10 +1,9 @@
-# Excluded until Phase 2 finishes decomposing it into components.
-# Formatting it now would rewrite ~1994 lines (1060 -> 1764) and bury the
-# real changes in every diff. Remove this entry once App.jsx is reduced to
-# a thin providers/routing shell.
-frontend/src/App.jsx
-
 # Build output
 dist
 build
 node_modules
+
+# Generated -- npm rewrites these on install, so formatting them only
+# creates churn on the next `npm install`.
+package-lock.json
+**/package-lock.json
