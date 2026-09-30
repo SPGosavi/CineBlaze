@@ -11,7 +11,8 @@ import {
   TMDB_API_KEY,
 } from "../config.js";
 import { fetchWithTimeout, bestEffort } from "../utils/http.js";
-import { getLanguageCode, getGenreIds } from "../utils/languageMap.js";
+import { sleep, backoffDelay } from "../utils/retry.js";
+import { getLanguageCodes, getGenreIds } from "../utils/languageMap.js";
 import type {
   ChatMessage,
   GroqChatOptions,
@@ -25,16 +26,6 @@ import type {
 } from "../types/index.js";
 
 // ─── Groq Request Helper (retry + backoff + fallback model) ────────────────
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Exponential backoff with jitter: ~500ms, ~1s, ~2s (+/- up to 100ms). */
-function backoffDelay(attempt: number): number {
-  const base = 500 * 2 ** (attempt - 1);
-  const jitter = Math.random() * 100;
-  return base + jitter;
-}
 
 /** Cheap non-cryptographic hash (djb2) used only to correlate log lines for the same query. */
 function hashString(str: string): string {
@@ -376,7 +367,7 @@ async function fetchDDGLite(query: string): Promise<string> {
 
 async function fetchActorFilmography(
   actorName: string,
-  languageCode: string | null,
+  languageCodes: string[],
   mediaTypes: MediaType[]
 ): Promise<string> {
   try {
@@ -404,10 +395,11 @@ async function fetchActorFilmography(
 
     let castCredits = creditsData.cast || [];
 
-    // Filter by language if specified
-    if (languageCode) {
-      const langFiltered = castCredits.filter(
-        (c: any) => c.original_language === languageCode
+    // Filter by language if specified. An umbrella term yields several codes,
+    // so match against any of them rather than a single value.
+    if (languageCodes.length > 0) {
+      const langFiltered = castCredits.filter((c: any) =>
+        languageCodes.includes(c.original_language)
       );
       // If language filter yields results, use them; otherwise keep all (AI will filter)
       if (langFiltered.length > 0) castCredits = langFiltered;
@@ -465,6 +457,9 @@ async function fetchLanguageFilteredDiscover(
       `[Context] Language-filtered discover: lang=${languageCode}, genres=${genreIds.join(",")}, type=${mediaType}`
     );
     const res = await fetchWithTimeout(url, GROUNDING_SOURCE_TIMEOUT_MS);
+    // Without this, a 429 or 401 parses into a body with no `results`, which
+    // silently degrades to an empty hint block that looks like "no matches".
+    if (!res.ok) throw new Error(`TMDB discover ${res.status}`);
     const data = (await res.json()) as any;
 
     return (data.results || [])
@@ -493,7 +488,10 @@ async function getStableContext(
   structuredParams: StructuredParams | null = null
 ): Promise<string> {
   const params = structuredParams || getDefaultParams();
-  const languageCode = getLanguageCode(params.language || "");
+  // Umbrella terms such as "south indian" cover four industries, so this can
+  // return several codes. The first is used where a single value is required.
+  const languageCodes = getLanguageCodes(params.language || "");
+  const languageCode = languageCodes[0] || null;
   const genreIds = getGenreIds(params.genres);
 
   // Build a smarter keyword string from structured params
@@ -579,17 +577,23 @@ async function getStableContext(
       run: () =>
         fetchActorFilmography(
           params.actors[0],
-          languageCode || null,
+          languageCodes,
           params.media_types
         ),
     });
   }
 
-  if (languageCode) {
+  // One discover call per language, capped so an umbrella term like "indian"
+  // cannot fan out into a dozen parallel requests.
+  const MAX_DISCOVER_SOURCES = 4;
+  let discoverCount = 0;
+  outer: for (const code of languageCodes) {
     for (const mt of params.media_types) {
+      if (discoverCount >= MAX_DISCOVER_SOURCES) break outer;
+      discoverCount++;
       sources.push({
-        label: `discover-${mt}`,
-        run: () => fetchLanguageFilteredDiscover(languageCode, genreIds, mt),
+        label: `discover-${code}-${mt}`,
+        run: () => fetchLanguageFilteredDiscover(code, genreIds, mt),
       });
     }
   }
@@ -744,14 +748,32 @@ async function makeGroqRequest(
     ? "Return 1-3 titles that best match the specific plot described. If the plot description is specific enough to identify a single movie, return that one. If multiple movies match the described plot, return all of them (up to 3)."
     : "Return 1-3 most relevant titles.";
 
+  /**
+   * The hint rules only make sense when there are hints.
+   *
+   * When every grounding source comes back empty, the original wording still
+   * told the model to prioritise a section that did not exist and to be
+   * suspicious of any answer missing from it. The observed result was a
+   * confident-looking `{"results": []}` for a query the model could very
+   * likely have answered from its own knowledge.
+   */
+  const hasHints =
+    externalContext.trim().length > 0 &&
+    !externalContext.startsWith("No external context available.");
+
+  const hintRules = hasHints
+    ? `2. **HINT PRIORITY**: The "REAL-WORLD DATABASE HINTS" section contains actual entries from TMDB, Wikipedia, and actor filmographies. Treat these as strong candidates and prefer them when they match the user's description.
+    3. **VERIFY AGAINST HINTS**: If your best guess does not appear in the hints, satisfy yourself that it is a real title before returning it. A title absent from the hints is still valid if you are confident it exists.`
+    : `2. **NO HINTS AVAILABLE**: External lookups returned nothing for this query. Answer from your own knowledge of cinema.
+    3. **DO NOT RETURN AN EMPTY LIST** merely because there are no hints. Return your best match and let the caller verify it. Only return an empty list if the description genuinely matches no film or show you know of.`;
+
   const systemPrompt = `You are a world-class cinema historian and movie identification expert, with deep knowledge of regional and international cinema.
     Goal: Identify 1-3 REAL movies or TV shows that match the user's description.
 
     CRITICAL RULES:
     1. **NO HALLUCINATIONS**: Do not invent titles. Do not return movies with release years in the future (e.g., 2025, 2026) unless they are major confirmed productions.
-    2. **HINT PRIORITY**: The "REAL-WORLD DATABASE HINTS" section contains actual entries from TMDB, Wikipedia, and actor filmographies. You MUST prioritize titles that appear in these hints and match the user's description.
-    3. **VERIFY AGAINST HINTS**: If your internal "best guess" is not found in the hints, double-check if it actually exists. Favor titles that appear in the hints.
-    4. **LANGUAGE LOCK**: If a language is specified in the constraints, you MUST ONLY return titles in that language. A Hindi movie is NOT a substitute for a Marathi movie, and vice versa. A Telugu movie is NOT a substitute for a Tamil movie. Different Indian languages are COMPLETELY DIFFERENT film industries with separate actors, directors, and stories.
+    ${hintRules}
+    4. **LANGUAGE LOCK**: If a language is specified in the constraints, you MUST ONLY return titles in that language. A Hindi movie is NOT a substitute for a Marathi movie, and vice versa. A Telugu movie is NOT a substitute for a Tamil movie. Different Indian languages are COMPLETELY DIFFERENT film industries with separate actors, directors, and stories. If the constraint names a region rather than a single language (for example "South Indian"), any of that region's languages is acceptable.
     5. **ACTOR LOCK**: If actors are specified, every returned title MUST feature that actor in a significant role. Cross-reference with the actor filmography hints provided.
     6. **MEDIA TYPE**: Return both movies and TV shows unless the user specifically asks for one type. Use the "media_type" field correctly ("movie" or "tv").
     7. **PLOT PRECISION**: Match the SPECIFIC plot elements described. Do not return movies that share only the genre or general theme. For example, if the user says "recalling childhood love", the movie must specifically be about a character reminiscing about a past childhood love — not just any love story.

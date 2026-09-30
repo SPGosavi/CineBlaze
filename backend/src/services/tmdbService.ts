@@ -1,6 +1,13 @@
 import fetch from "node-fetch";
 import cache from "../utils/cache.js";
-import { TMDB_API_KEY, OMDB_API_KEY } from "../config.js";
+import {
+  TMDB_API_KEY,
+  OMDB_API_KEY,
+  TMDB_MAX_RETRIES,
+  TMDB_TIMEOUT_MS,
+} from "../config.js";
+import { fetchWithTimeout } from "../utils/http.js";
+import { sleep, backoffDelay, isRetryableStatus } from "../utils/retry.js";
 import {
   MediaType,
   BasicTmdbResult,
@@ -107,10 +114,59 @@ export async function fetchRatings(
   }
 }
 
+/**
+ * Fetches a TMDB list endpoint, retrying transient failures.
+ *
+ * Callers treat a throw here as fatal for the whole request, so the trending
+ * controllers turned a single dropped connection into a 500 and a blank shelf.
+ * Retries cover the connection resets that show up under the fan-out of a cold
+ * Discover page, where three shelves enrich twelve items each.
+ */
 export async function fetchTmdb(url: string): Promise<TmdbPaginatedResponse> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("TMDB Error");
-  return (await res.json()) as TmdbPaginatedResponse;
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= TMDB_MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
+
+      if (!res.ok) {
+        lastError = new Error(`TMDB Error: ${res.status}`);
+
+        if (isRetryableStatus(res.status) && attempt < TMDB_MAX_RETRIES) {
+          const retryAfter = Number(res.headers.get("retry-after"));
+          const waitMs =
+            Number.isFinite(retryAfter) && retryAfter > 0
+              ? retryAfter * 1000
+              : backoffDelay(attempt);
+          console.warn(
+            `[TMDB] ${res.status} on attempt ${attempt}/${TMDB_MAX_RETRIES}, retrying in ${Math.round(waitMs)}ms`
+          );
+          await sleep(waitMs);
+          continue;
+        }
+        // 4xx other than 429: the request itself is wrong, retrying cannot help.
+        throw lastError;
+      }
+
+      return (await res.json()) as TmdbPaginatedResponse;
+    } catch (e: unknown) {
+      lastError = e as Error;
+
+      // A non-retryable HTTP error was rethrown above; do not loop on it.
+      if (lastError.message?.startsWith("TMDB Error:")) throw lastError;
+
+      if (attempt < TMDB_MAX_RETRIES) {
+        const waitMs = backoffDelay(attempt);
+        console.warn(
+          `[TMDB] ${lastError.message} on attempt ${attempt}/${TMDB_MAX_RETRIES}, retrying in ${Math.round(waitMs)}ms`
+        );
+        await sleep(waitMs);
+        continue;
+      }
+    }
+  }
+
+  throw lastError ?? new Error("TMDB Error");
 }
 
 /**
