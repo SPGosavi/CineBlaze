@@ -64,6 +64,29 @@ export const GROUNDING_SOURCE_TIMEOUT_MS =
 export const GROUNDING_TOTAL_TIMEOUT_MS =
   Number(process.env.GROUNDING_TOTAL_TIMEOUT_MS) || 6000;
 
+// ─── TMDB ───────────────────────────────────────────────────────────────────
+
+/**
+ * Attempts for a TMDB list request before giving up.
+ *
+ * These calls had no retry at all, so a single dropped connection returned a
+ * 500 for the whole endpoint. On the trending shelves that meant one flaky
+ * request blanked an entire row, and because the successful shelves were then
+ * cached for six hours, a reload appeared to fix it.
+ */
+export const TMDB_MAX_RETRIES = Number(process.env.TMDB_MAX_RETRIES) || 3;
+
+/**
+ * Per-attempt deadline for a TMDB request.
+ *
+ * The whole retry budget has to fit inside the client's own timeout, which is
+ * 15s for the non-AI endpoints. Three attempts at 4s plus roughly 1.5s of
+ * backoff lands near 13.5s worst case, so the server gives up and returns an
+ * error before the browser abandons the request. A longer per-attempt budget
+ * would mean the client timed out first and the retries were wasted work.
+ */
+export const TMDB_TIMEOUT_MS = Number(process.env.TMDB_TIMEOUT_MS) || 4000;
+
 export const PROVIDERS: Providers = {
   netflix: 8,
   prime: 119,
