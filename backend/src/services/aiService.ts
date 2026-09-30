@@ -5,6 +5,7 @@ import {
   GROQ_MODEL,
   GROQ_FALLBACK_MODEL,
   GROQ_MAX_RETRIES,
+  GROQ_REASONING_EFFORT,
   TMDB_API_KEY,
 } from "../config.js";
 import { getLanguageCode, getGenreIds } from "../utils/languageMap.js";
@@ -66,9 +67,10 @@ async function groqChat(
 ): Promise<string> {
   const {
     temperature = 0.1,
-    maxTokens = 800,
+    maxTokens = 2048,
     responseFormat = null,
     label = "groqChat",
+    reasoningEffort = GROQ_REASONING_EFFORT,
   } = opts;
 
   const lastUserMessage =
@@ -92,6 +94,9 @@ async function groqChat(
           stream: false,
         };
         if (responseFormat) body.response_format = responseFormat;
+        // Reasoning tokens count against max_tokens on the gpt-oss models,
+        // so capping the reasoning budget is what leaves room for the answer.
+        if (reasoningEffort) body.reasoning_effort = reasoningEffort;
 
         const response = await fetch(GROQ_API_URL, {
           method: "POST",
@@ -132,6 +137,7 @@ async function groqChat(
             .catch(() => ({}))) as GroqApiError;
           const message =
             errorBody.error?.message || `Groq API error: ${response.status}`;
+          const failedGeneration = errorBody.error?.failed_generation;
           logGroqCall({
             label,
             model,
@@ -141,6 +147,14 @@ async function groqChat(
             error: message,
             queryHash,
           });
+          // Without this, a truncated response and a genuinely malformed one
+          // look identical in the logs, which is what made this class of
+          // failure so hard to pin down.
+          if (failedGeneration) {
+            console.warn(
+              `[Groq] failed_generation (${failedGeneration.length} chars, label=${label}): ${failedGeneration.slice(0, 300)}`
+            );
+          }
           lastError = new Error(message);
 
           // Retry on 5xx (transient); don't retry on 4xx other than 429 (bad request won't fix itself)
@@ -163,6 +177,16 @@ async function groqChat(
           promptTokens: usage.prompt_tokens,
           completionTokens: usage.completion_tokens,
         });
+
+        const finishReason = data.choices?.[0]?.finish_reason;
+        if (finishReason === "length") {
+          // The model ran out of budget mid-answer. Outside JSON mode this
+          // returns silently truncated (often empty) content rather than an
+          // error, so it has to be surfaced explicitly.
+          console.warn(
+            `[Groq] Response truncated: hit max_tokens=${maxTokens} (label=${label}, model=${model}). Raise maxTokens or lower reasoningEffort.`
+          );
+        }
 
         const content = data.choices?.[0]?.message?.content;
         if (!content) {
@@ -220,7 +244,7 @@ Query: "${query}"`;
   try {
     const content = await groqChat([{ role: "user", content: prompt }], {
       temperature: 0.05,
-      maxTokens: 300,
+      maxTokens: 1024,
       responseFormat: { type: "json_object" },
       label: "extractStructuredParams",
     });
@@ -291,7 +315,7 @@ export async function extractKeywords(query: string): Promise<string> {
   try {
     const content = await groqChat([{ role: "user", content: extractPrompt }], {
       temperature: 0.1,
-      maxTokens: 60,
+      maxTokens: 512,
       label: "extractKeywords",
     });
     return content.trim() || query;
@@ -632,7 +656,7 @@ export async function callGroqSimilar(
   try {
     const content = await groqChat(messages, {
       temperature: 0.3,
-      maxTokens: 1200,
+      maxTokens: 2048,
       label: "callGroqSimilar",
     });
     return parseJsonSafe(content);
@@ -711,7 +735,7 @@ async function makeGroqRequest(
 
   const content = await groqChat(messages, {
     temperature: 0.1,
-    maxTokens: 800,
+    maxTokens: 2048,
     responseFormat: { type: "json_object" },
     label: "makeGroqRequest",
   });
