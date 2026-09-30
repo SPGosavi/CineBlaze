@@ -1,4 +1,4 @@
-import fetch, { Response } from "node-fetch";
+import fetch from "node-fetch";
 import {
   GROQ_API_KEY,
   GROQ_API_URL,
@@ -6,8 +6,11 @@ import {
   GROQ_FALLBACK_MODEL,
   GROQ_MAX_RETRIES,
   GROQ_REASONING_EFFORT,
+  GROUNDING_SOURCE_TIMEOUT_MS,
+  GROUNDING_TOTAL_TIMEOUT_MS,
   TMDB_API_KEY,
 } from "../config.js";
+import { fetchWithTimeout, bestEffort } from "../utils/http.js";
 import { getLanguageCode, getGenreIds } from "../utils/languageMap.js";
 import type {
   ChatMessage,
@@ -332,15 +335,19 @@ export async function extractKeywords(query: string): Promise<string> {
 
 async function fetchDDGLite(query: string): Promise<string> {
   try {
-    const res = await fetch("https://lite.duckduckgo.com/lite/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
-      },
-      body: "q=" + encodeURIComponent(query),
-    });
+    const res = await fetchWithTimeout(
+      "https://lite.duckduckgo.com/lite/",
+      GROUNDING_SOURCE_TIMEOUT_MS,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)",
+        },
+        body: "q=" + encodeURIComponent(query),
+      }
+    );
     const html = await res.text();
 
     const results: string[] = [];
@@ -375,7 +382,10 @@ async function fetchActorFilmography(
   try {
     // Step 1: Find the actor on TMDB
     const searchUrl = `https://api.themoviedb.org/3/search/person?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(actorName)}&language=en-US&page=1`;
-    const searchRes = await fetch(searchUrl);
+    const searchRes = await fetchWithTimeout(
+      searchUrl,
+      GROUNDING_SOURCE_TIMEOUT_MS
+    );
     const searchData = (await searchRes.json()) as any;
 
     const person = searchData.results?.[0];
@@ -386,7 +396,10 @@ async function fetchActorFilmography(
 
     // Step 2: Get combined credits
     const creditsUrl = `https://api.themoviedb.org/3/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=en-US`;
-    const creditsRes = await fetch(creditsUrl);
+    const creditsRes = await fetchWithTimeout(
+      creditsUrl,
+      GROUNDING_SOURCE_TIMEOUT_MS
+    );
     const creditsData = (await creditsRes.json()) as any;
 
     let castCredits = creditsData.cast || [];
@@ -451,7 +464,7 @@ async function fetchLanguageFilteredDiscover(
     console.log(
       `[Context] Language-filtered discover: lang=${languageCode}, genres=${genreIds.join(",")}, type=${mediaType}`
     );
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, GROUNDING_SOURCE_TIMEOUT_MS);
     const data = (await res.json()) as any;
 
     return (data.results || [])
@@ -479,131 +492,158 @@ async function getStableContext(
   userQuery: string,
   structuredParams: StructuredParams | null = null
 ): Promise<string> {
-  try {
-    const params = structuredParams || getDefaultParams();
-    const languageCode = getLanguageCode(params.language || "");
-    const genreIds = getGenreIds(params.genres);
+  const params = structuredParams || getDefaultParams();
+  const languageCode = getLanguageCode(params.language || "");
+  const genreIds = getGenreIds(params.genres);
 
-    // Build a smarter keyword string from structured params
-    const keywordParts: string[] = [];
-    if (params.language) keywordParts.push(params.language);
-    if (params.actors.length > 0) keywordParts.push(params.actors[0]);
-    if (params.plot_keywords) keywordParts.push(params.plot_keywords);
-    if (params.genres.length > 0) keywordParts.push(params.genres[0]);
-    const keywords =
-      keywordParts.length > 0 ? keywordParts.join(" ") : userQuery;
+  // Build a smarter keyword string from structured params
+  const keywordParts: string[] = [];
+  if (params.language) keywordParts.push(params.language);
+  if (params.actors.length > 0) keywordParts.push(params.actors[0]);
+  if (params.plot_keywords) keywordParts.push(params.plot_keywords);
+  if (params.genres.length > 0) keywordParts.push(params.genres[0]);
+  const keywords = keywordParts.length > 0 ? keywordParts.join(" ") : userQuery;
 
-    // Build parallel context fetches
-    const contextPromises: Promise<Response | string>[] = [
-      // Wiki search with structured keywords
-      fetch(
-        `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(keywords)}&format=json&origin=*&srlimit=3`
-      ),
-      // TMDB multi-search with keywords
-      fetch(
-        `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(keywords)}&language=en-US&page=1`
-      ),
-      // Web search with full user query for better plot matching
-      fetchDDGLite(userQuery),
-      // Second wiki search with raw user query for broader coverage
-      fetch(
-        `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(userQuery)}&format=json&origin=*&srlimit=3`
-      ),
-    ];
+  const wikiUrl = (q: string) =>
+    `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&format=json&origin=*&srlimit=3`;
 
-    // Add actor filmography if actors are specified
-    if (params.actors.length > 0) {
-      contextPromises.push(
+  const formatWiki = (data: WikiSearchResponse): string =>
+    (data.query?.search || [])
+      .map(
+        (s: any) => `[Wiki] ${s.title}: ${s.snippet.replace(/<[^>]*>?/gm, "")}`
+      )
+      .join("\n");
+
+  /**
+   * Each source owns its own fetch and its own parsing, and yields a string.
+   *
+   * The previous version collected raw promises, awaited them with Promise.all
+   * and then unpicked the results by array index, type-sniffing the tail to
+   * tell a Response from an already-formatted string. That coupled the build
+   * order to the parse order, and -- more importantly -- meant one unresponsive
+   * source stalled the entire search, because none of the fetches had a
+   * deadline.
+   */
+  const sources: { label: string; run: () => Promise<string> }[] = [
+    {
+      label: "wiki-keywords",
+      run: async () =>
+        formatWiki(
+          (await (
+            await fetchWithTimeout(
+              wikiUrl(keywords),
+              GROUNDING_SOURCE_TIMEOUT_MS
+            )
+          ).json()) as WikiSearchResponse
+        ),
+    },
+    {
+      label: "wiki-raw-query",
+      run: async () =>
+        formatWiki(
+          (await (
+            await fetchWithTimeout(
+              wikiUrl(userQuery),
+              GROUNDING_SOURCE_TIMEOUT_MS
+            )
+          ).json()) as WikiSearchResponse
+        ),
+    },
+    {
+      label: "tmdb-multi",
+      run: async () => {
+        const res = await fetchWithTimeout(
+          `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(keywords)}&language=en-US&page=1`,
+          GROUNDING_SOURCE_TIMEOUT_MS
+        );
+        const data = (await res.json()) as TmdbPaginatedResponse;
+        return (data.results || [])
+          .filter((r: any) => r.media_type === "movie" || r.media_type === "tv")
+          .slice(0, 5)
+          .map(
+            (r: any) =>
+              `[TMDB Candidate] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}) [${r.media_type}]: ${r.overview}`
+          )
+          .join("\n");
+      },
+    },
+    {
+      label: "ddg",
+      run: () => fetchDDGLite(userQuery),
+    },
+  ];
+
+  if (params.actors.length > 0) {
+    sources.push({
+      label: "actor-filmography",
+      run: () =>
         fetchActorFilmography(
           params.actors[0],
           languageCode || null,
           params.media_types
-        )
-      );
-    }
-
-    // Add language-filtered discover if language is specified
-    if (languageCode) {
-      for (const mt of params.media_types) {
-        contextPromises.push(
-          fetchLanguageFilteredDiscover(languageCode, genreIds, mt)
-        );
-      }
-    }
-
-    // Add plot-specific TMDB search with language filtering
-    if (params.plot_keywords && languageCode) {
-      const plotSearchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(params.plot_keywords)}&language=en-US&page=1`;
-      contextPromises.push(fetch(plotSearchUrl));
-    }
-
-    const contextResults = await Promise.all(contextPromises);
-
-    // Parse standard results
-    const wikiData = (await (
-      contextResults[0] as Response
-    ).json()) as WikiSearchResponse;
-    const tmdbData = (await (
-      contextResults[1] as Response
-    ).json()) as TmdbPaginatedResponse;
-    const webRes = contextResults[2] as string;
-    const wiki2Data = (await (
-      contextResults[3] as Response
-    ).json()) as WikiSearchResponse;
-
-    const wikiContext = (wikiData.query?.search || [])
-      .map(
-        (s: any) => `[Wiki] ${s.title}: ${s.snippet.replace(/<[^>]*>?/gm, "")}`
-      )
-      .join("\n");
-
-    // Second wiki search results (from raw user query)
-    const wiki2Context = (wiki2Data.query?.search || [])
-      .map(
-        (s: any) => `[Wiki] ${s.title}: ${s.snippet.replace(/<[^>]*>?/gm, "")}`
-      )
-      .join("\n");
-
-    const tmdbContext = (tmdbData.results || [])
-      .filter((r: any) => r.media_type === "movie" || r.media_type === "tv")
-      .slice(0, 5)
-      .map(
-        (r: any) =>
-          `[TMDB Candidate] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}) [${r.media_type}]: ${r.overview}`
-      )
-      .join("\n");
-
-    // Gather additional context (actor filmography + discover + plot search results)
-    let additionalContext = "";
-    for (let i = 4; i < contextResults.length; i++) {
-      const result = contextResults[i];
-      if (typeof result === "string") {
-        additionalContext += result + "\n";
-      } else if (result && typeof (result as Response).json === "function") {
-        // This is a fetch Response (e.g. plot-specific TMDB search)
-        try {
-          const plotData = (await (result as Response).json()) as any;
-          if (plotData.results) {
-            const plotContext = plotData.results
-              .slice(0, 5)
-              .map(
-                (r: any) =>
-                  `[TMDB Plot Match] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}): ${r.overview}`
-              )
-              .join("\n");
-            additionalContext += plotContext + "\n";
-          }
-        } catch (e) {
-          /* ignore parse errors */
-        }
-      }
-    }
-
-    return `--- REAL-WORLD DATABASE & WEB HINTS ---\n${webRes}\n${wikiContext}\n${wiki2Context}\n${tmdbContext}\n${additionalContext}`;
-  } catch (e: any) {
-    console.error("[Search] Context fetch failed:", e.message);
-    return "No external context available.";
+        ),
+    });
   }
+
+  if (languageCode) {
+    for (const mt of params.media_types) {
+      sources.push({
+        label: `discover-${mt}`,
+        run: () => fetchLanguageFilteredDiscover(languageCode, genreIds, mt),
+      });
+    }
+  }
+
+  if (params.plot_keywords && languageCode) {
+    sources.push({
+      label: "tmdb-plot-search",
+      run: async () => {
+        const res = await fetchWithTimeout(
+          `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(params.plot_keywords as string)}&language=en-US&page=1`,
+          GROUNDING_SOURCE_TIMEOUT_MS
+        );
+        const data = (await res.json()) as any;
+        return (data.results || [])
+          .slice(0, 5)
+          .map(
+            (r: any) =>
+              `[TMDB Plot Match] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}): ${r.overview}`
+          )
+          .join("\n");
+      },
+    });
+  }
+
+  const started = Date.now();
+
+  // bestEffort never rejects, so Promise.all is safe here: a failed or slow
+  // source contributes an empty string instead of taking the search down.
+  const settled = await Promise.race([
+    Promise.all(
+      sources.map((s) =>
+        bestEffort(s.label, GROUNDING_SOURCE_TIMEOUT_MS, "", () => s.run())
+      )
+    ),
+    new Promise<string[]>((resolve) =>
+      setTimeout(() => resolve([]), GROUNDING_TOTAL_TIMEOUT_MS)
+    ),
+  ]);
+
+  const parts = settled.filter((p) => p && p.trim().length > 0);
+
+  console.log(
+    JSON.stringify({
+      tag: "grounding",
+      source: "total",
+      ms: Date.now() - started,
+      sources: sources.length,
+      populated: parts.length,
+    })
+  );
+
+  if (parts.length === 0) return "No external context available.";
+
+  return `--- REAL-WORLD DATABASE & WEB HINTS ---\n${parts.join("\n")}`;
 }
 
 // ─── Find Similar (AI-Powered) ──────────────────────────────────────────────

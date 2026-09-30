@@ -44,6 +44,26 @@ export const GROQ_MAX_RETRIES = Number(process.env.GROQ_MAX_RETRIES) || 3;
 export const GROQ_REASONING_EFFORT = (process.env.GROQ_REASONING_EFFORT ||
   "low") as "low" | "medium" | "high";
 
+// ─── Grounding Context ──────────────────────────────────────────────────────
+
+/**
+ * Per-source deadline for the grounding lookups behind /find-movies.
+ *
+ * TMDB and Wikipedia normally answer in well under 500ms. The budget exists
+ * for the sources that do not: from a datacenter IP some hosts throttle or
+ * silently blackhole requests, and node-fetch has no default timeout, so one
+ * unresponsive source used to stall the entire search.
+ */
+export const GROUNDING_SOURCE_TIMEOUT_MS =
+  Number(process.env.GROUNDING_SOURCE_TIMEOUT_MS) || 3000;
+
+/**
+ * Backstop across all grounding sources combined. Sources run in parallel, so
+ * this should only bite if many of them are simultaneously degraded.
+ */
+export const GROUNDING_TOTAL_TIMEOUT_MS =
+  Number(process.env.GROUNDING_TOTAL_TIMEOUT_MS) || 6000;
+
 export const PROVIDERS: Providers = {
   netflix: 8,
   prime: 119,
