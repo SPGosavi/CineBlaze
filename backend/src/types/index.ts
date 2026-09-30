@@ -79,6 +79,13 @@ export interface GroqChatOptions {
   maxTokens?: number;
   responseFormat?: { type: string } | null;
   label?: string;
+  /**
+   * How much budget the model may spend on internal reasoning before it
+   * starts emitting output. Only meaningful for reasoning models such as
+   * the gpt-oss family, where reasoning tokens are billed against
+   * max_tokens. Defaults to GROQ_REASONING_EFFORT.
+   */
+  reasoningEffort?: "low" | "medium" | "high" | null;
 }
 
 /** A single message in the Groq chat format */
@@ -212,10 +219,16 @@ export interface GroqApiResponse {
     message?: {
       content?: string;
     };
+    /** "stop" on a complete answer, "length" when max_tokens was hit. */
+    finish_reason?: string;
   }[];
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
+    /** Reasoning models report their thinking budget separately here. */
+    completion_tokens_details?: {
+      reasoning_tokens?: number;
+    };
   };
 }
 
@@ -223,6 +236,12 @@ export interface GroqApiResponse {
 export interface GroqApiError {
   error?: {
     message?: string;
+    /**
+     * Present when the model produced output that failed JSON-schema
+     * validation. Contains the raw text it tried to emit, which is the only
+     * way to tell a truncated response apart from a malformed one.
+     */
+    failed_generation?: string;
   };
 }
 
