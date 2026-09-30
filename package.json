@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "<h1 align=\"center\">🔥CineBlaze</h1>",
   "main": "index.js",
+  "//workspaces": "frontend/ is deliberately NOT a workspace. It is the Phase 2 React+Vite app, kept as a reference and still deployed from its own directory with its own lockfile; pulling it in here would change how Vercel installs it. Use the *:legacy scripts to run it.",
+  "workspaces": [
+    "shared",
+    "backend",
+    "web"
+  ],
   "devDependencies": {
     "concurrently": "^10.0.5",
     "husky": "^9.1.7",
@@ -10,10 +16,12 @@
     "prettier": "^3.9.8"
   },
   "scripts": {
-    "dev": "concurrently \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
-    "lint": "npm run lint --prefix frontend",
-    "typecheck": "npm run typecheck --prefix backend",
-    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "dev": "concurrently -n shared,api,web -c gray,cyan,magenta \"npm run dev -w @cineblaze/shared\" \"npm run dev -w movie-finder-backend\" \"npm run dev -w web\"",
+    "dev:legacy": "concurrently -n vite,api -c yellow,cyan \"npm run dev --prefix frontend\" \"npm run dev -w movie-finder-backend\"",
+    "lint": "npm run lint -w web && npm run lint --prefix frontend",
+    "typecheck": "npm run build -w @cineblaze/shared && npm run typecheck -w movie-finder-backend && npm run typecheck -w web",
+    "build": "npm run build -w @cineblaze/shared && npm run build -w movie-finder-backend && npm run build -w web",
+    "build:legacy": "npm run build --prefix frontend",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky",

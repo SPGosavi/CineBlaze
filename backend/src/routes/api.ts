@@ -7,6 +7,7 @@ import {
 import {
   findMovies,
   getSimilar,
+  getMediaById,
   getMediaDetails,
   getMediaExtras,
 } from "../controllers/searchController.js";
@@ -17,6 +18,11 @@ const router: Router = express.Router();
 router.get("/trending/all", getTrendingAll);
 router.get("/trending/indian", getTrendingIndian);
 router.get("/trending/platform/:platform", getTrendingPlatform);
+
+// Media Routes
+// A cacheable read used by the Next.js detail page. `POST /media-details`
+// stays for the Vite frontend, which looks titles up by name as well as by id.
+router.get("/media/:mediaType/:id", getMediaById);
 
 // Search Routes
 router.post("/find-movies", findMovies);

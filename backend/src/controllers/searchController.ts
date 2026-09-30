@@ -8,7 +8,7 @@ import {
 } from "../services/aiService.js";
 import {
   fetchEnrichedData,
-  fetchEnrichedDataById,
+  fetchFullDetailsById,
   getNativeTmdbRecommendations,
   enrichWithDeepData,
   searchTmdbDirect,
@@ -24,6 +24,58 @@ import {
   MoviesResponse,
   EnrichedMedia,
 } from "../types/index.js";
+
+/**
+ * `GET /api/media/:mediaType/:id` — full record for a single title.
+ *
+ * A GET rather than a reuse of `POST /api/media-details` because this is a
+ * pure read of an immutable-ish resource, and every caching layer between the
+ * browser and here — the CDN, Next.js's data cache, the browser itself — only
+ * caches GETs. The Next.js detail route is server-rendered and revalidated on
+ * a timer, so it needs a request that is legitimately cacheable.
+ *
+ * Responds 404 when TMDB has no such id, so the page can render `notFound()`
+ * instead of an empty shell.
+ */
+export const getMediaById = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { mediaType, id } = req.params;
+
+  if (mediaType !== "movie" && mediaType !== "tv") {
+    res.status(400).json({ error: "mediaType must be 'movie' or 'tv'" });
+    return;
+  }
+
+  const numericId = Number(id);
+  if (!Number.isInteger(numericId) || numericId <= 0) {
+    res.status(400).json({ error: "id must be a positive integer" });
+    return;
+  }
+
+  const cacheKey = `details_${mediaType}_${numericId}`;
+  const cached = cache.get<EnrichedMedia>(cacheKey);
+  if (cached) {
+    res.json(cached);
+    return;
+  }
+
+  try {
+    const data = await fetchFullDetailsById(numericId, mediaType);
+
+    if (!data) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
+    cache.set(cacheKey, data, 3600);
+    res.json(data);
+  } catch (e) {
+    console.error("[Media] Detail fetch error:", e);
+    res.status(500).json({ error: "Failed to fetch details" });
+  }
+};
 
 export const getMediaDetails = async (
   req: Request,
@@ -45,7 +97,12 @@ export const getMediaDetails = async (
     let data;
 
     if (id) {
-      data = await fetchEnrichedDataById(id, media_type);
+      // Returns the complete record rather than just genres/director/cast.
+      // The Next.js detail route renders from an id alone and has no prior
+      // state to merge the extras into; the modal this endpoint was built for
+      // did. Callers that already hold a title are unaffected — they just
+      // receive fields they were going to overwrite anyway.
+      data = await fetchFullDetailsById(id, media_type);
     } else if (title) {
       data = await fetchEnrichedData(title, year, media_type);
     }

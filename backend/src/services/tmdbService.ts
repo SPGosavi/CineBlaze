@@ -613,40 +613,116 @@ async function performTmdbSearch(
   }
 }
 
+/**
+ * Pulls genres, director and cast out of a TMDB detail payload.
+ *
+ * Split out of `fetchTmdbDetails` so `fetchFullDetailsById` can reuse the
+ * credit-parsing rules — in particular the TV fallback chain of
+ * `created_by` -> executive producer -> "Unknown" — without duplicating them.
+ *
+ * `castLimit` exists because the two callers want different amounts: a card
+ * shows three names, a detail page has room for the top billing.
+ */
+function parseTmdbDetails(
+  data: TmdbDetailResponse,
+  mediaType: MediaType,
+  castLimit = 3
+): TmdbDetails {
+  const genres = data.genres ? data.genres.map((g) => g.name).slice(0, 3) : [];
+
+  let director = "Unknown";
+  if (mediaType === "movie") {
+    const d = data.credits?.crew?.find((p) => p.job === "Director");
+    if (d) director = d.name;
+  } else if (data.created_by && data.created_by.length > 0) {
+    director = data.created_by.map((c) => c.name).join(", ");
+  } else {
+    const exec = data.credits?.crew?.find(
+      (p) => p.job === "Executive Producer"
+    );
+    if (exec) director = exec.name;
+  }
+
+  const cast = data.credits?.cast?.slice(0, castLimit).map((c) => c.name) ?? [];
+
+  return { genres, director, cast };
+}
+
 async function fetchTmdbDetails(
   id: number,
   mediaType: MediaType
 ): Promise<TmdbDetails> {
   const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
   try {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
     const data = (await res.json()) as TmdbDetailResponse;
-    const genres = data.genres
-      ? data.genres.map((g: any) => g.name).slice(0, 3)
-      : [];
-    let director = "Unknown";
-    if (mediaType === "movie") {
-      const d = data.credits?.crew?.find((p: any) => p.job === "Director");
-      if (d) director = d.name;
-    } else {
-      if (data.created_by && data.created_by.length > 0)
-        director = data.created_by.map((c: any) => c.name).join(", ");
-      else {
-        const exec = data.credits?.crew?.find(
-          (p: any) => p.job === "Executive Producer"
-        );
-        if (exec) director = exec.name;
-      }
-    }
-    const cast = data.credits?.cast?.slice(0, 3).map((c: any) => c.name) || [];
-    return { genres, director, cast } as TmdbDetails;
-  } catch (e) {
-    return {
-      genres: [],
-      director: "Unknown",
-      cast: [],
-    } as unknown as TmdbDetails;
+    return parseTmdbDetails(data, mediaType);
+  } catch {
+    return { genres: [], director: "Unknown", cast: [] };
   }
+}
+
+/**
+ * Fetches everything needed to render a title from its TMDB id alone.
+ *
+ * `fetchEnrichedDataById` deliberately returns only genres/director/cast: it
+ * was written for the Phase 2 details modal, which opened with the title,
+ * poster and overview already in hand from the card the user clicked and only
+ * needed the missing extras backfilled.
+ *
+ * The Next.js detail route has no such prior state — an id from the URL is
+ * all it gets — so it needs the full record. The underlying TMDB request
+ * already returns title, poster, overview and release date; the old path
+ * simply discarded them.
+ *
+ * Returns null when TMDB has no such id, which the controller turns into a
+ * 404 rather than an empty page.
+ */
+export async function fetchFullDetailsById(
+  id: number,
+  mediaType: MediaType
+): Promise<EnrichedMedia | null> {
+  if (!id || !mediaType) return null;
+
+  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
+
+  let data: TmdbDetailResponse;
+  try {
+    const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
+    if (!res.ok) return null;
+    data = (await res.json()) as TmdbDetailResponse;
+  } catch (e) {
+    console.warn(`[TMDB] Full detail fetch failed for ${mediaType}/${id}:`, e);
+    return null;
+  }
+
+  const title = data.title || data.name || "";
+  if (!title) return null;
+
+  const releaseDate = data.release_date || data.first_air_date || "";
+  const details = parseTmdbDetails(data, mediaType, 10);
+
+  // Both are independently cached and neither blocks the other.
+  const [providers, ratings] = await Promise.all([
+    fetchWatchProviders(id, mediaType),
+    fetchRatings(title, releaseDate.split("-")[0] || undefined),
+  ]);
+
+  return {
+    id,
+    title,
+    media_type: mediaType,
+    release_date: releaseDate,
+    overview: data.overview ?? "",
+    poster_path: data.poster_path ?? null,
+    vote_average: data.vote_average ?? 0,
+    genres: details.genres,
+    director: details.director,
+    cast: details.cast,
+    providers,
+    imdb_rating: ratings.imdb,
+    rotten_tomatoes: ratings.rt,
+  };
 }
 
 export async function fetchWatchProviders(

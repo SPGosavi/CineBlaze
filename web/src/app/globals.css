@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind v4 is CSS-first: there is no tailwind.config.js. Theme values and
+ * custom utilities are declared here instead.
+ *
+ * The Phase 2 app referenced `animate-fade-in`, `scrollbar-hide`,
+ * `scrollbar-thin` and `pb-safe` but its tailwind.config.js had an empty
+ * `theme.extend` and only defined the scrollbar rules via an injected <style>
+ * tag. The animation classes therefore did nothing at all. They are defined
+ * properly here so the markup means what it says.
+ */
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --animate-fade-in: fade-in 0.25s ease-out;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background-color: #000;
+  color: #f3f4f6;
+}
+
+/* App-wide scrollbar styling. Was an injected <style> tag in Phase 2. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #262626;
+  border-radius: 4px;
+  border: 1px solid #0a0a0a;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #dc2626;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #262626 #0a0a0a;
+}
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+/* Keeps the mobile bottom bar clear of the iOS home indicator. */
+@utility pb-safe {
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+}

@@ -38,7 +38,6 @@
     <em>Note: Guest login is enabled for quick access. AI-based search responses take minimal time thanks to low-latency Groq inference.</em>
 </p>
 
-
 ## 🧠 Skills & Concepts Demonstrated
 
 - GenAI Integration & Prompt Engineering
@@ -57,13 +56,13 @@
 
 ## 🚀 Key Features
 
-- 🧠 **AI Semantic Search** — Find movies and series using natural language descriptions powered by Groq  
-- 📋 **Kanban Watchlist** — Drag & drop content across watch states ("Want to Watch", "Watching Now", "Watched")  
-- 🔥 **Trending & Platform Discovery** — Netflix, Prime Video, Hotstar, Indian & Global content  
-- 📺 **Streaming Availability** — Know where to watch instantly with platform logos  
-- ⭐ **Unified Ratings** — IMDb, Rotten Tomatoes & TMDB in one place  
-- 📱 **Fully Responsive Design** — Mobile-first UX with touch and swipe-friendly carousels  
-- 🔐 **Authentication** — Secure Email/Password login, prefilled Demo access, and Guest login powered by Firebase Auth  
+- 🧠 **AI Semantic Search** — Find movies and series using natural language descriptions powered by Groq
+- 📋 **Kanban Watchlist** — Drag & drop content across watch states ("Want to Watch", "Watching Now", "Watched")
+- 🔥 **Trending & Platform Discovery** — Netflix, Prime Video, Hotstar, Indian & Global content
+- 📺 **Streaming Availability** — Know where to watch instantly with platform logos
+- ⭐ **Unified Ratings** — IMDb, Rotten Tomatoes & TMDB in one place
+- 📱 **Fully Responsive Design** — Mobile-first UX with touch and swipe-friendly carousels
+- 🔐 **Authentication** — Secure Email/Password login, prefilled Demo access, and Guest login powered by Firebase Auth
 
 ---
 
@@ -99,84 +98,114 @@ Client (React 19 + Vite)
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- React 19 + Vite  
-- Tailwind CSS  
-- Lucide Icons  
-- Axios  
-- Firebase SDK (Auth & Firestore)  
-- Native HTML5 Drag & Drop API  
+### Web app (`web/`)
 
-### Backend
-- Node.js + Express  
-- Groq API (High-throughput, low-latency LLM inference)  
-- TMDB API & OMDb API  
-- node-cache (Multi-tier caching)  
-- node-fetch  
+- Next.js 16 (App Router, Server Components, Turbopack)
+- TypeScript
+- Tailwind CSS v4
+- Lucide Icons
+- Axios
+- Firebase SDK (Auth & Firestore)
+- Native HTML5 Drag & Drop API
+
+### Backend (`backend/`)
+
+- Node.js + Express + TypeScript
+- Groq API (High-throughput, low-latency LLM inference)
+- TMDB API & OMDb API
+- node-cache (Multi-tier caching)
+- node-fetch
+
+### Shared (`shared/`)
+
+- `@cineblaze/shared` — the request/response types both sides import, so the
+  API contract is enforced by the compiler rather than by convention
+
+### Rendering strategy
+
+| Route                   | Strategy                                             |
+| ----------------------- | ---------------------------------------------------- |
+| `/` — Discover          | ISR (trending shelves stream in behind Suspense)     |
+| `/search?q=`            | SSR — shareable, refreshable search URLs             |
+| `/movie/:id`, `/tv/:id` | SSR with Open Graph tags + JSON-LD structured data   |
+| `/watchlist`            | CSR — live Firestore sync, drag-and-drop, auth-gated |
 
 ### Deployment & Services
-- **Frontend**: Vercel  
-- **Backend**: Render  
-- **Database / Auth**: Firebase Cloud Firestore & Firebase Auth  
-- **External APIs**: Groq, TMDB, OMDb  
+
+- **Web**: Vercel
+- **Backend**: Render
+- **Database / Auth**: Firebase Cloud Firestore & Firebase Auth
+- **External APIs**: Groq, TMDB, OMDb
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js v18 or higher  
-- npm or yarn  
+
+- Node.js v22.19.0 (see `.nvmrc`)
+- npm v10+ (workspaces)
 - API keys for:
   - Groq API (`GROQ_API_KEY`)
   - TMDB API (`TMDB_API_KEY`)
   - OMDb API (`OMDB_API_KEY`)
-  - Firebase Project Configuration  
+  - Firebase Project Configuration
 
 ### Setup & Run Locally
 
-1. **Clone the repository:**
+1. **Clone and install.** One install at the root covers `shared`, `backend`
+   and `web` — they are npm workspaces.
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/cineblaze.git
    cd cineblaze
-   ```
-
-2. **Backend Setup:**
-   ```bash
-   cd backend
    npm install
    ```
-   Create a `.env` file in `backend/`:
+
+2. **Backend environment** — create `backend/.env`:
+
    ```env
    PORT=5001
    GROQ_API_KEY=your_groq_api_key
    TMDB_API_KEY=your_tmdb_api_key
    OMDB_API_KEY=your_omdb_api_key
    ```
-   Start the backend:
-   ```bash
-   npm run dev
+
+3. **Web environment** — copy `web/.env.example` to `web/.env.local` and fill
+   in the Firebase values. Leave them blank to run without auth: discovery,
+   search and detail pages all work signed out, only the watchlist is disabled.
+
+   ```env
+   BACKEND_API_URL=http://localhost:5001
+   NEXT_PUBLIC_SITE_URL=http://localhost:3000
+   NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_key
+   # ...see web/.env.example for the full list
    ```
 
-3. **Frontend Setup:**
+   The browser never calls the backend directly — `next.config.ts` rewrites
+   `/api/*` to `BACKEND_API_URL`, so there is no CORS setup and the API origin
+   stays out of the client bundle.
+
+4. **Run everything:**
    ```bash
-   cd ../frontend
-   npm install
+   npm run dev          # shared (watch) + Express API + Next.js
    ```
-   Create a `.env` file in `frontend/`:
-   ```env
-   VITE_API_URL=http://localhost:5001
-   VITE_FIREBASE_API_KEY=your_firebase_key
-   VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-   VITE_FIREBASE_PROJECT_ID=your_project_id
-   VITE_FIREBASE_STORAGE_BUCKET=your_bucket.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-   VITE_FIREBASE_APP_ID=your_app_id
-   ```
-   Start the frontend:
-   ```bash
-   npm run dev
-   ```
+   Then open http://localhost:3000.
+
+### Useful scripts
+
+| Command              | What it does                                 |
+| -------------------- | -------------------------------------------- |
+| `npm run dev`        | Shared types watcher + Express API + Next.js |
+| `npm run dev:legacy` | The Phase 2 React + Vite app + Express API   |
+| `npm run build`      | Builds shared, backend and web               |
+| `npm run typecheck`  | Type-checks every workspace                  |
+| `npm run lint`       | Lints `web/` and `frontend/`                 |
+| `npm run format`     | Prettier across the repo                     |
+
+> `frontend/` is the previous React + Vite client, kept for reference. It is
+> not an npm workspace, so it keeps its own `package-lock.json` — install it
+> separately with `npm install --prefix frontend` if you want to run it.
 
 <h2>📄 License</h2>
 
@@ -184,8 +213,3 @@ Client (React 19 + Vite)
     This project is licensed under the <strong>MIT License</strong>.  
     You are free to use, modify, and distribute this software with proper attribution.
 </p>
-
-
-
-
-
