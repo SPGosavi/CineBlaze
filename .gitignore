@@ -11,6 +11,12 @@ build
 dist
 frontend/dist
 
+# next.js
+web/.next
+web/out
+web/next-env.d.ts
+.vercel
+
 # misc
 .DS_Store
 .env
