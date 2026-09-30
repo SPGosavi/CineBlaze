@@ -87,7 +87,59 @@ export function getLanguageCode(
   languageName: string | null | undefined
 ): string | null {
   if (!languageName) return null;
-  return LANGUAGE_MAP[languageName.toLowerCase().trim()] || null;
+  return LANGUAGE_MAP[normalizeLanguageName(languageName)] || null;
+}
+
+/**
+ * Umbrella terms that describe a group of film industries rather than one
+ * language.
+ *
+ * "south indian" is the common case: it spans four separate industries, and a
+ * single ISO code cannot express it. Before this existed, such a query
+ * resolved to null, which meant no language-filtered discover ran at all and
+ * the model was asked to identify a film with almost no grounding.
+ */
+const LANGUAGE_GROUPS: Record<string, string[]> = {
+  "south indian": ["ta", "te", "ml", "kn"],
+  "south india": ["ta", "te", "ml", "kn"],
+  south: ["ta", "te", "ml", "kn"],
+  dravidian: ["ta", "te", "ml", "kn"],
+
+  indian: ["hi", "ta", "te", "ml"],
+  india: ["hi", "ta", "te", "ml"],
+  desi: ["hi", "ta", "te", "ml"],
+
+  "north indian": ["hi", "pa"],
+  "north india": ["hi", "pa"],
+};
+
+/** Strips the filler that tends to trail an industry name in a query. */
+function normalizeLanguageName(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/\b(cinema|movies?|films?|film industry|language)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Resolves a language or region name to one or more ISO 639-1 codes.
+ *
+ * Returns an array because umbrella terms map to several industries. Callers
+ * that can only handle one code should use `getLanguageCode`.
+ */
+export function getLanguageCodes(
+  languageName: string | null | undefined
+): string[] {
+  if (!languageName) return [];
+  const normalized = normalizeLanguageName(languageName);
+
+  const group = LANGUAGE_GROUPS[normalized];
+  if (group) return group;
+
+  const single = LANGUAGE_MAP[normalized];
+  return single ? [single] : [];
 }
 
 export function getGenreIds(genreNames: string[] | null | undefined): number[] {
@@ -97,4 +149,4 @@ export function getGenreIds(genreNames: string[] | null | undefined): number[] {
     .filter((id): id is number => Boolean(id));
 }
 
-export { LANGUAGE_MAP, GENRE_ID_MAP };
+export { LANGUAGE_MAP, GENRE_ID_MAP, LANGUAGE_GROUPS };

@@ -49,20 +49,25 @@ export const GROQ_REASONING_EFFORT = (process.env.GROQ_REASONING_EFFORT ||
 /**
  * Per-source deadline for the grounding lookups behind /find-movies.
  *
- * TMDB and Wikipedia normally answer in well under 500ms. The budget exists
- * for the sources that do not: from a datacenter IP some hosts throttle or
- * silently blackhole requests, and node-fetch has no default timeout, so one
- * unresponsive source used to stall the entire search.
+ * TMDB and Wikipedia answer in roughly 130-430ms. The budget exists for the
+ * sources that do not: from a datacenter IP some hosts throttle or silently
+ * blackhole requests, and node-fetch has no default timeout.
+ *
+ * Measured at 3000ms this was too generous in practice. DuckDuckGo regularly
+ * consumed the full budget and, because the phase waits for its slowest
+ * source, single-handedly set grounding latency at ~3s while contributing
+ * nothing. At 2000ms a healthy DDG response (~1s) still lands, while a stalled
+ * one is dropped before it dominates the phase.
  */
 export const GROUNDING_SOURCE_TIMEOUT_MS =
-  Number(process.env.GROUNDING_SOURCE_TIMEOUT_MS) || 3000;
+  Number(process.env.GROUNDING_SOURCE_TIMEOUT_MS) || 2000;
 
 /**
  * Backstop across all grounding sources combined. Sources run in parallel, so
  * this should only bite if many of them are simultaneously degraded.
  */
 export const GROUNDING_TOTAL_TIMEOUT_MS =
-  Number(process.env.GROUNDING_TOTAL_TIMEOUT_MS) || 6000;
+  Number(process.env.GROUNDING_TOTAL_TIMEOUT_MS) || 2500;
 
 // ─── TMDB ───────────────────────────────────────────────────────────────────
 
