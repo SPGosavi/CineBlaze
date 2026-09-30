@@ -11,6 +11,7 @@ import {
   TMDB_API_KEY,
 } from "../config.js";
 import { fetchWithTimeout, bestEffort } from "../utils/http.js";
+import { sleep, backoffDelay } from "../utils/retry.js";
 import { getLanguageCode, getGenreIds } from "../utils/languageMap.js";
 import type {
   ChatMessage,
@@ -25,16 +26,6 @@ import type {
 } from "../types/index.js";
 
 // ─── Groq Request Helper (retry + backoff + fallback model) ────────────────
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Exponential backoff with jitter: ~500ms, ~1s, ~2s (+/- up to 100ms). */
-function backoffDelay(attempt: number): number {
-  const base = 500 * 2 ** (attempt - 1);
-  const jitter = Math.random() * 100;
-  return base + jitter;
-}
 
 /** Cheap non-cryptographic hash (djb2) used only to correlate log lines for the same query. */
 function hashString(str: string): string {
