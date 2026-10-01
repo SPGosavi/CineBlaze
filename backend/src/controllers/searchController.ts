@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
-import cache from "../utils/cache.js";
+import * as cache from "../cache/index.js";
+import { CacheKeys } from "../cache/index.js";
 import {
   callGroqWithFallback,
   callGroqSimilar,
@@ -24,6 +25,10 @@ import {
   MoviesResponse,
   EnrichedMedia,
 } from "../types/index.js";
+import { childLogger } from "../utils/logger.js";
+import { recordSearch, recordWatchEvent } from "../db/repositories.js";
+
+const log = childLogger("search");
 
 /**
  * `GET /api/media/:mediaType/:id` — full record for a single title.
@@ -54,8 +59,8 @@ export const getMediaById = async (
     return;
   }
 
-  const cacheKey = `details_${mediaType}_${numericId}`;
-  const cached = cache.get<EnrichedMedia>(cacheKey);
+  const cacheKey = CacheKeys.details(mediaType, numericId);
+  const cached = await cache.get<EnrichedMedia>(cacheKey);
   if (cached) {
     res.json(cached);
     return;
@@ -69,10 +74,26 @@ export const getMediaById = async (
       return;
     }
 
-    cache.set(cacheKey, data, 3600);
+    await cache.set(cacheKey, data, 3600);
+
+    // A detail fetch is the strongest passive signal of interest the app
+    // has — stronger than a search, weaker than a watchlist add — and it is
+    // what Phase 5's taste profiles are built from. Fire-and-forget, and a
+    // no-op when either the database or the user is absent.
+    if (req.user?.userId) {
+      void recordWatchEvent({
+        userId: req.user.userId,
+        tmdbId: data.id,
+        mediaType: data.media_type,
+        title: data.title,
+        genres: data.genres ?? [],
+        action: "viewed",
+      });
+    }
+
     res.json(data);
   } catch (e) {
-    console.error("[Media] Detail fetch error:", e);
+    log.error({ err: String(e) }, "[Media] Detail fetch error:");
     res.status(500).json({ error: "Failed to fetch details" });
   }
 };
@@ -85,9 +106,9 @@ export const getMediaDetails = async (
 
   // Check cache for details to save API calls
   const cacheKey = id
-    ? `details_${media_type}_${id}`
-    : `details_${title}_${year}_${media_type}`;
-  const cached = cache.get(cacheKey);
+    ? CacheKeys.details(media_type, id)
+    : CacheKeys.detailsByTitle(title ?? "", year, media_type);
+  const cached = await cache.get(cacheKey);
   if (cached) {
     res.json(cached);
     return;
@@ -108,13 +129,13 @@ export const getMediaDetails = async (
     }
 
     if (data) {
-      cache.set(cacheKey, data, 3600); // Cache details for 1 hour
+      await cache.set(cacheKey, data, 3600); // Cache details for 1 hour
       res.json(data);
     } else {
       res.json({}); // Return empty if not found to stop spinner
     }
   } catch (e) {
-    console.error("Detail Fetch Error:", e);
+    log.error({ err: String(e) }, "Detail Fetch Error:");
     res.status(500).json({ error: "Failed to fetch details" });
   }
 };
@@ -209,7 +230,7 @@ function isGenericBrowsingQuery(query: string): boolean {
       "loves",
     ];
     if (!plotWords.some((pw) => prefix.includes(pw))) {
-      console.log(
+      log.debug(
         `[Search] Detected generic browsing query (suffix pattern): "${q}"`
       );
       return true;
@@ -221,7 +242,7 @@ function isGenericBrowsingQuery(query: string): boolean {
     const middle = match![2];
     const plotWords = ["about", "where", "who", "story", "based on", "set in"];
     if (!plotWords.some((pw) => middle.includes(pw))) {
-      console.log(
+      log.debug(
         `[Search] Detected generic browsing query (prefix pattern): "${q}"`
       );
       return true;
@@ -229,7 +250,7 @@ function isGenericBrowsingQuery(query: string): boolean {
   }
 
   if (moviesOfPattern.test(q)) {
-    console.log(
+    log.debug(
       `[Search] Detected generic browsing query (of/by pattern): "${q}"`
     );
     return true;
@@ -277,16 +298,56 @@ export const findMovies = async (
     return;
   }
 
-  const cacheKey = `search_${description?.toLowerCase().trim()}`;
-  const cached = cache.get<MoviesResponse>(cacheKey);
+  const cacheKey = CacheKeys.search(description);
+  const startedAt = Date.now();
+
+  /**
+   * Single exit point for a successful search.
+   *
+   * `findMovies` has six of them across its routing ladder, and every one had
+   * to cache, respond and — now — record. Centralising it keeps those three
+   * from drifting apart, and makes `resolvedBy` cheap to attach: which branch
+   * answered is the one thing the Phase 5 eval harness most needs and the
+   * logs never recorded.
+   */
+  const respond = async (
+    movies: EnrichedMedia[],
+    resolvedBy:
+      | "cache"
+      | "title"
+      | "generic"
+      | "ai-generic"
+      | "ai"
+      | "keyword-fallback"
+      | "none",
+    ttlSeconds: number | null
+  ): Promise<void> => {
+    const response: MoviesResponse = { movies };
+    if (ttlSeconds !== null) await cache.set(cacheKey, response, ttlSeconds);
+
+    // Not awaited: recording that a search happened must never be able to
+    // delay or fail the search itself. The repository swallows its own errors.
+    void recordSearch({
+      userId: req.user?.userId ?? null,
+      query: description,
+      resultsCount: movies.length,
+      resolvedBy,
+      durationMs: Date.now() - startedAt,
+    });
+
+    res.setHeader("X-Resolved-By", resolvedBy);
+    res.json(response);
+  };
+
+  const cached = await cache.get<MoviesResponse>(cacheKey);
   if (cached) {
-    console.log(`[Cache] Hit: "${description.substring(0, 20)}..."`);
-    res.json(cached);
+    log.debug(`[Cache] Hit: "${description.substring(0, 20)}..."`);
+    await respond(cached.movies, "cache", null);
     return;
   }
 
   try {
-    console.log(`[Search] Processing: "${description.substring(0, 50)}..."`);
+    log.debug(`[Search] Processing: "${description.substring(0, 50)}..."`);
 
     let aiResults: AiSuggestion[] = [];
     const isTitle = isLikelyTitleQuery(description);
@@ -294,23 +355,20 @@ export const findMovies = async (
 
     // ─── Fast Path: Direct title lookup ─────────────────────────
     if (isTitle) {
-      console.log("[Search] Detected title query. Skipping AI Search.");
+      log.debug("[Search] Detected title query. Skipping AI Search.");
 
       const directResults = await searchTmdbDirect(description);
 
       if (directResults.length > 0) {
         const enriched = await enrichWithDeepData(directResults);
-        const response: MoviesResponse = { movies: enriched };
-
-        cache.set(cacheKey, response, 3600); // cache for 1 hour
-        res.json(response);
+        await respond(enriched, "title", 3600);
         return;
       }
     }
 
     // ─── Fast Path: Generic browsing query ──────────────────────
     if (isGeneric) {
-      console.log(
+      log.debug(
         "[Search] Detected generic browsing query. Skipping AI, using TMDB direct search."
       );
 
@@ -318,10 +376,7 @@ export const findMovies = async (
 
       if (directResults.length > 0) {
         const enriched = await enrichWithDeepData(directResults);
-        const response: MoviesResponse = { movies: enriched };
-
-        cache.set(cacheKey, response, 3600);
-        res.json(response);
+        await respond(enriched, "generic", 3600);
         return;
       }
       // If direct search fails for generic query, fall through to AI
@@ -334,20 +389,18 @@ export const findMovies = async (
 
       // Double-check: if AI says it's generic but our regex missed it
       if (structuredParams?.is_generic && !structuredParams.plot_keywords) {
-        console.log(
+        log.debug(
           "[Search] AI flagged query as generic. Using TMDB direct search."
         );
         const directResults = await searchTmdbDirect(description);
         if (directResults.length > 0) {
           const enriched = await enrichWithDeepData(directResults);
-          const response: MoviesResponse = { movies: enriched };
-          cache.set(cacheKey, response, 3600);
-          res.json(response);
+          await respond(enriched, "ai-generic", 3600);
           return;
         }
       }
     } catch (e) {
-      console.warn(
+      log.warn(
         "[Search] Structured param extraction failed, continuing with basic AI search."
       );
     }
@@ -376,7 +429,7 @@ export const findMovies = async (
         });
         return;
       }
-      console.warn("[Search] AI Service Failed. Switching to Fallback.");
+      log.warn("[Search] AI Service Failed. Switching to Fallback.");
     }
 
     // 2. Fallback Logic: Direct TMDB Search if AI returned nothing AND it's a short query
@@ -384,30 +437,31 @@ export const findMovies = async (
       (!aiResults || aiResults.length === 0) &&
       description.split(" ").length < 8
     ) {
-      console.log(
+      log.debug(
         "[Search] AI returned 0 results. Executing Direct TMDB Search with keywords."
       );
 
       // Extract clean keywords if it's currently a full description
       if (aiKeywords === description) {
         aiKeywords = await extractKeywords(description);
-        console.log(`[Fallback] Extracted Keywords: "${aiKeywords}"`);
+        log.debug(`[Fallback] Extracted Keywords: "${aiKeywords}"`);
       }
 
       const directResults = await searchTmdbDirect(aiKeywords);
 
       if (directResults.length > 0) {
         const enriched = await enrichWithDeepData(directResults);
-        const response: MoviesResponse = { movies: enriched };
-        cache.set(cacheKey, response, 300);
-        res.json(response);
+        await respond(enriched, "keyword-fallback", 300);
         return;
       }
     }
 
     // If it's a long description and AI returned nothing, we stop here rather than showing irrelevant TMDB results
     if (!aiResults || aiResults.length === 0) {
-      res.json({ movies: [] });
+      // Not cached: an empty result is usually a retrieval failure rather
+      // than a fact about the catalogue, and caching it would pin that
+      // failure in place for everyone who asks the same thing.
+      await respond([], "none", null);
       return;
     }
 
@@ -415,14 +469,14 @@ export const findMovies = async (
     // Determine media type preferences from structured params or description
     const userWantsTV = /show|series|season/i.test(description);
 
-    console.log(`[Search] AI Results:`, JSON.stringify(aiResults));
+    log.debug({ payload: JSON.stringify(aiResults) }, `[Search] AI Results:`);
     const results = await Promise.all(
       aiResults.map((item) => {
         // Use the AI's media_type, but allow both types if unspecified
         let effectiveType = item.media_type || "movie";
         if (userWantsTV) effectiveType = "tv";
 
-        console.log(
+        log.debug(
           `[Search] Fetching: "${item.title}" (${item.year}) [${effectiveType}]`
         );
         return fetchEnrichedData(
@@ -437,20 +491,23 @@ export const findMovies = async (
 
     if (foundMovies.length === 0) {
       // If AI gave titles but TMDB found nothing, try Direct Search with keywords as last resort
-      console.log(
+      log.debug(
         `[Search] AI suggestions not found in TMDB. Trying Direct Search with: "${aiKeywords}"`
       );
       const directResults = await searchTmdbDirect(aiKeywords);
       const enriched = await enrichWithDeepData(directResults);
-      res.json({ movies: enriched });
+      await respond(
+        enriched,
+        "keyword-fallback",
+        enriched.length > 0 ? 300 : null
+      );
       return;
     } else {
-      cache.set(cacheKey, { movies: foundMovies }, 86400);
-      res.json({ movies: foundMovies });
+      await respond(foundMovies, "ai", 86400);
       return;
     }
   } catch (error) {
-    console.error("[Search Controller]", error);
+    log.error({ err: String(error) }, "[Search Controller]");
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -510,12 +567,12 @@ export const getSimilar = async (
         });
         return;
       }
-      console.warn("[Similar] AI Service Failed. Falling back to native.");
+      log.warn("[Similar] AI Service Failed. Falling back to native.");
     }
 
     // 2. Fallback to Native TMDB if AI failed or returned nothing
     if (finalResults.length === 0) {
-      console.log(`[Similar] Fallback to Native for: ${title} (${media_type})`);
+      log.debug(`[Similar] Fallback to Native for: ${title} (${media_type})`);
       const nativeRecs = await getNativeTmdbRecommendations(
         title,
         year || "",
@@ -528,7 +585,7 @@ export const getSimilar = async (
 
     res.json({ similar: finalResults });
   } catch (e) {
-    console.error(e);
+    log.error(e);
     res.status(500).json({ error: "Error" });
   }
 };
