@@ -1,15 +1,5 @@
 import type { NextConfig } from "next";
 
-/**
- * Origin of the Express API.
- *
- * Read here as well as in `lib/server-api.ts` because the rewrite below is
- * evaluated at config load, before any request exists.
- */
-const BACKEND_API_URL = (
-  process.env.BACKEND_API_URL ?? "http://localhost:5001"
-).replace(/\/$/, "");
-
 const nextConfig: NextConfig = {
   /**
    * `@cineblaze/shared` ships TypeScript-built ESM from the workspace rather
@@ -26,26 +16,16 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  async rewrites() {
-    return [
-      {
-        /**
-         * Proxies the browser's `/api/*` calls to Express.
-         *
-         * This is the Backend-for-Frontend seam: the client only ever talks
-         * to the Next.js origin, so the API's real host stays out of the
-         * bundle and there is no CORS preflight on any request. It also gives
-         * Phase 4 a single place to add auth headers or rate limiting.
-         *
-         * Server Components bypass this entirely — they have no origin to
-         * resolve a relative URL against, so `lib/server-api.ts` calls
-         * BACKEND_API_URL directly.
-         */
-        source: "/api/:path*",
-        destination: `${BACKEND_API_URL}/api/:path*`,
-      },
-    ];
-  },
+  /*
+   * The `/api/:path*` rewrite that used to live here is now a Route Handler
+   * at `src/app/api/[...path]/route.ts`.
+   *
+   * A rewrite proxies the request untouched, which was fine when the API was
+   * open. Phase 4 put a shared secret in front of Express, and that header has
+   * to be attached on the server — a rewrite has nowhere to do it, and a key
+   * added in the browser would not be a secret. The Route Handler is the same
+   * hop with somewhere to put credentials.
+   */
 };
 
 export default nextConfig;

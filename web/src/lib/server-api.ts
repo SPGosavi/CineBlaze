@@ -28,6 +28,19 @@ const BACKEND_URL = (
 ).replace(/\/$/, "");
 
 /**
+ * Shared secret for the Express API.
+ *
+ * Server-only, like BACKEND_API_URL. The whole reason the API key works as
+ * protection is that the browser never talks to Express directly — client
+ * requests go through the Next `/api/*` rewrite, so the key lives here and
+ * never reaches a bundle.
+ */
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY ?? null;
+
+const authHeaders = (): Record<string, string> =>
+  INTERNAL_API_KEY ? { "x-api-key": INTERNAL_API_KEY } : {};
+
+/**
  * Outcome of a server-side API call.
  *
  * The three cases are kept distinct on purpose. Collapsing a failure into an
@@ -63,6 +76,7 @@ async function request<T>(
   try {
     const response = await fetch(`${BACKEND_URL}${path}`, {
       ...init,
+      headers: { ...authHeaders(), ...init.headers },
       signal: controller.signal,
       next: { revalidate, ...(tags ? { tags } : {}) },
     });
