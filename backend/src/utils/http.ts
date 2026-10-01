@@ -1,4 +1,7 @@
 import fetch, { Response, RequestInit } from "node-fetch";
+import { childLogger } from "./logger.js";
+
+const log = childLogger("http");
 
 /** Thrown when a request is aborted by its own deadline rather than by the peer. */
 export class TimeoutError extends Error {
@@ -73,7 +76,7 @@ export async function bestEffort<T>(
     const result = await Promise.race([fn(controller.signal), deadline]);
 
     if (result === TIMED_OUT) {
-      console.warn(
+      log.warn(
         JSON.stringify({
           tag: "grounding",
           source: label,
@@ -84,7 +87,7 @@ export async function bestEffort<T>(
       return fallback;
     }
 
-    console.log(
+    log.debug(
       JSON.stringify({
         tag: "grounding",
         source: label,
@@ -96,7 +99,7 @@ export async function bestEffort<T>(
     return result as T;
   } catch (e: unknown) {
     const err = e as Error;
-    console.warn(
+    log.warn(
       JSON.stringify({
         tag: "grounding",
         source: label,
