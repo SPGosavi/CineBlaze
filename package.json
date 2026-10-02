@@ -40,6 +40,7 @@
   },
   "homepage": "https://github.com/SPGosavi/CineBlaze-movie-finder-web-app#readme",
   "dependencies": {
-    "@sentry/nextjs": "^11.2.0"
+    "@sentry/nextjs": "^11.2.0",
+    "typescript": "^5.9.3"
   }
 }
