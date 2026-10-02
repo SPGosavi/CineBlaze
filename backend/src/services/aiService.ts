@@ -24,6 +24,9 @@ import type {
   WikiSearchResponse,
   TmdbPaginatedResponse,
 } from "../types/index.js";
+import { childLogger } from "../utils/logger.js";
+
+const log = childLogger("ai");
 
 // ─── Groq Request Helper (retry + backoff + fallback model) ────────────────
 
@@ -37,7 +40,7 @@ function hashString(str: string): string {
 }
 
 function logGroqCall(info: Record<string, unknown>): void {
-  console.log(`[Groq]`, JSON.stringify(info));
+  log.debug({ payload: JSON.stringify(info) }, `[Groq]`);
 }
 
 /**
@@ -145,7 +148,7 @@ async function groqChat(
           // look identical in the logs, which is what made this class of
           // failure so hard to pin down.
           if (failedGeneration) {
-            console.warn(
+            log.warn(
               `[Groq] failed_generation (${failedGeneration.length} chars, label=${label}): ${failedGeneration.slice(0, 300)}`
             );
           }
@@ -177,7 +180,7 @@ async function groqChat(
           // The model ran out of budget mid-answer. Outside JSON mode this
           // returns silently truncated (often empty) content rather than an
           // error, so it has to be surfaced explicitly.
-          console.warn(
+          log.warn(
             `[Groq] Response truncated: hit max_tokens=${maxTokens} (label=${label}, model=${model}). Raise maxTokens or lower reasoningEffort.`
           );
         }
@@ -246,7 +249,7 @@ Query: "${query}"`;
     const parsed = JSON.parse(
       content.replace(/```json|```/g, "").trim()
     ) as Record<string, unknown>;
-    console.log(`[AI] Structured Params:`, JSON.stringify(parsed));
+    log.debug({ payload: JSON.stringify(parsed) }, `[AI] Structured Params:`);
     return {
       language: (parsed.language as string) || null,
       genres: Array.isArray(parsed.genres) ? parsed.genres : [],
@@ -260,7 +263,10 @@ Query: "${query}"`;
       is_generic: !!parsed.is_generic,
     };
   } catch (e: any) {
-    console.warn("[AI] Structured param extraction failed:", e.message);
+    log.warn(
+      { err: String(e.message) },
+      "[AI] Structured param extraction failed:"
+    );
     return getDefaultParams();
   }
 }
@@ -284,14 +290,14 @@ export async function callGroqWithFallback(
   userQuery: string,
   structuredParams: StructuredParams | null
 ): Promise<AiSuggestion[]> {
-  console.log(
+  log.debug(
     `[AI] Processing Single-Pass Search: "${userQuery.substring(0, 50)}..."`
   );
   try {
     const results = await makeGroqRequest(userQuery, structuredParams);
     return results || [];
   } catch (e: any) {
-    console.error("[AI] Single-Pass Request failed:", e.message);
+    log.error({ err: String(e.message) }, "[AI] Single-Pass Request failed:");
     throw e;
   }
 }
@@ -314,9 +320,9 @@ export async function extractKeywords(query: string): Promise<string> {
     });
     return content.trim() || query;
   } catch (e: any) {
-    console.warn(
-      "[AI] Keyword extraction failed, falling back to raw query:",
-      e.message
+    log.warn(
+      { err: String(e.message) },
+      "[AI] Keyword extraction failed, falling back to raw query:"
     );
     return query;
   }
@@ -358,7 +364,7 @@ async function fetchDDGLite(query: string): Promise<string> {
     }
     return results.slice(0, 3).join("\n");
   } catch (e: any) {
-    console.warn("[Search] DDG Lite fetch failed:", e.message);
+    log.warn({ err: String(e.message) }, "[Search] DDG Lite fetch failed:");
     return "";
   }
 }
@@ -383,7 +389,7 @@ async function fetchActorFilmography(
     if (!person) return "";
 
     const personId = person.id;
-    console.log(`[Context] Found actor "${actorName}" (ID: ${personId})`);
+    log.debug(`[Context] Found actor "${actorName}" (ID: ${personId})`);
 
     // Step 2: Get combined credits
     const creditsUrl = `https://api.themoviedb.org/3/person/${personId}/combined_credits?api_key=${TMDB_API_KEY}&language=en-US`;
@@ -433,7 +439,7 @@ async function fetchActorFilmography(
       })
       .join("\n");
   } catch (e: any) {
-    console.warn(
+    log.warn(
       `[Context] Actor filmography fetch failed for "${actorName}":`,
       e.message
     );
@@ -453,7 +459,7 @@ async function fetchLanguageFilteredDiscover(
       genreIds.length > 0 ? `&with_genres=${genreIds.join(",")}` : "";
     const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${TMDB_API_KEY}&with_original_language=${languageCode}${genreParam}&sort_by=popularity.desc&page=1`;
 
-    console.log(
+    log.debug(
       `[Context] Language-filtered discover: lang=${languageCode}, genres=${genreIds.join(",")}, type=${mediaType}`
     );
     const res = await fetchWithTimeout(url, GROUNDING_SOURCE_TIMEOUT_MS);
@@ -471,7 +477,10 @@ async function fetchLanguageFilteredDiscover(
       })
       .join("\n");
   } catch (e: any) {
-    console.warn("[Context] Language-filtered discover failed:", e.message);
+    log.warn(
+      { err: String(e.message) },
+      "[Context] Language-filtered discover failed:"
+    );
     return "";
   }
 }
@@ -635,7 +644,7 @@ async function getStableContext(
 
   const parts = settled.filter((p) => p && p.trim().length > 0);
 
-  console.log(
+  log.debug(
     JSON.stringify({
       tag: "grounding",
       source: "total",
@@ -705,7 +714,7 @@ export async function callGroqSimilar(
     });
     return parseJsonSafe(content);
   } catch (e: any) {
-    console.error("[AI Similar] Error:", e.message);
+    log.error({ err: String(e.message) }, "[AI Similar] Error:");
     throw e;
   }
 }
@@ -802,7 +811,7 @@ async function makeGroqRequest(
     label: "makeGroqRequest",
   });
 
-  console.log(`[AI] Raw Response: ${content?.substring(0, 200)}...`);
+  log.debug(`[AI] Raw Response: ${content?.substring(0, 200)}...`);
   return parseJsonSafe(content);
 }
 
@@ -813,7 +822,7 @@ async function makeGroqRequest(
  */
 function parseJsonSafe(text: string | null | undefined): AiSuggestion[] {
   if (!text) {
-    console.warn("[AI] parseJsonSafe called with empty content");
+    log.warn("[AI] parseJsonSafe called with empty content");
     return [];
   }
   const cleaned = text.replace(/```json|```/g, "").trim();
@@ -831,15 +840,15 @@ function parseJsonSafe(text: string | null | undefined): AiSuggestion[] {
         return jsonParsed[keys[0]].slice(0, 5) as AiSuggestion[];
     }
     // Valid JSON, but not a shape we recognize — treat as "no matches", not an error.
-    console.warn(
-      "[AI] parseJsonSafe: valid JSON but unrecognized shape:",
-      cleaned.substring(0, 200)
+    log.warn(
+      { payload: cleaned.substring(0, 200) },
+      "[AI] parseJsonSafe: valid JSON but unrecognized shape"
     );
     return [];
   } catch (e: any) {
-    console.warn(
-      "[AI] parseJsonSafe: malformed JSON from model:",
-      cleaned.substring(0, 200)
+    log.warn(
+      { payload: cleaned.substring(0, 200) },
+      "[AI] parseJsonSafe: malformed JSON from model"
     );
     return [];
   }

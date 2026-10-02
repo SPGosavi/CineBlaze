@@ -1,5 +1,6 @@
 import axios from "axios";
 import { DEFAULT_REQUEST_TIMEOUT } from "./constants";
+import { auth } from "./firebase";
 
 /**
  * Browser-side API client.
@@ -17,6 +18,34 @@ const api = axios.create({
   timeout: DEFAULT_REQUEST_TIMEOUT,
 });
 
+/**
+ * Attaches the caller's Firebase ID token when they are signed in.
+ *
+ * The API treats this as optional — every endpoint works anonymously, which
+ * is what keeps discovery and detail pages crawlable. What it buys is
+ * attribution: rate limits apply per account rather than per IP (so people
+ * behind the same NAT do not share a quota), and history can be recorded
+ * against a user.
+ *
+ * `getIdToken()` returns a cached token and refreshes it only when it is
+ * close to expiry, so this is not a network call on every request.
+ */
+api.interceptors.request.use(async (config) => {
+  const currentUser = auth?.currentUser;
+  if (currentUser) {
+    try {
+      config.headers.set(
+        "Authorization",
+        `Bearer ${await currentUser.getIdToken()}`
+      );
+    } catch {
+      // A token refresh failure must not block the request — the endpoint
+      // will simply treat it as anonymous.
+    }
+  }
+  return config;
+});
+
 export default api;
 
 /**
@@ -29,9 +58,30 @@ export default api;
  */
 export function describeApiError(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    if (error.response?.status === 429) {
-      return "Daily limit exceeded. Try again tomorrow, or search for the exact title instead.";
+    const status = error.response?.status;
+
+    if (status === 429) {
+      // The API now returns a real retry window rather than a flat refusal.
+      const retryAfter = Number(
+        (error.response?.data as { retryAfterSeconds?: number })
+          ?.retryAfterSeconds
+      );
+      if (Number.isFinite(retryAfter) && retryAfter > 0) {
+        const minutes = Math.ceil(retryAfter / 60);
+        return `Rate limit reached. Try again in about ${
+          minutes <= 1 ? "a minute" : `${minutes} minutes`
+        }, or search for an exact title.`;
+      }
+      return "Rate limit reached. Try again shortly, or search for an exact title.";
     }
+
+    if (status === 400) {
+      const issues = (
+        error.response?.data as { issues?: { message: string }[] }
+      )?.issues;
+      return issues?.[0]?.message ?? "That request wasn't valid.";
+    }
+
     if (error.response) {
       return "Search failed. Please try again.";
     }

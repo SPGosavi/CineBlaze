@@ -38,5 +38,8 @@
   "bugs": {
     "url": "https://github.com/SPGosavi/CineBlaze-movie-finder-web-app/issues"
   },
-  "homepage": "https://github.com/SPGosavi/CineBlaze-movie-finder-web-app#readme"
+  "homepage": "https://github.com/SPGosavi/CineBlaze-movie-finder-web-app#readme",
+  "dependencies": {
+    "@sentry/nextjs": "^11.2.0"
+  }
 }

@@ -113,8 +113,9 @@ Client (React 19 + Vite)
 - Node.js + Express + TypeScript
 - Groq API (High-throughput, low-latency LLM inference)
 - TMDB API & OMDb API
-- node-cache (Multi-tier caching)
-- node-fetch
+- Drizzle ORM + PostgreSQL (search history, taste profiles)
+- Redis (distributed cache, token-bucket rate limiting)
+- Zod (request validation) · Pino (structured JSON logging) · Sentry
 
 ### Shared (`shared/`)
 
@@ -129,6 +130,18 @@ Client (React 19 + Vite)
 | `/search?q=`            | SSR — shareable, refreshable search URLs             |
 | `/movie/:id`, `/tv/:id` | SSR with Open Graph tags + JSON-LD structured data   |
 | `/watchlist`            | CSR — live Firestore sync, drag-and-drop, auth-gated |
+
+### Infrastructure is optional
+
+Redis, PostgreSQL, Firebase token verification, the internal API key and
+Sentry are each independently optional. With only the three API keys the app
+runs end to end: the cache falls back to an in-process one, history becomes a
+no-op, and requests are anonymous.
+
+`GET /health` reports which dependencies are actually live, and distinguishes
+**disabled** (a deployment choice) from **degraded** (an incident) — because a
+missing env var fails open, and silently losing a layer is worse than not
+having it.
 
 ### Deployment & Services
 
@@ -162,13 +175,21 @@ Client (React 19 + Vite)
    npm install
    ```
 
-2. **Backend environment** — create `backend/.env`:
+2. **Backend environment** — copy `backend/.env.example` to `backend/.env`.
+   Only the three API keys are required; everything else is optional and
+   documented inline.
 
    ```env
    PORT=5001
    GROQ_API_KEY=your_groq_api_key
    TMDB_API_KEY=your_tmdb_api_key
    OMDB_API_KEY=your_omdb_api_key
+
+   # Optional — see backend/.env.example
+   # REDIS_URL=            # unset: in-process cache
+   # DATABASE_URL=         # unset: history disabled
+   # FIREBASE_PROJECT_ID=  # unset: requests are anonymous
+   # INTERNAL_API_KEY=     # unset: API is open
    ```
 
 3. **Web environment** — copy `web/.env.example` to `web/.env.local` and fill
@@ -182,26 +203,47 @@ Client (React 19 + Vite)
    # ...see web/.env.example for the full list
    ```
 
-   The browser never calls the backend directly — `next.config.ts` rewrites
-   `/api/*` to `BACKEND_API_URL`, so there is no CORS setup and the API origin
-   stays out of the client bundle.
+   The browser never calls the backend directly. Client requests go to the
+   Next.js Route Handler at `src/app/api/[...path]/route.ts`, which forwards
+   them to `BACKEND_API_URL` and attaches `INTERNAL_API_KEY` server-side — so
+   there is no CORS setup, and neither the API origin nor the shared secret
+   reaches the client bundle.
 
 4. **Run everything:**
+
    ```bash
    npm run dev          # shared (watch) + Express API + Next.js
    ```
+
    Then open http://localhost:3000.
+
+5. **Optional — set up the database.** Only needed for search history and
+   taste profiles.
+   ```bash
+   # with DATABASE_URL set in backend/.env
+   npm run db:migrate -w movie-finder-backend
+   ```
 
 ### Useful scripts
 
-| Command              | What it does                                 |
-| -------------------- | -------------------------------------------- |
-| `npm run dev`        | Shared types watcher + Express API + Next.js |
-| `npm run dev:legacy` | The Phase 2 React + Vite app + Express API   |
-| `npm run build`      | Builds shared, backend and web               |
-| `npm run typecheck`  | Type-checks every workspace                  |
-| `npm run lint`       | Lints `web/` and `frontend/`                 |
-| `npm run format`     | Prettier across the repo                     |
+| Command                                       | What it does                                      |
+| --------------------------------------------- | ------------------------------------------------- |
+| `npm run dev`                                 | Shared types watcher + Express API + Next.js      |
+| `npm run dev:legacy`                          | The Phase 2 React + Vite app + Express API        |
+| `npm run build`                               | Builds shared, backend and web                    |
+| `npm run typecheck`                           | Type-checks every workspace                       |
+| `npm run lint`                                | Lints `web/` and `frontend/`                      |
+| `npm run format`                              | Prettier across the repo                          |
+| `npm run db:generate -w movie-finder-backend` | Generates a SQL migration from the Drizzle schema |
+| `npm run db:migrate -w movie-finder-backend`  | Applies pending migrations                        |
+| `npm run db:studio -w movie-finder-backend`   | Drizzle Studio                                    |
+
+### Operational endpoints
+
+| Endpoint   | Purpose                                                           |
+| ---------- | ----------------------------------------------------------------- |
+| `/health`  | Per-dependency status; 503 when a _configured_ dependency is down |
+| `/metrics` | Request counts, error rates and p50/p95 latency per route         |
 
 > `frontend/` is the previous React + Vite client, kept for reference. It is
 > not an npm workspace, so it keeps its own `package-lock.json` — install it

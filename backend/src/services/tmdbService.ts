@@ -1,5 +1,6 @@
 import fetch from "node-fetch";
-import cache from "../utils/cache.js";
+import * as cache from "../cache/index.js";
+import { CacheKeys } from "../cache/index.js";
 import {
   TMDB_API_KEY,
   OMDB_API_KEY,
@@ -7,6 +8,7 @@ import {
   TMDB_TIMEOUT_MS,
 } from "../config.js";
 import { fetchWithTimeout } from "../utils/http.js";
+import { mapSettledLimit } from "../utils/concurrency.js";
 import { sleep, backoffDelay, isRetryableStatus } from "../utils/retry.js";
 import {
   MediaType,
@@ -22,6 +24,9 @@ import {
   TmdbWatchProvidersResponse,
   OmdbResponse,
 } from "../types/index.js";
+import { childLogger } from "../utils/logger.js";
+
+const log = childLogger("tmdb");
 
 const GENRE_MAP: Record<number, string> = {
   28: "Action",
@@ -101,16 +106,19 @@ export async function fetchRatings(
   title: string,
   year: string | undefined
 ): Promise<Ratings> {
-  const cacheKey = `ratings_${title}_${year}`;
-  const cached = cache.get(cacheKey) as Ratings | undefined;
+  const cacheKey = CacheKeys.ratings(title, year);
+  const cached = await cache.get<Ratings>(cacheKey);
   if (cached) return cached;
 
   try {
     const ratings = await fetchOmdbRatings(title, year);
-    cache.set(cacheKey, ratings, 86400); // 24 hours
+    await cache.set(cacheKey, ratings, 86_400); // 24 hours
     return ratings;
   } catch {
-    return { imdb: null, rt: null } as unknown as Ratings;
+    // Ratings are decoration, not content — a card without an IMDb badge is
+    // fine, a failed shelf is not. Deliberately not cached, so a transient
+    // OMDb failure does not suppress ratings for the next 24 hours.
+    return { imdb: null, rt: null };
   }
 }
 
@@ -138,7 +146,7 @@ export async function fetchTmdb(url: string): Promise<TmdbPaginatedResponse> {
             Number.isFinite(retryAfter) && retryAfter > 0
               ? retryAfter * 1000
               : backoffDelay(attempt);
-          console.warn(
+          log.warn(
             `[TMDB] ${res.status} on attempt ${attempt}/${TMDB_MAX_RETRIES}, retrying in ${Math.round(waitMs)}ms`
           );
           await sleep(waitMs);
@@ -157,7 +165,7 @@ export async function fetchTmdb(url: string): Promise<TmdbPaginatedResponse> {
 
       if (attempt < TMDB_MAX_RETRIES) {
         const waitMs = backoffDelay(attempt);
-        console.warn(
+        log.warn(
           `[TMDB] ${lastError.message} on attempt ${attempt}/${TMDB_MAX_RETRIES}, retrying in ${Math.round(waitMs)}ms`
         );
         await sleep(waitMs);
@@ -202,7 +210,7 @@ export async function searchTmdbDirect(
   query: string
 ): Promise<BasicTmdbResult[]> {
   try {
-    console.log(`[TMDB] Direct Search for: "${query}"`);
+    log.debug(`[TMDB] Direct Search for: "${query}"`);
 
     // Strip generic suffixes/prefixes that confuse TMDB search
     let cleanedQuery = query
@@ -215,7 +223,7 @@ export async function searchTmdbDirect(
     const searchQuery = cleanedQuery !== query ? cleanedQuery : query;
 
     if (cleanedQuery !== query) {
-      console.log(`[TMDB] Cleaned query: "${query}" → "${searchQuery}"`);
+      log.debug(`[TMDB] Cleaned query: "${query}" → "${searchQuery}"`);
     }
 
     // Use Multi-Search to handle Actors + Titles + Keywords in one go
@@ -251,7 +259,7 @@ export async function searchTmdbDirect(
       }
 
       if (names.length > 0) {
-        console.log(
+        log.debug(
           `[TMDB] No results for cleaned query. Trying actor-specific search for: "${names[0]}"`
         );
         const actorUrl = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(names[0])}&language=en-US&page=1`;
@@ -287,7 +295,7 @@ export async function searchTmdbDirect(
       .map((item) => formatTmdbResult(item, item.media_type as MediaType))
       .filter((item): item is BasicTmdbResult => item !== null);
   } catch (e) {
-    console.error("Direct Search Failed:", e);
+    log.error({ err: String(e) }, "Direct Search Failed:");
     return [];
   }
 }
@@ -335,29 +343,45 @@ export async function enrichWithDeepData(
   const topItems = items.slice(0, safeLimit);
   const remaining = items.slice(safeLimit);
 
-  const enriched = await Promise.all(
-    topItems.map(async (item) => {
-      const year = item.release_date?.split("-")[0];
-      const title = item.title;
-      const type = item.media_type;
+  // Bounded and settled. This was `Promise.all` over up to twenty items, each
+  // firing three more requests — sixty concurrent sockets, where a single
+  // failure rejected the lot and returned nothing.
+  const settled = await mapSettledLimit(topItems, async (item) => {
+    const year = item.release_date?.split("-")[0];
+    const type = item.media_type;
 
-      const [ratings, details, providers] = await Promise.all([
-        fetchOmdbRatings(title, year),
-        fetchTmdbDetails(item.id, type),
-        fetchWatchProviders(item.id, type),
-      ]);
+    const [ratings, details, providers] = await Promise.all([
+      // fetchRatings rather than fetchOmdbRatings: same data, but cached for
+      // 24h and it swallows OMDb failures instead of rejecting the item.
+      fetchRatings(item.title, year),
+      fetchTmdbDetails(item.id, type),
+      fetchWatchProviders(item.id, type),
+    ]);
 
-      return {
-        ...item,
-        media_type: type,
-        imdb_rating: (ratings as any).imdb,
-        rotten_tomatoes: (ratings as any).rotten,
-        director: details.director,
-        cast: details.cast,
-        genres: details.genres,
-        providers: providers,
-      };
-    })
+    return {
+      ...item,
+      media_type: type,
+      imdb_rating: ratings.imdb,
+      // Was `(ratings as any).rotten`, a field this shape has never had, so
+      // every search result and every "find similar" card silently rendered
+      // without its Rotten Tomatoes score. The `as any` is what hid it.
+      rotten_tomatoes: ratings.rt,
+      director: details.director,
+      cast: details.cast,
+      genres: details.genres,
+      providers,
+    } satisfies EnrichedMedia;
+  });
+
+  const enriched = settled.map((result, index) =>
+    result.status === "fulfilled"
+      ? result.value
+      : // Degrade to the unenriched item instead of dropping it.
+        ({
+          ...topItems[index],
+          imdb_rating: null,
+          rotten_tomatoes: null,
+        } satisfies EnrichedMedia)
   );
 
   return [...enriched, ...remaining] as EnrichedMedia[];
@@ -484,7 +508,7 @@ async function performTmdbSearch(
         const relaxedQuery = words
           .slice(0, Math.min(words.length - 1, 3))
           .join(" ");
-        console.log(
+        log.debug(
           `[TMDB] No results for "${queryTitle}". Trying relaxed: "${relaxedQuery}"`
         );
         const relaxedRes = await fetch(
@@ -509,9 +533,7 @@ async function performTmdbSearch(
             const subQuery = words.slice(drop).join(" ");
             if (subQuery.length < 3) break; // Too short to be useful
 
-            console.log(
-              `[TMDB] Spelling fallback (drop ${drop}): "${subQuery}"`
-            );
+            log.debug(`[TMDB] Spelling fallback (drop ${drop}): "${subQuery}"`);
             const subRes = await fetch(
               `${baseUrl}&query=${encodeURIComponent(subQuery)}`
             );
@@ -538,13 +560,13 @@ async function performTmdbSearch(
                 );
 
                 if (candidates[0]._similarityScore >= 0.7) {
-                  console.log(
+                  log.debug(
                     `[TMDB] Found fuzzy match: "${candidates[0].title || candidates[0].name}" (Score: ${candidates[0]._similarityScore.toFixed(2)})`
                   );
                   bestCandidates = candidates;
                   break; // Use the first sub-query that yields a strong match
                 } else {
-                  console.log(
+                  log.debug(
                     `[TMDB] Best candidate from "${subQuery}": "${candidates[0].title || candidates[0].name}" (Score: ${candidates[0]._similarityScore.toFixed(2)}) — below threshold`
                   );
                 }
@@ -560,7 +582,7 @@ async function performTmdbSearch(
     }
 
     if (!data.results || data.results.length === 0) {
-      console.log(`[TMDB] No results for "${queryTitle}"`);
+      log.debug(`[TMDB] No results for "${queryTitle}"`);
       return null;
     }
 
@@ -574,14 +596,14 @@ async function performTmdbSearch(
         .trim();
       const match = t === normalizedQuery || ot === normalizedQuery;
       if (match)
-        console.log(`[TMDB] Title Match: "${t}" === "${normalizedQuery}"`);
+        log.debug(`[TMDB] Title Match: "${t}" === "${normalizedQuery}"`);
       return match;
     };
     const matchesYear = (item: TmdbRawResult) => {
       const d = item.release_date || item.first_air_date;
       const match = !!(d && yearStr && d.startsWith(yearStr));
       if (match)
-        console.log(`[TMDB] Year Match: "${d}" starts with "${yearStr}"`);
+        log.debug(`[TMDB] Year Match: "${d}" starts with "${yearStr}"`);
       return match;
     };
 
@@ -603,7 +625,7 @@ async function performTmdbSearch(
       if (yearMatch) return formatTmdbResult(yearMatch, mediaType);
     }
 
-    console.log(
+    log.debug(
       `[TMDB] No exact match for "${queryTitle}" (${yearStr}). Using top result: "${data.results[0].title || data.results[0].name}"`
     );
     // 4. Fallback: top popularity result
@@ -692,7 +714,10 @@ export async function fetchFullDetailsById(
     if (!res.ok) return null;
     data = (await res.json()) as TmdbDetailResponse;
   } catch (e) {
-    console.warn(`[TMDB] Full detail fetch failed for ${mediaType}/${id}:`, e);
+    log.warn(
+      { err: String(e), mediaType, id },
+      "[TMDB] Full detail fetch failed"
+    );
     return null;
   }
 
