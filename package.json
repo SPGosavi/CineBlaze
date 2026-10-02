@@ -24,7 +24,7 @@
     "build:legacy": "npm run build --prefix frontend",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
