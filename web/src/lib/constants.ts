@@ -74,7 +74,7 @@ export const LOGIN_POSTERS: readonly string[] = [
   "/67FsF2kpgEZ1T5Qos4adgqm9dLf.jpg",
   "/kYDCl2y0VPvhT5eYWbMRInPoB03.jpg",
   "/lmrulvLbmaejTix1YaMxo1oGhH1.jpg",
-  "/5qHNjhtjMD4YWH3UP0rm4tKwxIQ.jpg",
+  "/gEU2QlsUUHXjNpeYY5ldcT2xU4L.jpg",
   "/8cdWjvZQUExUUTzyp4t6EDMubfO.jpg",
   "/1E5baAaEse26fej7uHcjOgEE2t2.jpg",
   "/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",

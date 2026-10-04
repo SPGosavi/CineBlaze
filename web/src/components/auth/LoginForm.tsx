@@ -56,7 +56,7 @@ export default function LoginForm() {
   const busy = submitting || loading;
 
   return (
-    <div className="relative grid min-h-screen grid-cols-1 overflow-hidden bg-black md:grid-cols-[minmax(0,560px)_1fr]">
+    <div className="relative grid min-h-screen grid-cols-1 overflow-hidden bg-black md:grid-cols-2">
       <div className="relative z-10 flex items-center justify-center p-4">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-red-900/20 via-black to-black" />
         <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl">
