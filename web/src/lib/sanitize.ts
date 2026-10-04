@@ -16,12 +16,20 @@ const asStringArray = (value: unknown): string[] =>
 
 const asProviders = (value: unknown): WatchProvider[] =>
   Array.isArray(value)
-    ? value.filter(
-        (entry): entry is WatchProvider =>
-          typeof entry === "object" &&
-          entry !== null &&
-          typeof (entry as WatchProvider).name === "string"
-      )
+    ? value.flatMap((entry) => {
+        if (typeof entry !== "object" || entry === null) return [];
+        const candidate = entry as Record<string, unknown>;
+        if (typeof candidate.name !== "string") return [];
+        return [
+          {
+            name: candidate.name,
+            logo: typeof candidate.logo === "string" ? candidate.logo : "",
+            ...(typeof candidate.link === "string" && candidate.link
+              ? { link: candidate.link }
+              : {}),
+          },
+        ];
+      })
     : [];
 
 const asStatus = (value: unknown): WatchlistStatus =>
@@ -63,6 +71,7 @@ export function sanitizeMedia(input: unknown): SanitizedMedia | null {
     cast: asStringArray(item.cast),
     providers: asProviders(item.providers),
     director: asString(item.director) || "Unknown",
+    original_language: asString(item.original_language),
     imdb_rating: asString(item.imdb_rating) || null,
     rotten_tomatoes: asString(item.rotten_tomatoes) || null,
     status: asStatus(item.status),

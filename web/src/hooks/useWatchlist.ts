@@ -158,6 +158,7 @@ export function useWatchlist(user: User | null): WatchlistState {
         imdb_rating: item.imdb_rating,
         rotten_tomatoes: item.rotten_tomatoes,
         providers: item.providers,
+        original_language: item.original_language,
         status,
         addedAt: Date.now(),
       };

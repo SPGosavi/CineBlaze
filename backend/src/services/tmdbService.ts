@@ -203,6 +203,7 @@ export function formatBasicTmdbResult(
       item.media_type ||
       (item.title ? "movie" : "tv")) as MediaType,
     genres: genres,
+    original_language: item.original_language || "",
   };
 }
 
@@ -741,6 +742,7 @@ export async function fetchFullDetailsById(
     overview: data.overview ?? "",
     poster_path: data.poster_path ?? null,
     vote_average: data.vote_average ?? 0,
+    original_language: data.original_language || "",
     genres: details.genres,
     director: details.director,
     cast: details.cast,
@@ -756,16 +758,18 @@ export async function fetchWatchProviders(
 ): Promise<WatchProvider[]> {
   const url = `https://api.themoviedb.org/3/${mediaType}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
   try {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
     const data = (await res.json()) as TmdbWatchProvidersResponse;
     const countryData = data.results?.IN || data.results?.US;
+    const link = countryData?.link;
     return (
-      countryData?.flatrate?.map((p: any) => ({
+      countryData?.flatrate?.map((p) => ({
         name: p.provider_name,
         logo: p.logo_path,
+        ...(link ? { link } : {}),
       })) || []
     );
-  } catch (e) {
+  } catch {
     return [];
   }
 }
@@ -808,5 +812,6 @@ function formatTmdbResult(
     poster_path: result.poster_path || "",
     vote_average: result.vote_average || 0,
     media_type: mediaType,
+    original_language: result.original_language || "",
   };
 }

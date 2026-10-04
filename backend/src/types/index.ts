@@ -90,6 +90,7 @@ export interface TmdbDetailResponse {
   release_date?: string;
   first_air_date?: string;
   vote_average?: number;
+  original_language?: string;
   genres?: { id: number; name: string }[];
   created_by?: { name: string }[];
   credits?: {
@@ -102,6 +103,8 @@ export interface TmdbDetailResponse {
 export interface TmdbWatchProvidersResponse {
   results?: {
     [countryCode: string]: {
+      /** JustWatch deep link for this title in this country. */
+      link?: string;
       flatrate?: { provider_name: string; logo_path: string }[];
     };
   };
