@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Film, MonitorPlay } from "lucide-react";
+import { Film, MonitorPlay, Ticket, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import type {
   EnrichedMedia,
@@ -15,6 +15,7 @@ import {
   releaseYear,
   sanitizeMedia,
   sanitizeMediaList,
+  isInTheatres,
 } from "@/lib/sanitize";
 import { getLanguageName } from "@/lib/language";
 import {
@@ -205,6 +206,7 @@ export default async function MediaDetailPage(
   const imdb = displayRating(item.imdb_rating);
   const rt = displayRating(item.rotten_tomatoes);
   const language = getLanguageName(item.original_language);
+  const inTheatres = isInTheatres(item);
 
   return (
     <article className="animate-fade-in pb-24 md:pb-10">
@@ -305,30 +307,48 @@ export default async function MediaDetailPage(
             </p>
           </section>
 
-          {item.providers.length > 0 && (
+          {(item.providers.length > 0 || inTheatres) && (
             <section className="mt-6 border-t border-neutral-800 pt-4">
               <h2 className="mb-3 flex items-center gap-2 text-[10px] font-bold tracking-widest text-gray-500 uppercase">
-                <MonitorPlay size={14} /> Streaming on
+                <MonitorPlay size={14} /> Watch now
               </h2>
-              <div className="flex flex-wrap gap-3">
-                {item.providers.map((provider) => (
-                  <div
-                    key={provider.name}
-                    className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 p-2"
-                  >
-                    <Image
-                      src={`${TMDB_LOGO_BASE_URL}${provider.logo}`}
-                      alt=""
-                      width={24}
-                      height={24}
-                      className="rounded-md"
-                    />
-                    <span className="text-xs font-medium text-gray-300">
-                      {provider.name}
-                    </span>
-                  </div>
-                ))}
-              </div>
+
+              {inTheatres ? (
+                <span className="inline-flex items-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm font-bold text-orange-400">
+                  <Ticket size={16} aria-hidden /> In theatres now
+                </span>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {item.providers.map((provider) =>
+                    provider.link ? (
+                      <a
+                        key={provider.name}
+                        href={provider.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 p-2 transition-colors hover:border-red-500/40 hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
+                      >
+                        <ProviderBadge provider={provider} />
+                        <ExternalLink
+                          size={12}
+                          aria-hidden
+                          className="text-gray-500"
+                        />
+                        <span className="sr-only">
+                          (opens {provider.name} in a new tab)
+                        </span>
+                      </a>
+                    ) : (
+                      <div
+                        key={provider.name}
+                        className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 p-2"
+                      >
+                        <ProviderBadge provider={provider} />
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
             </section>
           )}
 
@@ -347,5 +367,24 @@ export default async function MediaDetailPage(
         </Suspense>
       </section>
     </article>
+  );
+}
+
+function ProviderBadge({
+  provider,
+}: {
+  provider: { name: string; logo: string };
+}) {
+  return (
+    <>
+      <Image
+        src={`${TMDB_LOGO_BASE_URL}${provider.logo}`}
+        alt=""
+        width={24}
+        height={24}
+        className="rounded-md"
+      />
+      <span className="text-xs font-medium text-gray-300">{provider.name}</span>
+    </>
   );
 }
