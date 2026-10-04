@@ -50,3 +50,30 @@ export const SITE_URL =
 export const SITE_NAME = "CineBlaze";
 export const SITE_DESCRIPTION =
   "Describe a plot, a vibe, or the scene stuck in your head — CineBlaze finds the movie or series. Track what you want to watch with an AI-powered personal cinema tracker.";
+
+/**
+ * Poster paths for the login backdrop.
+ *
+ * Hardcoded rather than fetched. The login page is the one route that must
+ * render instantly with no network dependency — an ISR miss or a failed
+ * trending call would leave the panel blank, and these are decoration, not
+ * content. TMDB path format: `/xxxxxxxx.jpg`, resolved against
+ * TMDB_IMAGE_BASE_URL.
+ */
+export const LOGIN_POSTERS: readonly string[] = [
+  "/yBKMAIj7clP42UkFejhGDBBoTpb.jpg",
+  "/6QgJQrClh9ej357yzLWgCxrjAmJ.jpg",
+  "/bNErActDctl6cdUGw9pnjSCmyhQ.jpg",
+  "/bRwnj8WEKBCvmfeUNOukJPwB43K.jpg",
+  "/5rhTDKUhPYvpdQIijFIs5VoWsON.jpg",
+  "/39aMkR8Y5vhCG9dTkjiqRl8AVqp.jpg",
+  "/rhGx6E3qRNMgj3i5su2oukNHwIQ.jpg",
+  "/sfQtVlIHljToOwYjhe21KPGzZWK.jpg",
+  "/bHiAp8WWHgfUrJmRnoiw4URYGcq.jpg",
+  "/1ApfSA8JTqeha3GTFEY8syV4auq.jpg",
+  "/67FsF2kpgEZ1T5Qos4adgqm9dLf.jpg",
+  "/kYDCl2y0VPvhT5eYWbMRInPoB03.jpg",
+  "/lmrulvLbmaejTix1YaMxo1oGhH1.jpg",
+  "/jRXYjXNq0Cs2TcJjLkki24MLp7u.jpg",
+  "/or06FN3Dka5tukK1e9sl16pB3iy.jpg",
+];
