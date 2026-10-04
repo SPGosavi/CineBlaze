@@ -123,7 +123,7 @@ export async function warmPopularSearches(
 
   let warmed = 0;
   for (const { query } of popular) {
-    const key = CacheKeys.search(query);
+    const key = CacheKeys.search("ai", query);
     if ((await cache.get(key)) !== undefined) continue;
 
     try {

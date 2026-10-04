@@ -79,6 +79,11 @@ export const findMoviesSchema = z.object({
     .trim()
     .min(1, "Describe what you are looking for")
     .max(500, "Keep the description under 500 characters"),
+  mode: z.enum(["ai", "recommend"]).optional(),
+});
+
+export const directSearchSchema = z.object({
+  query: z.string().trim().min(1).max(200),
 });
 
 export const getSimilarSchema = z.object({

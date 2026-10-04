@@ -6,6 +6,7 @@ import {
 } from "../controllers/trendingController.js";
 import {
   findMovies,
+  directSearch,
   getSimilar,
   getMediaById,
   getMediaDetails,
@@ -16,6 +17,7 @@ import {
   validateBody,
   validateParams,
   findMoviesSchema,
+  directSearchSchema,
   getSimilarSchema,
   mediaByIdParamsSchema,
   mediaDetailsSchema,
@@ -73,6 +75,12 @@ router.post(
   aiLimiter,
   validateBody(findMoviesSchema),
   findMovies
+);
+router.post(
+  "/direct-search",
+  tmdbLimiter,
+  validateBody(directSearchSchema),
+  directSearch
 );
 router.post(
   "/get-similar",

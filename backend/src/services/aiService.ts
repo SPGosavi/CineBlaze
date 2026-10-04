@@ -719,6 +719,51 @@ export async function callGroqSimilar(
   }
 }
 
+// ─── Recommend (AI-Powered) ──────────────────────────────────────────────
+
+export async function callGroqRecommend(
+  userQuery: string,
+  pool: import("../types/index.js").BasicTmdbResult[]
+): Promise<AiSuggestion[]> {
+  const poolContext = pool
+    .map((item, index) => {
+      const year = (item.release_date || "").substring(0, 4);
+      return `[${index}] ${item.title} (${year}) [${item.media_type}]: ${item.overview}`;
+    })
+    .join("\n");
+
+  const systemPrompt = `You are a precise media recommendation expert.
+    Task: The user has requested a recommendation. We have filtered a candidate pool from TMDB using the user's genre/language/era constraints. 
+    You must select the top 1-5 titles from this specific candidate pool that best match the user's detailed plot or vibe request.
+
+    Candidate Pool:
+    ${poolContext}
+
+    Rules:
+    1. Select up to 5 titles from the Candidate Pool provided above.
+    2. Rank them by how well they match the user's request.
+    3. Return ONLY titles that exist in the candidate pool. Do not invent titles or bring in outside titles.
+    4. JSON Array ONLY. No markdown, no commentary.
+    Format: [{"title": "Title", "year": "YYYY", "media_type": "movie or tv"}]`;
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: `Rank the best matches for: ${userQuery}` },
+  ];
+
+  try {
+    const content = await groqChat(messages, {
+      temperature: 0.1,
+      maxTokens: 2048,
+      label: "callGroqRecommend",
+    });
+    return parseJsonSafe(content);
+  } catch (e: any) {
+    log.error({ err: String(e.message) }, "[AI Recommend] Error:");
+    throw e;
+  }
+}
+
 // ─── Core AI Identification Request ─────────────────────────────────────────
 
 async function makeGroqRequest(

@@ -301,6 +301,41 @@ export async function searchTmdbDirect(
   }
 }
 
+export async function fetchRecommendPool(
+  languageCode: string,
+  genreIds: number[],
+  mediaType: MediaType,
+  dateGte: string,
+  dateLte: string
+): Promise<BasicTmdbResult[]> {
+  try {
+    const genreParam =
+      genreIds.length > 0 ? `&with_genres=${genreIds.join(",")}` : "";
+    const langParam = languageCode
+      ? `&with_original_language=${languageCode}`
+      : "";
+    const gteParam = dateGte ? `&primary_release_date.gte=${dateGte}` : "";
+    const lteParam = dateLte ? `&primary_release_date.lte=${dateLte}` : "";
+
+    const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${TMDB_API_KEY}${langParam}${genreParam}${gteParam}${lteParam}&sort_by=popularity.desc&page=1`;
+    log.debug(`[TMDB] Fetching recommend pool: ${url}`);
+
+    const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as TmdbPaginatedResponse;
+    if (!data.results) return [];
+
+    return data.results
+      .slice(0, 20)
+      .map((item) => formatTmdbResult(item, mediaType))
+      .filter((item): item is BasicTmdbResult => item !== null);
+  } catch (e) {
+    log.error({ err: String(e) }, "[TMDB] Recommend Pool Fetch Failed:");
+    return [];
+  }
+}
+
 export async function getNativeTmdbRecommendations(
   title: string,
   year: string | undefined,
