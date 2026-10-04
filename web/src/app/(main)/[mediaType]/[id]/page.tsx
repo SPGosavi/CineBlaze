@@ -209,7 +209,7 @@ export default async function MediaDetailPage(
   const inTheatres = isInTheatres(item);
 
   return (
-    <article className="animate-fade-in pb-24 md:pb-10">
+    <article className="relative z-0 animate-fade-in pb-24 md:pb-10">
       {item.poster_path && (
         <div
           aria-hidden
