@@ -16,6 +16,7 @@ import {
   sanitizeMedia,
   sanitizeMediaList,
 } from "@/lib/sanitize";
+import { getLanguageName } from "@/lib/language";
 import {
   PLACEHOLDER_IMAGE,
   SITE_NAME,
@@ -203,6 +204,7 @@ export default async function MediaDetailPage(
   const isTv = item.media_type === "tv";
   const imdb = displayRating(item.imdb_rating);
   const rt = displayRating(item.rotten_tomatoes);
+  const language = getLanguageName(item.original_language);
 
   return (
     <article className="animate-fade-in pb-24 md:pb-10">
@@ -257,10 +259,22 @@ export default async function MediaDetailPage(
             </div>
           )}
 
-          {item.director !== "Unknown" && (
+          {(item.director !== "Unknown" || language) && (
             <p className="mt-3 text-sm text-gray-400">
-              Directed by{" "}
-              <span className="font-semibold text-white">{item.director}</span>
+              {item.director !== "Unknown" && (
+                <>
+                  Directed by{" "}
+                  <span className="font-semibold text-white">
+                    {item.director}
+                  </span>
+                </>
+              )}
+              {item.director !== "Unknown" && language && (
+                <span aria-hidden className="mx-2 text-neutral-600">
+                  ·
+                </span>
+              )}
+              {language && <span className="text-gray-300">{language}</span>}
             </p>
           )}
 
