@@ -210,6 +210,22 @@ export default async function MediaDetailPage(
 
   return (
     <article className="animate-fade-in pb-24 md:pb-10">
+      {item.poster_path && (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[60vh] overflow-hidden md:hidden"
+        >
+          <Image
+            src={`${TMDB_IMAGE_BASE_URL}${item.poster_path}`}
+            alt=""
+            fill
+            priority={false}
+            sizes="100vw"
+            className="scale-125 object-cover opacity-30 blur-3xl"
+          />
+          <div className="absolute inset-0 bg-linear-to-b from-black/60 via-black/70 to-black" />
+        </div>
+      )}
       <StructuredData item={item} />
 
       <div className="grid gap-8 md:grid-cols-[minmax(0,300px)_1fr]">
