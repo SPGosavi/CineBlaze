@@ -3,6 +3,7 @@ import type { SanitizedMedia } from "@cineblaze/shared";
 import { displayRating, releaseYear } from "@/lib/sanitize";
 import Poster from "@/components/ui/Poster";
 import WatchlistButton from "./WatchlistButton";
+import { getLanguageName } from "@/lib/language";
 
 export interface MediaCardProps {
   item: SanitizedMedia;
@@ -26,6 +27,7 @@ export default function MediaCard({ item, priority = false }: MediaCardProps) {
   const isTv = item.media_type === "tv";
   const imdb = displayRating(item.imdb_rating);
   const rt = displayRating(item.rotten_tomatoes);
+  const language = getLanguageName(item.original_language);
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-neutral-700/50 bg-neutral-800 shadow-lg transition-all duration-200 hover:border-red-500/30 md:hover:scale-[1.02]">
@@ -54,11 +56,19 @@ export default function MediaCard({ item, priority = false }: MediaCardProps) {
           {item.title}
         </h3>
 
-        <div className="mb-2 flex items-center justify-between text-xs text-gray-400">
+        <div className="mb-2 flex items-center gap-1.5 text-xs text-gray-400">
           <span className="font-mono text-gray-500">{year}</span>
+          {language && (
+            <>
+              <span aria-hidden className="text-neutral-600">
+                ·
+              </span>
+              <span className="text-gray-500">{language}</span>
+            </>
+          )}
           {item.director !== "Unknown" && (
             <span
-              className="max-w-[80px] truncate text-gray-500 md:max-w-[100px]"
+              className="ml-auto max-w-[70px] truncate text-gray-500 md:max-w-[100px]"
               title={item.director}
             >
               {item.director}
