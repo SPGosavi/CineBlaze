@@ -53,7 +53,7 @@ export default function PosterMarquee() {
       ))}
 
       {/* Fades the wall into the page edges and behind the form. */}
-      <div className="absolute inset-0 bg-linear-to-r from-black via-black/40 to-black/80" />
+      <div className="absolute inset-0 bg-linear-to-r from-black via-transparent to-transparent" />
       <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-black to-transparent" />
       <div className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-black to-transparent" />
     </div>
