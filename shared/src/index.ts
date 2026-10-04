@@ -38,12 +38,20 @@ export interface BasicTmdbResult {
   vote_average?: number;
   media_type: MediaType;
   genres?: string[];
+  /** Raw ISO 639-1 code from TMDB, e.g. "hi", "en". Not a display name. */
+  original_language?: string;
 }
 
 /** Streaming provider info from TMDB watch/providers endpoint */
 export interface WatchProvider {
   name: string;
   logo: string;
+  /**
+   * JustWatch deep link for the title, not the provider. TMDB returns one
+   * link per country, so every provider on a title shares the same URL.
+   * Optional: entries written to Firestore before this field existed lack it.
+   */
+  link?: string;
 }
 
 /** OMDb ratings (IMDb + Rotten Tomatoes) */
@@ -102,6 +110,7 @@ export interface WatchlistItem extends EnrichedMedia {
   release_date: string;
   overview: string;
   vote_average: number;
+  original_language: string;
 }
 
 /**
