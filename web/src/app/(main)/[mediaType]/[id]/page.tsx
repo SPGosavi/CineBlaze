@@ -209,7 +209,7 @@ export default async function MediaDetailPage(
   const inTheatres = isInTheatres(item);
 
   return (
-    <article className="animate-fade-in pb-24 md:pb-10">
+    <article className="isolate animate-fade-in pb-24 md:pb-10">
       {item.poster_path && (
         <div
           aria-hidden
@@ -221,7 +221,7 @@ export default async function MediaDetailPage(
             fill
             priority={false}
             sizes="100vw"
-            className="scale-125 object-cover opacity-90 blur-3xl"
+            className="scale-125 object-cover opacity-60 blur-3xl"
           />
           <div className="absolute inset-0 bg-linear-to-b from-black/60 via-black/70 to-black" />
         </div>
