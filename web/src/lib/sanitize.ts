@@ -98,3 +98,31 @@ export function releaseYear(
 export function displayRating(value: string | null | undefined): string | null {
   return value && value !== "N/A" ? value : null;
 }
+
+/** Days a movie is assumed to still be in cinemas after release. */
+const THEATRICAL_WINDOW_DAYS = 45;
+
+/**
+ * True when a title is probably still in cinemas.
+ *
+ * A heuristic rather than a TMDB `/release_dates` lookup, which would cost an
+ * extra upstream call per detail render for a label. The absence of any
+ * flatrate provider is the strongest signal: TMDB surfaces nothing under
+ * `watch/providers` for a title that has not reached streaming, which is
+ * exactly why the section used to disappear for new releases.
+ *
+ * Movies only — a TV series has no theatrical run.
+ */
+export function isInTheatres(
+  item: Pick<SanitizedMedia, "media_type" | "release_date" | "providers">
+): boolean {
+  if (item.media_type !== "movie") return false;
+  if (item.providers.length > 0) return false;
+  if (!item.release_date) return false;
+
+  const released = Date.parse(item.release_date);
+  if (Number.isNaN(released)) return false;
+
+  const ageDays = (Date.now() - released) / 86_400_000;
+  return ageDays >= 0 && ageDays <= THEATRICAL_WINDOW_DAYS;
+}
