@@ -86,7 +86,7 @@ export default function SearchBar({
         <div
           role="tablist"
           aria-label="Search mode"
-          className="flex max-w-full gap-1 sm:gap-2 overflow-x-auto rounded-full border border-white/10 bg-black/40 p-1 sm:p-1.5 backdrop-blur-sm scrollbar-hide"
+          className="flex max-w-full gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-1 sm:p-1.5 backdrop-blur-sm scrollbar-hide"
         >
           {SEARCH_MODE_META.map((meta) => {
             const isActive = mode === meta.mode;
@@ -97,7 +97,7 @@ export default function SearchBar({
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => setMode(meta.mode)}
-                className={`flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-full p-2 sm:px-5 sm:py-2 text-xs sm:text-sm font-medium transition-all ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-xl px-4 py-2 sm:px-5 sm:py-2 text-xs sm:text-sm font-medium transition-all ${
                   isActive
                     ? "bg-white/10 text-white shadow-sm ring-1 ring-white/20"
                     : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
