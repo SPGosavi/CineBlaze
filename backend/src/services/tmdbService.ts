@@ -216,7 +216,6 @@ export async function searchTmdbDirect(
     // Strip generic suffixes/prefixes that confuse TMDB search
     let cleanedQuery = query
       .replace(/\b(movies?|films?|shows?|series)\b/gi, "")
-      .replace(/^(best|top|latest|recent|new|popular|all)\s+/i, "")
       .trim();
 
     if (!cleanedQuery) cleanedQuery = query; // safety fallback
@@ -227,10 +226,8 @@ export async function searchTmdbDirect(
       log.debug(`[TMDB] Cleaned query: "${query}" → "${searchQuery}"`);
     }
 
-    // Use Multi-Search to handle Actors + Titles + Keywords in one go
     const url = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(searchQuery)}&language=en-US&page=1`;
-    const res = await fetch(url);
-    const data = (await res.json()) as TmdbPaginatedResponse;
+    const data = await fetchTmdb(url);
 
     let combined: TmdbRawResult[] = [];
     if (data.results && data.results.length > 0) {
@@ -264,8 +261,7 @@ export async function searchTmdbDirect(
           `[TMDB] No results for cleaned query. Trying actor-specific search for: "${names[0]}"`
         );
         const actorUrl = `https://api.themoviedb.org/3/search/multi?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(names[0])}&language=en-US&page=1`;
-        const actorRes = await fetch(actorUrl);
-        const actorData = (await actorRes.json()) as TmdbPaginatedResponse;
+        const actorData = await fetchTmdb(actorUrl);
 
         if (actorData.results) {
           for (const item of actorData.results) {
@@ -297,6 +293,41 @@ export async function searchTmdbDirect(
       .filter((item): item is BasicTmdbResult => item !== null);
   } catch (e) {
     log.error({ err: String(e) }, "Direct Search Failed:");
+    throw e;
+  }
+}
+
+export async function fetchRecommendPool(
+  languageCode: string,
+  genreIds: number[],
+  mediaType: MediaType,
+  dateGte: string,
+  dateLte: string
+): Promise<BasicTmdbResult[]> {
+  try {
+    const genreParam =
+      genreIds.length > 0 ? `&with_genres=${genreIds.join(",")}` : "";
+    const langParam = languageCode
+      ? `&with_original_language=${languageCode}`
+      : "";
+    const gteParam = dateGte ? `&primary_release_date.gte=${dateGte}` : "";
+    const lteParam = dateLte ? `&primary_release_date.lte=${dateLte}` : "";
+
+    const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${TMDB_API_KEY}${langParam}${genreParam}${gteParam}${lteParam}&sort_by=popularity.desc&page=1`;
+    log.debug(`[TMDB] Fetching recommend pool: ${url}`);
+
+    const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
+    if (!res.ok) return [];
+
+    const data = (await res.json()) as TmdbPaginatedResponse;
+    if (!data.results) return [];
+
+    return data.results
+      .slice(0, 20)
+      .map((item) => formatTmdbResult(item, mediaType))
+      .filter((item): item is BasicTmdbResult => item !== null);
+  } catch (e) {
+    log.error({ err: String(e) }, "[TMDB] Recommend Pool Fetch Failed:");
     return [];
   }
 }
@@ -320,8 +351,7 @@ export async function getNativeTmdbRecommendations(
   const url = `https://api.themoviedb.org/3/${mediaType}/${searchResult.id}/similar?api_key=${TMDB_API_KEY}&language=en-US&page=1`;
 
   try {
-    const res = await fetch(url);
-    const data = (await res.json()) as TmdbPaginatedResponse;
+    const data = await fetchTmdb(url);
     if (!data.results || data.results.length === 0) return [];
     return data.results
       .slice(0, 10)
@@ -495,9 +525,9 @@ async function performTmdbSearch(
   const baseUrl = `https://api.themoviedb.org/3/search/${endpoint}?api_key=${TMDB_API_KEY}&language=en-US&page=1`;
 
   try {
-    let res = await fetch(`${baseUrl}&query=${encodeURIComponent(queryTitle)}`);
-    if (!res.ok) return null;
-    let data = (await res.json()) as TmdbPaginatedResponse;
+    let data = await fetchTmdb(
+      `${baseUrl}&query=${encodeURIComponent(queryTitle)}`
+    );
 
     // Relaxed search if no results and query has multiple words
     if (
@@ -512,12 +542,10 @@ async function performTmdbSearch(
         log.debug(
           `[TMDB] No results for "${queryTitle}". Trying relaxed: "${relaxedQuery}"`
         );
-        const relaxedRes = await fetch(
+        const relaxedData = await fetchTmdb(
           `${baseUrl}&query=${encodeURIComponent(relaxedQuery)}`
         );
-        if (relaxedRes.ok) {
-          const relaxedData =
-            (await relaxedRes.json()) as TmdbPaginatedResponse;
+        if (relaxedData) {
           if (relaxedData.results && relaxedData.results.length > 0) {
             data = relaxedData;
           }
@@ -535,12 +563,10 @@ async function performTmdbSearch(
             if (subQuery.length < 3) break; // Too short to be useful
 
             log.debug(`[TMDB] Spelling fallback (drop ${drop}): "${subQuery}"`);
-            const subRes = await fetch(
+            const subData = await fetchTmdb(
               `${baseUrl}&query=${encodeURIComponent(subQuery)}`
             );
-
-            if (subRes.ok) {
-              const subData = (await subRes.json()) as TmdbPaginatedResponse;
+            if (subData) {
               if (subData.results && subData.results.length > 0) {
                 // Score every candidate against the original full query title
                 const candidates: ScoredTmdbResult[] = subData.results.map(

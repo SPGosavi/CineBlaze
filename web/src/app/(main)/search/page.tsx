@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Zap } from "lucide-react";
 import { findMovies } from "@/lib/server-api";
+import { SearchMode, isSearchMode } from "@cineblaze/shared";
 import { sanitizeMediaList } from "@/lib/sanitize";
 import SearchBar from "@/components/search/SearchBar";
 import MediaCard from "@/components/media/MediaCard";
@@ -18,20 +19,31 @@ import { EmptyResults, FailedToLoad } from "@/components/ui/StatePanels";
 export async function generateMetadata(
   props: PageProps<"/search">
 ): Promise<Metadata> {
-  const { q } = await props.searchParams;
+  const { q, mode: modeParam } = await props.searchParams;
   const query = typeof q === "string" ? q.trim() : "";
+  const mode = isSearchMode(modeParam) ? modeParam : "ai";
 
   return {
     title: query ? `Search: ${query}` : "Search",
     description: query
-      ? `AI-matched movies and series for “${query}”.`
+      ? mode === "recommend"
+        ? `Recommendations for “${query}”.`
+        : mode === "direct"
+          ? `Search results for “${query}”.`
+          : `AI-matched movies and series for “${query}”.`
       : "Describe a plot and find the movie or series.",
     robots: { index: false, follow: true },
   };
 }
 
-async function SearchResults({ query }: { query: string }) {
-  const result = await findMovies(query);
+async function SearchResults({
+  query,
+  mode,
+}: {
+  query: string;
+  mode: SearchMode;
+}) {
+  const result = await findMovies(query, mode);
 
   if (result.status === "failed") {
     return <FailedToLoad what="those results" reason={result.reason} />;
@@ -46,8 +58,15 @@ async function SearchResults({ query }: { query: string }) {
   return (
     <>
       <p className="px-1 text-sm text-gray-500">
-        {items.length} {items.length === 1 ? "match" : "matches"} for{" "}
-        <span className="font-medium text-gray-300">“{query}”</span>
+        {items.length}{" "}
+        {items.length === 1
+          ? mode === "recommend"
+            ? "recommendation"
+            : "match"
+          : mode === "recommend"
+            ? "recommendations"
+            : "matches"}{" "}
+        for <span className="font-medium text-gray-300">“{query}”</span>
       </p>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-4 xl:grid-cols-5">
         {items.map((item, index) => (
@@ -74,8 +93,9 @@ async function SearchResults({ query }: { query: string }) {
  * query echoed back and retype it without waiting.
  */
 export default async function SearchPage(props: PageProps<"/search">) {
-  const { q } = await props.searchParams;
+  const { q, mode: modeParam } = await props.searchParams;
   const query = typeof q === "string" ? q.trim() : "";
+  const mode = isSearchMode(modeParam) ? modeParam : "ai";
 
   return (
     <div className="animate-fade-in space-y-8 pb-24 md:pb-10">
@@ -84,7 +104,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
           <Zap className="fill-orange-500 text-orange-500" size={20} />
           Results
         </h1>
-        <SearchBar defaultQuery={query} autoFocus={!query} />
+        <SearchBar defaultQuery={query} autoFocus={!query} defaultMode={mode} />
       </div>
 
       {query ? (
@@ -94,8 +114,8 @@ export default async function SearchPage(props: PageProps<"/search">) {
             re-suspends and shows the skeleton, rather than leaving the
             previous results on screen while the new ones load.
           */}
-          <Suspense key={query} fallback={<MediaGridSkeleton />}>
-            <SearchResults query={query} />
+          <Suspense key={`${mode}:${query}`} fallback={<MediaGridSkeleton />}>
+            <SearchResults query={query} mode={mode} />
           </Suspense>
         </div>
       ) : (

@@ -31,8 +31,10 @@ log.info(
 export const CacheKeys = {
   trending: (shelf: string) => `trending:${shelf}`,
   trendingPrefix: "trending:",
-  search: (description: string) => `search:${description.toLowerCase().trim()}`,
+  search: (mode: string, description: string) =>
+    `search:${mode}:${description.toLowerCase().trim()}`,
   searchPrefix: "search:",
+  directSearch: (query: string) => `directSearch:${query.toLowerCase().trim()}`,
   details: (mediaType: string, id: number) => `details:${mediaType}:${id}`,
   detailsByTitle: (
     title: string,

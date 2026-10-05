@@ -125,6 +125,17 @@ export type SanitizedMedia = Omit<WatchlistItem, "status" | "addedAt"> & {
 
 // ─── AI ─────────────────────────────────────────────────────────────────────
 
+export const SEARCH_MODES = ["ai", "direct", "recommend"] as const;
+
+export type SearchMode = (typeof SEARCH_MODES)[number];
+
+export function isSearchMode(value: unknown): value is SearchMode {
+  return (
+    typeof value === "string" &&
+    (SEARCH_MODES as readonly string[]).includes(value)
+  );
+}
+
 /** Output of extractStructuredParams — decomposed user query */
 export interface StructuredParams {
   language: string | null;
@@ -149,6 +160,12 @@ export interface AiSuggestion {
 /** POST /api/find-movies */
 export interface FindMoviesRequest {
   description: string;
+  mode?: Exclude<SearchMode, "direct">;
+}
+
+/** POST /api/direct-search */
+export interface DirectSearchRequest {
+  query: string;
 }
 
 /** POST /api/get-similar */

@@ -6,6 +6,7 @@ import {
   callGroqSimilar,
   extractKeywords,
   extractStructuredParams,
+  callGroqRecommend,
 } from "../services/aiService.js";
 import {
   fetchEnrichedData,
@@ -14,7 +15,10 @@ import {
   enrichWithDeepData,
   searchTmdbDirect,
   fetchWatchProviders,
+  fetchRecommendPool,
 } from "../services/tmdbService.js";
+import { getLanguageCodes, getGenreIds } from "../utils/languageMap.js";
+import { directSearchSchema } from "../middleware/validate.js";
 import {
   MediaDetailsRequest,
   FindMoviesRequest,
@@ -24,6 +28,7 @@ import {
   StructuredParams,
   MoviesResponse,
   EnrichedMedia,
+  DirectSearchRequest,
 } from "../types/index.js";
 import { childLogger } from "../utils/logger.js";
 import { recordSearch, recordWatchEvent } from "../db/repositories.js";
@@ -288,17 +293,41 @@ function isGenericBrowsingQuery(query: string): boolean {
  * (1hr for direct-search fast paths, 5min for the short-query keyword fallback,
  * 24hr for a fully resolved AI result — the most expensive path to reproduce).
  */
+
+export const directSearch = async (
+  req: Request<{}, {}, DirectSearchRequest>,
+  res: Response
+): Promise<void> => {
+  const { query } = directSearchSchema.parse(req.body);
+  const directResults = await searchTmdbDirect(query);
+  const enriched = await enrichWithDeepData(directResults);
+  const cacheKey = CacheKeys.directSearch(query);
+
+  await cache.set(cacheKey, { movies: enriched }, 3600);
+
+  void recordSearch({
+    userId: req.user?.userId || null,
+    query,
+    resultsCount: enriched.length,
+    resolvedBy: "title",
+    durationMs: 0,
+  });
+
+  res.setHeader("X-Resolved-By", "title");
+  res.json({ movies: enriched });
+};
+
 export const findMovies = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { description } = req.body as FindMoviesRequest;
+  const { description, mode = "ai" } = req.body as FindMoviesRequest;
   if (!description) {
     res.status(400).json({ error: "Description required" });
     return;
   }
 
-  const cacheKey = CacheKeys.search(description);
+  const cacheKey = CacheKeys.search(mode, description);
   const startedAt = Date.now();
 
   /**
@@ -318,6 +347,7 @@ export const findMovies = async (
       | "generic"
       | "ai-generic"
       | "ai"
+      | "recommend"
       | "keyword-fallback"
       | "none",
     ttlSeconds: number | null
@@ -328,7 +358,7 @@ export const findMovies = async (
     // Not awaited: recording that a search happened must never be able to
     // delay or fail the search itself. The repository swallows its own errors.
     void recordSearch({
-      userId: req.user?.userId ?? null,
+      userId: req.user?.userId || null,
       query: description,
       resultsCount: movies.length,
       resolvedBy,
@@ -353,8 +383,83 @@ export const findMovies = async (
     const isTitle = isLikelyTitleQuery(description);
     const isGeneric = isGenericBrowsingQuery(description);
 
+    // ─── Recommend Mode ─────────────────────────────────────────
+    if (mode === "recommend") {
+      log.debug("[Search] Recommend mode requested. Skipping fast paths.");
+
+      let structuredParams: StructuredParams | null = null;
+      try {
+        structuredParams = await extractStructuredParams(description);
+      } catch (e) {
+        log.warn(
+          "[Search] Structured param extraction failed in recommend mode."
+        );
+      }
+
+      if (structuredParams) {
+        let dateGte = "";
+        let dateLte = "";
+        if (structuredParams.era) {
+          const eraMatch = structuredParams.era.match(/(\d{4})s?/);
+          if (eraMatch) {
+            const year = parseInt(eraMatch[1], 10);
+            dateGte = `${year}-01-01`;
+            dateLte = `${year + 9}-12-31`;
+          }
+        }
+
+        const languageCodes = getLanguageCodes(structuredParams.language);
+        const languageCode = languageCodes[0] || "";
+        const genreIds = getGenreIds(structuredParams.genres);
+        const preferredType = structuredParams.media_types[0] || "movie";
+
+        const discoverResults = await fetchRecommendPool(
+          languageCode,
+          genreIds,
+          preferredType,
+          dateGte,
+          dateLte
+        );
+
+        if (discoverResults.length > 0) {
+          log.debug(
+            `[Search] Fetched ${discoverResults.length} candidates from TMDB discover.`
+          );
+          const recommendedTitles = await callGroqRecommend(
+            description,
+            discoverResults
+          );
+
+          if (recommendedTitles && recommendedTitles.length > 0) {
+            log.debug(
+              `[Search] AI ranked ${recommendedTitles.length} titles from candidate pool.`
+            );
+            // Resolve against TMDB again
+            const results = await Promise.all(
+              recommendedTitles.map((item) =>
+                fetchEnrichedData(
+                  item.title,
+                  item.year?.toString() || "",
+                  item.media_type || preferredType
+                )
+              )
+            );
+            const foundMovies = results.filter(Boolean) as EnrichedMedia[];
+            if (foundMovies.length > 0) {
+              await respond(foundMovies, "recommend", 86400);
+              return;
+            }
+          }
+        }
+      }
+
+      log.debug(
+        "[Search] Recommend mode yielded nothing. Falling back to AI ladder."
+      );
+    }
+
     // ─── Fast Path: Direct title lookup ─────────────────────────
-    if (isTitle) {
+    if (mode !== "recommend" && isTitle) {
       log.debug("[Search] Detected title query. Skipping AI Search.");
 
       const directResults = await searchTmdbDirect(description);
@@ -367,7 +472,7 @@ export const findMovies = async (
     }
 
     // ─── Fast Path: Generic browsing query ──────────────────────
-    if (isGeneric) {
+    if (mode !== "recommend" && isGeneric) {
       log.debug(
         "[Search] Detected generic browsing query. Skipping AI, using TMDB direct search."
       );
@@ -388,7 +493,11 @@ export const findMovies = async (
       structuredParams = await extractStructuredParams(description);
 
       // Double-check: if AI says it's generic but our regex missed it
-      if (structuredParams?.is_generic && !structuredParams.plot_keywords) {
+      if (
+        mode !== "recommend" &&
+        structuredParams?.is_generic &&
+        !structuredParams.plot_keywords
+      ) {
         log.debug(
           "[Search] AI flagged query as generic. Using TMDB direct search."
         );

@@ -1,10 +1,36 @@
 "use client";
 
+import { SearchMode } from "@cineblaze/shared";
+import { useState } from "react";
 import Form from "next/form";
 import { useFormStatus } from "react-dom";
-import { Search } from "lucide-react";
+import { Search, Sparkles, Wand2 } from "lucide-react";
 
-function SubmitButton() {
+const SEARCH_MODE_META = [
+  {
+    mode: "ai",
+    label: "Describe it",
+    Icon: Sparkles,
+    placeholder: "e.g. A noir detective movie set in 2049...",
+    hint: "Describe a plot, a scene, or a vibe.",
+  },
+  {
+    mode: "direct",
+    label: "Find a title",
+    Icon: Search,
+    placeholder: "e.g. Inception",
+    hint: "Already know it? Search by name.",
+  },
+  {
+    mode: "recommend",
+    label: "Recommend me",
+    Icon: Wand2,
+    placeholder: "e.g. A Tamil thriller from the 2010s",
+    hint: "Tell us a genre, language or era.",
+  },
+] as const;
+
+function SubmitButton({ label }: { label: string }) {
   // Reads the pending state of the enclosing <Form>. Scoped to its own
   // component because useFormStatus only reports on the form above it.
   const { pending } = useFormStatus();
@@ -18,7 +44,7 @@ function SubmitButton() {
       {pending ? (
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
       ) : (
-        "Find"
+        label
       )}
     </button>
   );
@@ -28,6 +54,7 @@ export interface SearchBarProps {
   /** Prefills the box when returning to a results page. */
   defaultQuery?: string;
   autoFocus?: boolean;
+  defaultMode?: SearchMode;
 }
 
 /**
@@ -44,13 +71,52 @@ export interface SearchBarProps {
 export default function SearchBar({
   defaultQuery = "",
   autoFocus = false,
+  defaultMode = "ai",
 }: SearchBarProps) {
+  const [mode, setMode] = useState<SearchMode>(defaultMode);
+
+  const currentMeta =
+    SEARCH_MODE_META.find((m) => m.mode === mode) || SEARCH_MODE_META[0];
+
   return (
     <Form action="/search" className="group relative mx-auto max-w-2xl">
-      <div className="absolute inset-0 rounded-2xl bg-linear-to-r from-red-500 to-orange-500 opacity-25 blur transition-opacity duration-300 group-hover:opacity-40" />
+      <input type="hidden" name="mode" value={mode} />
+
+      <div
+        role="tablist"
+        aria-label="Search mode"
+        className="mb-5 flex w-fit mx-auto gap-2 overflow-x-auto rounded-full border border-white/10 bg-black/40 p-1.5 backdrop-blur-sm scrollbar-hide"
+      >
+        {SEARCH_MODE_META.map((meta) => {
+          const isActive = mode === meta.mode;
+          return (
+            <button
+              key={meta.mode}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setMode(meta.mode)}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition-all ${
+                isActive
+                  ? "bg-white/10 text-white shadow-sm ring-1 ring-white/20"
+                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+              }`}
+            >
+              <meta.Icon
+                size={16}
+                aria-hidden
+                className={isActive ? "text-orange-400" : "text-gray-500"}
+              />
+              {meta.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="absolute inset-0 top-[3.5rem] rounded-2xl bg-linear-to-r from-red-500 to-orange-500 opacity-25 blur transition-opacity duration-300 group-hover:opacity-40" />
       <div className="relative flex items-center">
         <label htmlFor="q" className="sr-only">
-          Describe a movie or series
+          {currentMeta.hint}
         </label>
         <Search
           aria-hidden
@@ -64,11 +130,22 @@ export default function SearchBar({
           required
           defaultValue={defaultQuery}
           autoFocus={autoFocus}
-          placeholder="e.g. A noir detective movie set in 2049..."
+          placeholder={currentMeta.placeholder}
           className="w-full rounded-2xl border border-white/10 bg-neutral-900/90 p-4 pr-24 pl-12 text-base text-white shadow-xl transition-all outline-hidden placeholder:text-gray-500 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20"
         />
-        <SubmitButton />
+        <SubmitButton
+          label={
+            currentMeta.mode === "recommend"
+              ? "Recommend"
+              : currentMeta.mode === "direct"
+                ? "Search"
+                : "Find"
+          }
+        />
       </div>
+      <p className="mt-2 text-center text-xs text-gray-500">
+        {currentMeta.hint}
+      </p>
     </Form>
   );
 }

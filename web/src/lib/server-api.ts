@@ -202,11 +202,25 @@ export async function getSimilar(
  * network hop.
  */
 export async function findMovies(
-  description: string
+  description: string,
+  mode: import("@cineblaze/shared").SearchMode = "ai"
 ): Promise<FetchResult<EnrichedMedia[]>> {
+  if (mode === "direct") {
+    const result = await post<MoviesResponse>(
+      "/api/direct-search",
+      { query: description },
+      {
+        revalidate: 3600,
+        timeoutMs: DEFAULT_REQUEST_TIMEOUT,
+        tags: ["search"],
+      }
+    );
+    return narrow(result, (data) => data.movies ?? []);
+  }
+
   const result = await post<MoviesResponse>(
     "/api/find-movies",
-    { description },
+    { description, mode },
     {
       revalidate: DETAIL_REVALIDATE_SECONDS,
       timeoutMs: AI_REQUEST_TIMEOUT,
