@@ -97,7 +97,7 @@ export default function SearchBar({
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => setMode(meta.mode)}
-                className={`flex items-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-full px-3 py-1.5 sm:px-5 sm:py-2 text-xs sm:text-sm font-medium transition-all ${
+                className={`flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-full p-2 sm:px-5 sm:py-2 text-xs sm:text-sm font-medium transition-all ${
                   isActive
                     ? "bg-white/10 text-white shadow-sm ring-1 ring-white/20"
                     : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
@@ -108,7 +108,7 @@ export default function SearchBar({
                   aria-hidden
                   className={isActive ? "text-orange-400" : "text-gray-500"}
                 />
-                {meta.label}
+                <span className="hidden sm:inline">{meta.label}</span>
               </button>
             );
           })}
@@ -145,7 +145,7 @@ export default function SearchBar({
           }
         />
       </div>
-      <p className="mt-2 text-center text-xs text-gray-500">
+      <p className="mt-2 text-center text-sm text-gray-400 font-medium">
         {currentMeta.hint}
       </p>
     </Form>
