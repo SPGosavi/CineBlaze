@@ -306,7 +306,7 @@ export const directSearch = async (
   await cache.set(cacheKey, { movies: enriched }, 3600);
 
   void recordSearch({
-    userId: req.user?.userId ?? null,
+    userId: req.user?.userId || null,
     query,
     resultsCount: enriched.length,
     resolvedBy: "title",
@@ -358,7 +358,7 @@ export const findMovies = async (
     // Not awaited: recording that a search happened must never be able to
     // delay or fail the search itself. The repository swallows its own errors.
     void recordSearch({
-      userId: req.user?.userId ?? null,
+      userId: req.user?.userId || null,
       query: description,
       resultsCount: movies.length,
       resolvedBy,

@@ -698,8 +698,8 @@ export async function callGroqSimilar(
        d. Tone and style — similar mood, pacing, cinematographic approach
     3. Return REAL titles only. Do not invent movies.
     4. Prefer titles from the same language/region as the source.
-    5. JSON Array ONLY. No markdown, no commentary.
-    Format: [{"title": "Title", "year": "YYYY", "media_type": "${mediaType}"}]`;
+    5. Provide a valid JSON object with a "results" key containing the array of matches. No markdown, no commentary.
+    Format: {"results": [{"title": "Title", "year": "YYYY", "media_type": "${mediaType}"}]`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -710,6 +710,7 @@ export async function callGroqSimilar(
     const content = await groqChat(messages, {
       temperature: 0.3,
       maxTokens: 2048,
+      responseFormat: { type: "json_object" },
       label: "callGroqSimilar",
     });
     return parseJsonSafe(content);
@@ -743,8 +744,8 @@ export async function callGroqRecommend(
     1. Select up to 5 titles from the Candidate Pool provided above.
     2. Rank them by how well they match the user's request.
     3. Return ONLY titles that exist in the candidate pool. Do not invent titles or bring in outside titles.
-    4. JSON Array ONLY. No markdown, no commentary.
-    Format: [{"title": "Title", "year": "YYYY", "media_type": "movie or tv"}]`;
+    4. Provide a valid JSON object with a "results" key containing the array of matches. No markdown, no commentary.
+    Format: {"results": [{"title": "Title", "year": "YYYY", "media_type": "movie or tv"}]}]}`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -755,6 +756,7 @@ export async function callGroqRecommend(
     const content = await groqChat(messages, {
       temperature: 0.1,
       maxTokens: 2048,
+      responseFormat: { type: "json_object" },
       label: "callGroqRecommend",
     });
     return parseJsonSafe(content);
@@ -808,7 +810,7 @@ async function makeGroqRequest(
    * When every grounding source comes back empty, the original wording still
    * told the model to prioritise a section that did not exist and to be
    * suspicious of any answer missing from it. The observed result was a
-   * confident-looking `{"results": []}` for a query the model could very
+   * confident-looking `{"results": []}]}` for a query the model could very
    * likely have answered from its own knowledge.
    */
   const hasHints =
@@ -839,7 +841,7 @@ async function makeGroqRequest(
     ${externalContext}
 
     Output Requirement: Provide a valid JSON object with a "results" key containing the array of matches. Do not include markdown wraps or extra commentary.
-    Format: {"results": [{"title": "Exact Title", "year": "YYYY", "media_type": "movie or tv"}]}`;
+    Format: {"results": [{"title": "Exact Title", "year": "YYYY", "media_type": "movie or tv"}]}]}`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },

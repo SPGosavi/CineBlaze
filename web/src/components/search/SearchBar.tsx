@@ -85,7 +85,7 @@ export default function SearchBar({
       <div
         role="tablist"
         aria-label="Search mode"
-        className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-neutral-800 bg-black/60 p-1 scrollbar-hide"
+        className="mb-5 flex w-fit mx-auto gap-2 overflow-x-auto rounded-full border border-white/10 bg-black/40 p-1.5 backdrop-blur-sm scrollbar-hide"
       >
         {SEARCH_MODE_META.map((meta) => {
           const isActive = mode === meta.mode;
@@ -96,13 +96,17 @@ export default function SearchBar({
               role="tab"
               aria-selected={isActive}
               onClick={() => setMode(meta.mode)}
-              className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition-all ${
                 isActive
-                  ? "bg-red-600 text-white"
-                  : "text-gray-500 hover:bg-white/5 hover:text-white"
+                  ? "bg-white/10 text-white shadow-sm ring-1 ring-white/20"
+                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
               }`}
             >
-              <meta.Icon size={14} aria-hidden />
+              <meta.Icon
+                size={16}
+                aria-hidden
+                className={isActive ? "text-orange-400" : "text-gray-500"}
+              />
               {meta.label}
             </button>
           );
