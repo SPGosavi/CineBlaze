@@ -82,35 +82,37 @@ export default function SearchBar({
     <Form action="/search" className="group relative mx-auto max-w-2xl">
       <input type="hidden" name="mode" value={mode} />
 
-      <div
-        role="tablist"
-        aria-label="Search mode"
-        className="mb-5 flex w-fit mx-auto gap-2 overflow-x-auto rounded-full border border-white/10 bg-black/40 p-1.5 backdrop-blur-sm scrollbar-hide"
-      >
-        {SEARCH_MODE_META.map((meta) => {
-          const isActive = mode === meta.mode;
-          return (
-            <button
-              key={meta.mode}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => setMode(meta.mode)}
-              className={`flex items-center gap-2 whitespace-nowrap rounded-full px-5 py-2 text-sm font-medium transition-all ${
-                isActive
-                  ? "bg-white/10 text-white shadow-sm ring-1 ring-white/20"
-                  : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-              }`}
-            >
-              <meta.Icon
-                size={16}
-                aria-hidden
-                className={isActive ? "text-orange-400" : "text-gray-500"}
-              />
-              {meta.label}
-            </button>
-          );
-        })}
+      <div className="mb-4 sm:mb-5 flex w-full justify-center">
+        <div
+          role="tablist"
+          aria-label="Search mode"
+          className="flex max-w-full gap-1 sm:gap-2 overflow-x-auto rounded-full border border-white/10 bg-black/40 p-1 sm:p-1.5 backdrop-blur-sm scrollbar-hide"
+        >
+          {SEARCH_MODE_META.map((meta) => {
+            const isActive = mode === meta.mode;
+            return (
+              <button
+                key={meta.mode}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setMode(meta.mode)}
+                className={`flex items-center gap-1.5 sm:gap-2 whitespace-nowrap rounded-full px-3 py-1.5 sm:px-5 sm:py-2 text-xs sm:text-sm font-medium transition-all ${
+                  isActive
+                    ? "bg-white/10 text-white shadow-sm ring-1 ring-white/20"
+                    : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                }`}
+              >
+                <meta.Icon
+                  size={16}
+                  aria-hidden
+                  className={isActive ? "text-orange-400" : "text-gray-500"}
+                />
+                {meta.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="absolute inset-0 top-[3.5rem] rounded-2xl bg-linear-to-r from-red-500 to-orange-500 opacity-25 blur transition-opacity duration-300 group-hover:opacity-40" />
