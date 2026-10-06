@@ -1,20 +1,25 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Check, ChevronDown, Filter } from "lucide-react";
+import { Check, ChevronDown, Filter, type LucideIcon } from "lucide-react";
 
-export interface GenreFilterProps {
-  genres: string[];
+export interface FacetFilterProps {
+  /** Always includes the "All" sentinel as the first entry. */
+  options: string[];
   selected: string;
-  onChange: (genre: string) => void;
+  onChange: (value: string) => void;
+  label: string;
+  icon?: LucideIcon;
 }
 
-/** Dropdown for filtering the watchlist by genre. Closes on outside click. */
-export default function GenreFilter({
-  genres,
+/** Dropdown for filtering the watchlist by facet. Closes on outside click. */
+export default function FacetFilter({
+  options,
   selected,
   onChange,
-}: GenreFilterProps) {
+  label,
+  icon: Icon = Filter,
+}: FacetFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -39,22 +44,24 @@ export default function GenreFilter({
         aria-expanded={isOpen}
         aria-haspopup="listbox"
         onClick={() => setIsOpen((open) => !open)}
-        className={`flex min-w-[140px] items-center justify-between gap-2 rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition-all ${
+        className={`flex min-w-0 items-center justify-between gap-2 rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition-all ${
           isOpen
             ? "bg-neutral-800 text-white ring-1 ring-white/10"
             : "bg-transparent text-gray-300 hover:bg-white/5 hover:text-white"
         }`}
       >
-        <span className="flex items-center gap-2">
-          <Filter
+        <span className="flex items-center gap-2 truncate">
+          <Icon
             size={14}
             className={selected === "All" ? "text-gray-500" : "text-orange-500"}
           />
-          {selected}
+          <span className="truncate">
+            {selected === "All" ? label : selected}
+          </span>
         </span>
         <ChevronDown
           size={14}
-          className={`text-gray-500 transition-transform duration-200 ${
+          className={`shrink-0 text-gray-500 transition-transform duration-200 ${
             isOpen ? "rotate-180" : ""
           }`}
         />
@@ -66,24 +73,24 @@ export default function GenreFilter({
           className="animate-fade-in absolute top-full left-0 z-9999 mt-2 max-h-[60vh] w-56 overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900/95 shadow-2xl backdrop-blur-xl"
         >
           <div className="scrollbar-thin max-h-64 space-y-0.5 overflow-y-auto p-1.5">
-            {genres.map((genre) => (
+            {options.map((option) => (
               <button
-                key={genre}
+                key={option}
                 type="button"
                 role="option"
-                aria-selected={selected === genre}
+                aria-selected={selected === option}
                 onClick={() => {
-                  onChange(genre);
+                  onChange(option);
                   setIsOpen(false);
                 }}
                 className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm transition-all ${
-                  selected === genre
+                  selected === option
                     ? "bg-linear-to-r from-red-600/20 to-orange-600/20 font-semibold text-white"
                     : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
                 }`}
               >
-                {genre}
-                {selected === genre && (
+                {option}
+                {selected === option && (
                   <Check size={14} className="text-orange-500" />
                 )}
               </button>
