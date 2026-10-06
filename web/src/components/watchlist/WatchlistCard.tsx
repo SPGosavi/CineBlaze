@@ -58,6 +58,11 @@ function WatchlistCard({
       ref={cardRef}
       draggable
       {...handlers}
+      onContextMenu={(e) => {
+        // Prevent default context menu on long-press in mobile browsers
+        e.preventDefault();
+      }}
+      style={{ WebkitTouchCallout: "none" }}
       onDragStart={(event) => {
         event.dataTransfer.setData("text/plain", String(item.id));
         event.dataTransfer.effectAllowed = "move";
@@ -76,7 +81,7 @@ function WatchlistCard({
         setIsOver(false);
         onDropOnCard(item.id);
       }}
-      className={`group relative aspect-[2/3] overflow-hidden rounded-lg cursor-grab touch-manipulation active:cursor-grabbing ${
+      className={`group relative aspect-[2/3] overflow-hidden rounded-lg cursor-grab touch-manipulation active:cursor-grabbing select-none ${
         isOver ? "z-10 scale-[1.02] ring-2 ring-blue-500/50" : ""
       } ${isDragging ? "opacity-50" : "opacity-100"} ${
         revealed ? "touch-none" : ""
