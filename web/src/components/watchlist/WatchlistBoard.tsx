@@ -56,7 +56,7 @@ export default function WatchlistBoard() {
     const unique = new Set<string>();
     byType.forEach((item) => {
       const name = getLanguageName(item.original_language);
-      if (name) unique.add(name);
+      unique.add(name || "Unknown");
     });
     return ["All", ...Array.from(unique).sort()];
   }, [byType]);
@@ -83,7 +83,8 @@ export default function WatchlistBoard() {
         (item) =>
           (genre === "All" || item.genres.includes(genre)) &&
           (language === "All" ||
-            getLanguageName(item.original_language) === language) &&
+            (getLanguageName(item.original_language) || "Unknown") ===
+              language) &&
           (decade === "All" || toDecade(item) === decade)
       ),
     [byType, genre, language, decade]

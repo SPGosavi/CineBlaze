@@ -38,7 +38,7 @@ export default function FacetFilter({
   }, []);
 
   return (
-    <div className="relative z-60" ref={dropdownRef}>
+    <div className={`relative ${isOpen ? "z-50" : "z-10"}`} ref={dropdownRef}>
       <button
         type="button"
         aria-expanded={isOpen}
@@ -70,7 +70,7 @@ export default function FacetFilter({
       {isOpen && (
         <div
           role="listbox"
-          className="animate-fade-in absolute top-full left-0 z-9999 mt-2 max-h-[60vh] w-56 overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900/95 shadow-2xl backdrop-blur-xl"
+          className="animate-fade-in absolute top-full left-0 z-50 mt-2 max-h-[60vh] w-56 overflow-y-auto rounded-2xl border border-white/10 bg-neutral-900/95 shadow-2xl backdrop-blur-xl"
         >
           <div className="scrollbar-thin max-h-64 space-y-0.5 overflow-y-auto p-1.5">
             {options.map((option) => (
