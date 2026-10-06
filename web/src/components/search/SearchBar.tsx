@@ -39,7 +39,7 @@ function SubmitButton({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="absolute top-2 right-2 bottom-2 flex items-center gap-2 rounded-xl bg-linear-to-r from-red-600 to-orange-600 px-5 font-bold text-white shadow-lg transition-all hover:from-red-500 hover:to-orange-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+      className="absolute top-2 right-2 bottom-2 flex items-center gap-2 rounded-xl bg-linear-to-r from-red-600 to-orange-600 px-3 text-sm sm:px-5 sm:text-base font-bold text-white shadow-lg transition-all hover:from-red-500 hover:to-orange-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {pending ? (
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -133,7 +133,7 @@ export default function SearchBar({
           defaultValue={defaultQuery}
           autoFocus={autoFocus}
           placeholder={currentMeta.placeholder}
-          className="w-full rounded-2xl border border-white/10 bg-neutral-900/90 p-4 pr-24 pl-12 text-base text-white shadow-xl transition-all outline-hidden placeholder:text-gray-500 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20"
+          className="w-full rounded-2xl border border-white/10 bg-neutral-900/90 p-4 pr-28 sm:pr-32 pl-12 text-base text-white shadow-xl transition-all outline-hidden placeholder:text-gray-500 focus:border-red-500/50 focus:ring-2 focus:ring-red-500/20"
         />
         <SubmitButton
           label={
