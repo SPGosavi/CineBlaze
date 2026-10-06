@@ -59,9 +59,13 @@ const watchlistDocRef = (uid: string) =>
 const toWatchlistItem = (raw: unknown): WatchlistItem | null => {
   const sanitized = sanitizeMedia(raw);
   if (!sanitized) return null;
+  // "watching" was removed from the board; legacy documents are folded back
+  // into "want" on read rather than migrated, so a rollback does not strand
+  // anyone's data and no backfill job is needed.
+  const status = sanitized.status === "watching" ? "want" : sanitized.status;
   return {
     ...sanitized,
-    status: sanitized.status ?? "want",
+    status: status ?? "want",
     addedAt: sanitized.addedAt ?? 0,
   };
 };
