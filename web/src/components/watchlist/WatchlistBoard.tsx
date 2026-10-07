@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle, Filter, Languages, CalendarRange } from "lucide-react";
 import type {
@@ -14,6 +14,25 @@ import FacetFilter from "@/components/watchlist/FacetFilter";
 import KanbanColumn from "@/components/watchlist/KanbanColumn";
 import { getLanguageName } from "@/lib/language";
 import { releaseYear } from "@/lib/sanitize";
+
+function useSessionState<T extends string>(
+  key: string,
+  defaultValue: T
+): [T, (val: T) => void] {
+  const [state, setState] = useState<T>(() => {
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem(key);
+      if (stored !== null) return stored as T;
+    }
+    return defaultValue;
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem(key, state);
+  }, [key, state]);
+
+  return [state, setState];
+}
 
 /**
  * Kanban watchlist board.
@@ -35,11 +54,23 @@ export default function WatchlistBoard() {
     setStatus,
   } = useWatchlistContext();
 
-  const [mediaType, setMediaType] = useState<MediaType>("movie");
-  const [genre, setGenre] = useState("All");
-  const [language, setLanguage] = useState("All");
-  const [decade, setDecade] = useState("All");
-  const [mobileStatus, setMobileStatus] = useState<WatchlistStatus>("want");
+  const [mediaType, setMediaType] = useSessionState<MediaType>(
+    "watchlist_mediaType",
+    "movie"
+  );
+  const [genre, setGenre] = useSessionState<string>("watchlist_genre", "All");
+  const [language, setLanguage] = useSessionState<string>(
+    "watchlist_language",
+    "All"
+  );
+  const [decade, setDecade] = useSessionState<string>(
+    "watchlist_decade",
+    "All"
+  );
+  const [mobileStatus, setMobileStatus] = useSessionState<WatchlistStatus>(
+    "watchlist_mobileStatus",
+    "want"
+  );
 
   const byType = useMemo(
     () => watchlist.filter((item) => item.media_type === mediaType),
