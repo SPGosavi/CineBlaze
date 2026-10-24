@@ -386,7 +386,7 @@ export async function enrichWithDeepData(
       // 24h and it swallows OMDb failures instead of rejecting the item.
       fetchRatings(item.title, year),
       fetchTmdbDetails(item.id, type),
-      fetchWatchProviders(item.id, type),
+      fetchWatchProviders(item.id, type, item.title),
     ]);
 
     return {
@@ -433,7 +433,11 @@ export async function fetchEnrichedData(
       searchResult.title,
       searchResult.release_date?.split("-")[0] || year
     ),
-    fetchWatchProviders(searchResult.id, searchResult.media_type as MediaType),
+    fetchWatchProviders(
+      searchResult.id,
+      searchResult.media_type as MediaType,
+      searchResult.title
+    ),
   ]);
 
   return {
@@ -756,7 +760,7 @@ export async function fetchFullDetailsById(
 
   // Both are independently cached and neither blocks the other.
   const [providers, ratings] = await Promise.all([
-    fetchWatchProviders(id, mediaType),
+    fetchWatchProviders(id, mediaType, title),
     fetchRatings(title, releaseDate.split("-")[0] || undefined),
   ]);
 
@@ -778,22 +782,74 @@ export async function fetchFullDetailsById(
   };
 }
 
+/**
+ * Deep-link URL templates for major streaming providers.
+ *
+ * Most streaming services don't expose a public deep-link-by-id API, so we use
+ * their search pages. The `{title}` placeholder is URI-encoded at runtime.
+ *
+ * Key = TMDB `provider_id` (stable numeric identifier from the watch/providers
+ * endpoint). Unmapped providers silently fall back to the TMDB link.
+ */
+const PROVIDER_DEEP_LINKS: Record<number, string> = {
+  8: "https://www.netflix.com/search?q={title}", // Netflix
+  9: "https://www.primevideo.com/search?phrase={title}", // Amazon Prime Video
+  119: "https://www.primevideo.com/search?phrase={title}", // Amazon Prime Video (IN)
+  122: "https://www.hotstar.com/search?q={title}", // Hotstar
+  337: "https://www.hotstar.com/search?q={title}", // Disney+ Hotstar
+  390: "https://www.disneyplus.com/search?q={title}", // Disney+
+  2: "https://tv.apple.com/search?term={title}", // Apple TV
+  350: "https://tv.apple.com/search?term={title}", // Apple TV+
+  220: "https://www.jiocinema.com/search/{title}", // JioCinema
+  594: "https://www.jiocinema.com/search/{title}", // JioCinema
+  232: "https://www.zee5.com/search?q={title}", // Zee5
+  237: "https://www.sonyliv.com/search?query={title}", // SonyLIV
+  15: "https://www.hulu.com/search?q={title}", // Hulu
+  531: "https://www.paramountplus.com/search?q={title}", // Paramount+
+  384: "https://play.max.com/search?q={title}", // HBO Max
+  1899: "https://play.max.com/search?q={title}", // Max
+  386: "https://www.peacocktv.com/search?query={title}", // Peacock
+  387: "https://www.peacocktv.com/search?query={title}", // Peacock Premium
+  515: "https://www.mxplayer.in/search?query={title}", // MX Player
+};
+
+/**
+ * Resolves a streaming-service search URL for the given provider.
+ *
+ * Returns `undefined` for unmapped providers so the caller can fall back to
+ * the TMDB link.
+ */
+function resolveProviderLink(
+  providerId: number | undefined,
+  title: string | undefined
+): string | undefined {
+  if (!providerId || !title) return undefined;
+  const template = PROVIDER_DEEP_LINKS[providerId];
+  if (!template) return undefined;
+  return template.replace("{title}", encodeURIComponent(title.trim()));
+}
+
 export async function fetchWatchProviders(
   id: number,
-  mediaType: MediaType
+  mediaType: MediaType,
+  title?: string
 ): Promise<WatchProvider[]> {
   const url = `https://api.themoviedb.org/3/${mediaType}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
   try {
     const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
     const data = (await res.json()) as TmdbWatchProvidersResponse;
     const countryData = data.results?.IN || data.results?.US;
-    const link = countryData?.link;
+    const tmdbFallbackLink = countryData?.link;
     return (
-      countryData?.flatrate?.map((p) => ({
-        name: p.provider_name,
-        logo: p.logo_path,
-        ...(link ? { link } : {}),
-      })) || []
+      countryData?.flatrate?.map((p) => {
+        const link =
+          resolveProviderLink(p.provider_id, title) ?? tmdbFallbackLink;
+        return {
+          name: p.provider_name,
+          logo: p.logo_path,
+          ...(link ? { link } : {}),
+        };
+      }) || []
     );
   } catch {
     return [];
