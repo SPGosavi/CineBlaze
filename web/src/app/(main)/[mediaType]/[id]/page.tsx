@@ -7,6 +7,7 @@ import type {
   EnrichedMedia,
   MediaType,
   SanitizedMedia,
+  WatchProvider,
 } from "@cineblaze/shared";
 import { isMediaType } from "@cineblaze/shared";
 import { getMediaDetails, getSimilar } from "@/lib/server-api";
@@ -208,6 +209,24 @@ export default async function MediaDetailPage(
   const language = getLanguageName(item.original_language);
   const inTheatres = isInTheatres(item);
 
+  // Group providers by streaming (flatrate) vs rental/purchase (rent/buy),
+  // replicating TMDB's Watch Provider categories and under-poster banner.
+  const flatrateProviders = item.providers.filter(
+    (p) => p.type === "flatrate" || !p.type
+  );
+  const otherProviders = item.providers.filter(
+    (p) =>
+      p.type !== "flatrate" && !flatrateProviders.some((f) => f.name === p.name)
+  );
+  const seenRentBuy = new Set<string>();
+  const rentBuyProviders = otherProviders.filter((p) => {
+    if (seenRentBuy.has(p.name)) return false;
+    seenRentBuy.add(p.name);
+    return true;
+  });
+  const hasStreaming = flatrateProviders.length > 0;
+  const primaryProvider = flatrateProviders[0] || rentBuyProviders[0];
+
   return (
     <article className="isolate animate-fade-in pb-24 md:pb-10">
       {item.poster_path && (
@@ -229,13 +248,44 @@ export default async function MediaDetailPage(
       <StructuredData item={item} />
 
       <div className="grid gap-8 md:grid-cols-[minmax(0,300px)_1fr]">
-        <div className="relative mx-auto aspect-2/3 w-48 overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl md:mx-0 md:w-full">
-          <Poster
-            path={item.poster_path}
-            alt={`${item.title} poster`}
-            priority
-            sizes="(max-width: 768px) 192px, 300px"
-          />
+        <div className="mx-auto flex w-48 flex-col overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl md:mx-0 md:w-full">
+          <div className="relative aspect-2/3 w-full overflow-hidden">
+            <Poster
+              path={item.poster_path}
+              alt={`${item.title} poster`}
+              priority
+              sizes="(max-width: 768px) 192px, 300px"
+            />
+          </div>
+          {primaryProvider && (
+            <a
+              href={primaryProvider.link || "#watch-now"}
+              target={primaryProvider.link ? "_blank" : undefined}
+              rel={primaryProvider.link ? "noopener noreferrer" : undefined}
+              className="group/ott flex items-center justify-between border-t border-neutral-700/80 bg-neutral-900/95 px-3 py-2.5 transition-colors hover:bg-neutral-800 focus-visible:ring-2 focus-visible:ring-red-500"
+            >
+              <div className="flex min-w-0 items-center gap-2.5">
+                <Image
+                  src={`${TMDB_LOGO_BASE_URL}${primaryProvider.logo}`}
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="shrink-0 rounded-md shadow-xs"
+                />
+                <div className="flex min-w-0 flex-col text-left leading-tight">
+                  <span className="truncate text-[10px] font-normal tracking-wide text-gray-400">
+                    {hasStreaming
+                      ? "Now Streaming"
+                      : "Available to Rent or Buy"}
+                  </span>
+                  <span className="text-xs font-bold text-white transition-colors group-hover/ott:text-red-400">
+                    Watch Now
+                  </span>
+                </div>
+              </div>
+              <ExternalLink size={12} className="shrink-0 text-gray-500" />
+            </a>
+          )}
         </div>
 
         <div className="flex flex-col">
@@ -324,44 +374,56 @@ export default async function MediaDetailPage(
           </section>
 
           {(item.providers.length > 0 || inTheatres) && (
-            <section className="mt-6 border-t border-neutral-800 pt-4">
-              <h2 className="mb-3 flex items-center gap-2 text-[10px] font-bold tracking-widest text-gray-500 uppercase">
-                <MonitorPlay size={14} /> Watch now
-              </h2>
+            <section
+              id="watch-now"
+              className="mt-6 border-t border-neutral-800 pt-4"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-[10px] font-bold tracking-widest text-gray-500 uppercase">
+                  <MonitorPlay size={14} /> Watch now
+                </h2>
+                <span className="text-[10px] text-gray-500">
+                  Streaming data via{" "}
+                  <span className="font-semibold text-gray-400">JustWatch</span>
+                </span>
+              </div>
 
               {inTheatres ? (
                 <span className="inline-flex items-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm font-bold text-orange-400">
                   <Ticket size={16} aria-hidden /> In theatres now
                 </span>
               ) : (
-                <div className="flex flex-wrap gap-3">
-                  {item.providers.map((provider) =>
-                    provider.link ? (
-                      <a
-                        key={provider.name}
-                        href={provider.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 p-2 transition-colors hover:border-red-500/40 hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
-                      >
-                        <ProviderBadge provider={provider} />
-                        <ExternalLink
-                          size={12}
-                          aria-hidden
-                          className="text-gray-500"
-                        />
-                        <span className="sr-only">
-                          (opens {provider.name} in a new tab)
-                        </span>
-                      </a>
-                    ) : (
-                      <div
-                        key={provider.name}
-                        className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 p-2"
-                      >
-                        <ProviderBadge provider={provider} />
+                <div className="flex flex-col gap-4">
+                  {flatrateProviders.length > 0 && (
+                    <div>
+                      <h3 className="mb-2 text-xs font-semibold text-gray-400">
+                        Stream
+                      </h3>
+                      <div className="flex flex-wrap gap-2.5">
+                        {flatrateProviders.map((provider) => (
+                          <ProviderLinkItem
+                            key={`stream-${provider.name}`}
+                            provider={provider}
+                          />
+                        ))}
                       </div>
-                    )
+                    </div>
+                  )}
+
+                  {rentBuyProviders.length > 0 && (
+                    <div>
+                      <h3 className="mb-2 text-xs font-semibold text-gray-400">
+                        Rent / Buy
+                      </h3>
+                      <div className="flex flex-wrap gap-2.5">
+                        {rentBuyProviders.map((provider) => (
+                          <ProviderLinkItem
+                            key={`rentbuy-${provider.name}`}
+                            provider={provider}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -386,6 +448,33 @@ export default async function MediaDetailPage(
   );
 }
 
+function ProviderLinkItem({ provider }: { provider: WatchProvider }) {
+  if (provider.link) {
+    return (
+      <a
+        href={provider.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 p-2 transition-colors hover:border-red-500/40 hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
+      >
+        <ProviderBadge provider={provider} />
+        <ExternalLink
+          size={12}
+          aria-hidden
+          className="text-gray-500 shrink-0"
+        />
+        <span className="sr-only">(opens {provider.name} in a new tab)</span>
+      </a>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 p-2">
+      <ProviderBadge provider={provider} />
+    </div>
+  );
+}
+
 function ProviderBadge({
   provider,
 }: {
@@ -398,7 +487,7 @@ function ProviderBadge({
         alt=""
         width={24}
         height={24}
-        className="rounded-md"
+        className="rounded-md shrink-0"
       />
       <span className="text-xs font-medium text-gray-300">{provider.name}</span>
     </>

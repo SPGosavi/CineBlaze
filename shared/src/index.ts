@@ -52,6 +52,8 @@ export interface WatchProvider {
    * Optional: entries written to Firestore before this field existed lack it.
    */
   link?: string;
+  /** Monetization type: subscription (flatrate), rent, or buy */
+  type?: "flatrate" | "rent" | "buy";
 }
 
 /** OMDb ratings (IMDb + Rotten Tomatoes) */

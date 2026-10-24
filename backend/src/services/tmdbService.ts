@@ -810,6 +810,10 @@ const PROVIDER_DEEP_LINKS: Record<number, string> = {
   1899: "https://play.max.com/search?q={title}", // Max
   386: "https://www.peacocktv.com/search?query={title}", // Peacock
   387: "https://www.peacocktv.com/search?query={title}", // Peacock Premium
+  10: "https://www.primevideo.com/search?phrase={title}", // Amazon Video
+  3: "https://play.google.com/store/search?q={title}&c=movies", // Google Play Movies
+  192: "https://www.youtube.com/results?search_query={title}+movie", // YouTube
+  7: "https://athome.fandango.com/content/browse/search?query={title}", // Fandango At Home
   515: "https://www.mxplayer.in/search?query={title}", // MX Player
 };
 
@@ -840,17 +844,33 @@ export async function fetchWatchProviders(
     const data = (await res.json()) as TmdbWatchProvidersResponse;
     const countryData = data.results?.IN || data.results?.US;
     const tmdbFallbackLink = countryData?.link;
-    return (
-      countryData?.flatrate?.map((p) => {
+
+    const mapList = (
+      list:
+        | {
+            provider_id: number;
+            provider_name: string;
+            logo_path: string;
+          }[]
+        | undefined,
+      type: "flatrate" | "rent" | "buy"
+    ): WatchProvider[] =>
+      (list || []).map((p) => {
         const link =
           resolveProviderLink(p.provider_id, title) ?? tmdbFallbackLink;
         return {
           name: p.provider_name,
           logo: p.logo_path,
+          type,
           ...(link ? { link } : {}),
         };
-      }) || []
-    );
+      });
+
+    const flatrate = mapList(countryData?.flatrate, "flatrate");
+    const rent = mapList(countryData?.rent, "rent");
+    const buy = mapList(countryData?.buy, "buy");
+
+    return [...flatrate, ...rent, ...buy];
   } catch {
     return [];
   }

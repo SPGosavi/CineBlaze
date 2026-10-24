@@ -110,6 +110,16 @@ export interface TmdbWatchProvidersResponse {
         provider_name: string;
         logo_path: string;
       }[];
+      rent?: {
+        provider_id: number;
+        provider_name: string;
+        logo_path: string;
+      }[];
+      buy?: {
+        provider_id: number;
+        provider_name: string;
+        logo_path: string;
+      }[];
     };
   };
 }
