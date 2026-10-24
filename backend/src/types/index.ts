@@ -105,7 +105,11 @@ export interface TmdbWatchProvidersResponse {
     [countryCode: string]: {
       /** JustWatch deep link for this title in this country. */
       link?: string;
-      flatrate?: { provider_name: string; logo_path: string }[];
+      flatrate?: {
+        provider_id: number;
+        provider_name: string;
+        logo_path: string;
+      }[];
     };
   };
 }
