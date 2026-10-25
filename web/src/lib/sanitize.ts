@@ -20,6 +20,12 @@ const asProviders = (value: unknown): WatchProvider[] =>
         if (typeof entry !== "object" || entry === null) return [];
         const candidate = entry as Record<string, unknown>;
         if (typeof candidate.name !== "string") return [];
+        const validTypes = ["flatrate", "rent", "buy"] as const;
+        const type =
+          typeof candidate.type === "string" &&
+          (validTypes as readonly string[]).includes(candidate.type)
+            ? (candidate.type as "flatrate" | "rent" | "buy")
+            : undefined;
         return [
           {
             name: candidate.name,
@@ -27,6 +33,7 @@ const asProviders = (value: unknown): WatchProvider[] =>
             ...(typeof candidate.link === "string" && candidate.link
               ? { link: candidate.link }
               : {}),
+            ...(type ? { type } : {}),
           },
         ];
       })
@@ -117,7 +124,11 @@ export function isInTheatres(
   item: Pick<SanitizedMedia, "media_type" | "release_date" | "providers">
 ): boolean {
   if (item.media_type !== "movie") return false;
-  if (item.providers.length > 0) return false;
+  // If subscription streaming is already available, it is not in theatres
+  const hasStreaming = item.providers.some(
+    (p) => p.type === "flatrate" || !p.type
+  );
+  if (hasStreaming) return false;
   if (!item.release_date) return false;
 
   const released = Date.parse(item.release_date);
