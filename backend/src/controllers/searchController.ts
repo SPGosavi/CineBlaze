@@ -703,14 +703,16 @@ export const getMediaExtras = async (
   req: Request,
   res: Response
 ): Promise<void> => {
-  const { id, media_type } = req.body as MediaExtrasRequest;
+  const { id, media_type, title } = req.body as MediaExtrasRequest & {
+    title?: string;
+  };
   if (!id || !media_type) {
     res.json({});
     return;
   }
 
   try {
-    const providers = await fetchWatchProviders(id, media_type);
+    const providers = await fetchWatchProviders(id, media_type, title);
     res.json({ providers });
   } catch {
     res.json({ providers: [] });

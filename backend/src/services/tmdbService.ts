@@ -25,7 +25,7 @@ import {
   OmdbResponse,
 } from "../types/index.js";
 import {
-  fetchJustWatchOffers,
+  fetchCombinedJustWatchOffers,
   resolveDirectProviderLink,
 } from "./justWatchService.js";
 import { childLogger } from "../utils/logger.js";
@@ -390,7 +390,18 @@ export async function enrichWithDeepData(
       // 24h and it swallows OMDb failures instead of rejecting the item.
       fetchRatings(item.title, year),
       fetchTmdbDetails(item.id, type),
-      fetchWatchProviders(item.id, type, item.title),
+      fetchWatchProviders(
+        item.id,
+        type,
+        Array.from(
+          new Set(
+            [
+              item.title,
+              (item as any).original_title || (item as any).original_name,
+            ].filter(Boolean)
+          )
+        )
+      ),
     ]);
 
     return {
@@ -440,7 +451,15 @@ export async function fetchEnrichedData(
     fetchWatchProviders(
       searchResult.id,
       searchResult.media_type as MediaType,
-      searchResult.title
+      Array.from(
+        new Set(
+          [
+            searchResult.title,
+            (searchResult as any).original_title ||
+              (searchResult as any).original_name,
+          ].filter(Boolean)
+        )
+      )
     ),
   ]);
 
@@ -764,7 +783,18 @@ export async function fetchFullDetailsById(
 
   // Both are independently cached and neither blocks the other.
   const [providers, ratings] = await Promise.all([
-    fetchWatchProviders(id, mediaType, title),
+    fetchWatchProviders(
+      id,
+      mediaType,
+      Array.from(
+        new Set(
+          [
+            title,
+            (data as any).original_title || (data as any).original_name,
+          ].filter(Boolean)
+        )
+      )
+    ),
     fetchRatings(title, releaseDate.split("-")[0] || undefined),
   ]);
 
@@ -789,19 +819,17 @@ export async function fetchFullDetailsById(
 export async function fetchWatchProviders(
   id: number,
   mediaType: MediaType,
-  title?: string
+  title?: string | string[]
 ): Promise<WatchProvider[]> {
   const url = `https://api.themoviedb.org/3/${mediaType}/${id}/watch/providers?api_key=${TMDB_API_KEY}`;
   try {
+    const titles = Array.isArray(title) ? title : title ? [title] : [];
+    const primaryTitle = titles[0] || "";
+
     const [tmdbRes, jwOffers] = await Promise.all([
       fetchWithTimeout(url, TMDB_TIMEOUT_MS),
-      title
-        ? fetchJustWatchOffers(id, mediaType, title, "IN").then(
-            async (inOffers) => {
-              if (inOffers.length > 0) return inOffers;
-              return fetchJustWatchOffers(id, mediaType, title, "US");
-            }
-          )
+      titles.length > 0
+        ? fetchCombinedJustWatchOffers(id, mediaType, titles)
         : Promise.resolve([]),
     ]);
 
@@ -820,9 +848,13 @@ export async function fetchWatchProviders(
       type: "flatrate" | "rent" | "buy"
     ): WatchProvider[] =>
       (list || []).map((p) => {
-        const link =
-          resolveDirectProviderLink(p.provider_name, type, jwOffers) ??
-          tmdbFallbackLink;
+        const link = resolveDirectProviderLink(
+          p.provider_name,
+          type,
+          jwOffers,
+          primaryTitle,
+          tmdbFallbackLink
+        );
         return {
           name: p.provider_name,
           logo: p.logo_path,
