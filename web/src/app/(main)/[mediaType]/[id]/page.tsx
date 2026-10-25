@@ -224,8 +224,6 @@ export default async function MediaDetailPage(
     seenRentBuy.add(p.name);
     return true;
   });
-  const hasStreaming = flatrateProviders.length > 0;
-  const primaryProvider = flatrateProviders[0] || rentBuyProviders[0];
 
   return (
     <article className="isolate animate-fade-in pb-24 md:pb-10">
@@ -248,44 +246,13 @@ export default async function MediaDetailPage(
       <StructuredData item={item} />
 
       <div className="grid gap-8 md:grid-cols-[minmax(0,300px)_1fr]">
-        <div className="mx-auto flex w-48 flex-col overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl md:mx-0 md:w-full">
-          <div className="relative aspect-2/3 w-full overflow-hidden">
-            <Poster
-              path={item.poster_path}
-              alt={`${item.title} poster`}
-              priority
-              sizes="(max-width: 768px) 192px, 300px"
-            />
-          </div>
-          {primaryProvider && (
-            <a
-              href={primaryProvider.link || "#watch-now"}
-              target={primaryProvider.link ? "_blank" : undefined}
-              rel={primaryProvider.link ? "noopener noreferrer" : undefined}
-              className="group/ott flex items-center justify-between border-t border-neutral-700/80 bg-neutral-900/95 px-3 py-2.5 transition-colors hover:bg-neutral-800 focus-visible:ring-2 focus-visible:ring-red-500"
-            >
-              <div className="flex min-w-0 items-center gap-2.5">
-                <Image
-                  src={`${TMDB_LOGO_BASE_URL}${primaryProvider.logo}`}
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="shrink-0 rounded-md shadow-xs"
-                />
-                <div className="flex min-w-0 flex-col text-left leading-tight">
-                  <span className="truncate text-[10px] font-normal tracking-wide text-gray-400">
-                    {hasStreaming
-                      ? "Now Streaming"
-                      : "Available to Rent or Buy"}
-                  </span>
-                  <span className="text-xs font-bold text-white transition-colors group-hover/ott:text-red-400">
-                    Watch Now
-                  </span>
-                </div>
-              </div>
-              <ExternalLink size={12} className="shrink-0 text-gray-500" />
-            </a>
-          )}
+        <div className="relative mx-auto aspect-2/3 w-48 overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl md:mx-0 md:w-full">
+          <Poster
+            path={item.poster_path}
+            alt={`${item.title} poster`}
+            priority
+            sizes="(max-width: 768px) 192px, 300px"
+          />
         </div>
 
         <div className="flex flex-col">
