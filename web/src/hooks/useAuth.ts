@@ -19,31 +19,41 @@ export interface AuthState {
   /** True while a sign-in attempt is in flight. */
   submitting: boolean;
   loginError: string;
-  login: (email: string, password: string, isDemo: boolean) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string) => Promise<void>;
   continueAsGuest: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
-const message = (error: unknown): string =>
-  error instanceof FirebaseError || error instanceof Error
-    ? error.message
-    : "Authentication failed.";
+const message = (error: unknown): string => {
+  if (error instanceof FirebaseError) {
+    switch (error.code) {
+      case "auth/email-already-in-use":
+        return "An account with this email already exists.";
+      case "auth/invalid-email":
+        return "Please enter a valid email address.";
+      case "auth/operation-not-allowed":
+        return "Email and password sign-in is not enabled.";
+      case "auth/weak-password":
+        return "Password should be at least 6 characters.";
+      case "auth/user-not-found":
+      case "auth/wrong-password":
+      case "auth/invalid-credential":
+        return "Invalid email or password.";
+      case "auth/too-many-requests":
+        return "Too many attempts. Please try again later.";
+      default:
+        return error.message;
+    }
+  }
+  return error instanceof Error ? error.message : "Authentication failed.";
+};
 
 /**
- * Owns Firebase auth state and the sign-in / sign-out actions.
- *
- * `loading` and `submitting` are separate, unlike Phase 2 where a single flag
- * did both jobs. Conflating them meant a failed sign-in briefly re-rendered
- * the whole route as a full-page spinner before showing the error.
- *
- * When Firebase is not configured, loading resolves immediately and the user
- * stays null, which the UI treats as signed out.
+ * Owns Firebase auth state and the sign-in / sign-up / sign-out actions.
  */
 export function useAuth(): AuthState {
   const [user, setUser] = useState<User | null>(null);
-  // Seeded from the module-level flag rather than set to false inside the
-  // effect. With no Firebase configured there is nothing to wait for, so the
-  // initial value is already the final one and no cascading render happens.
   const [loading, setLoading] = useState(firebaseInitialized);
   const [submitting, setSubmitting] = useState(false);
   const [loginError, setLoginError] = useState("");
@@ -57,38 +67,29 @@ export function useAuth(): AuthState {
     return unsubscribe;
   }, []);
 
-  const login = useCallback(
-    async (email: string, password: string, isDemo: boolean) => {
-      setSubmitting(true);
-      setLoginError("");
-      try {
-        await signInWithEmailAndPassword(requireAuth(), email, password);
-      } catch (error) {
-        // The demo account is created on first use rather than seeded.
-        const isMissingAccount =
-          error instanceof FirebaseError &&
-          (error.code === "auth/user-not-found" ||
-            error.code === "auth/invalid-credential");
+  const login = useCallback(async (email: string, password: string) => {
+    setSubmitting(true);
+    setLoginError("");
+    try {
+      await signInWithEmailAndPassword(requireAuth(), email, password);
+    } catch (error) {
+      setLoginError(message(error));
+    } finally {
+      setSubmitting(false);
+    }
+  }, []);
 
-        if (isDemo && isMissingAccount) {
-          try {
-            await createUserWithEmailAndPassword(
-              requireAuth(),
-              email,
-              password
-            );
-          } catch (createError) {
-            setLoginError(message(createError));
-          }
-        } else {
-          setLoginError(message(error));
-        }
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    []
-  );
+  const signup = useCallback(async (email: string, password: string) => {
+    setSubmitting(true);
+    setLoginError("");
+    try {
+      await createUserWithEmailAndPassword(requireAuth(), email, password);
+    } catch (error) {
+      setLoginError(message(error));
+    } finally {
+      setSubmitting(false);
+    }
+  }, []);
 
   const continueAsGuest = useCallback(async () => {
     setSubmitting(true);
@@ -117,9 +118,19 @@ export function useAuth(): AuthState {
       submitting,
       loginError,
       login,
+      signup,
       continueAsGuest,
       logout,
     }),
-    [user, loading, submitting, loginError, login, continueAsGuest, logout]
+    [
+      user,
+      loading,
+      submitting,
+      loginError,
+      login,
+      signup,
+      continueAsGuest,
+      logout,
+    ]
   );
 }
