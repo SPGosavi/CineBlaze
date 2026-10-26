@@ -2,12 +2,13 @@ import Link from "next/link";
 import { Flame } from "lucide-react";
 import NavLinks from "./NavLinks";
 import AccountPanel from "./AccountPanel";
+import MobileAccountButton from "./MobileAccountButton";
 
 /**
  * App shell: desktop sidebar, mobile top bar and mobile bottom bar.
  *
  * A Server Component — only the pieces that need the URL or auth state
- * (`NavLinks`, `AccountPanel`) are client islands.
+ * (`NavLinks`, `AccountPanel`, `MobileAccountButton`) are client islands.
  */
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -19,6 +20,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </span>
           <span className="text-lg font-black tracking-tight">CineBlaze</span>
         </Link>
+        <MobileAccountButton />
       </header>
 
       <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-neutral-800 bg-black md:flex">
