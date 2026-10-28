@@ -2,6 +2,7 @@
 
 import type { WatchlistItem, WatchlistStatus } from "@cineblaze/shared";
 import WatchlistCard from "./WatchlistCard";
+import { useWatchlistDrag } from "@/contexts/WatchlistDragContext";
 
 export interface KanbanColumnProps {
   title: string;
@@ -18,7 +19,7 @@ export interface KanbanColumnProps {
   onDropOnCard: (targetId: number) => void;
 }
 
-/** One status column ("Want", "Watching", "Watched") of the watchlist board. */
+/** One status column ("Want to watch", "Watched") of the watchlist board. */
 export default function KanbanColumn({
   title,
   status,
@@ -30,13 +31,31 @@ export default function KanbanColumn({
   onDropInColumn,
   onDropOnCard,
 }: KanbanColumnProps) {
+  const { isTouchDragging, dragTarget } = useWatchlistDrag();
+  const isColumnDropTarget =
+    isTouchDragging &&
+    dragTarget?.type === "status" &&
+    dragTarget.status === status;
+
   return (
     <section
+      data-watchlist-status-target={status}
       onDragOver={onDragOver}
       onDrop={(event) => onDropInColumn(event, status)}
-      className={`flex h-auto min-w-full flex-1 flex-col rounded-xl border border-neutral-800/50 bg-neutral-900/50 p-4 md:h-full md:min-w-[280px] ${className}`}
+      className={`flex h-auto min-w-full flex-1 flex-col rounded-xl border bg-neutral-900/50 p-4 transition-all md:h-full md:min-w-[280px] ${
+        isColumnDropTarget
+          ? "border-red-500/80 ring-2 ring-red-500/40"
+          : "border-neutral-800/50"
+      } ${className}`}
     >
-      <h3 className="sticky top-0 z-10 mb-4 flex items-center justify-between rounded-lg border-b border-neutral-800 bg-neutral-900/90 p-2 text-xs font-bold tracking-wider text-gray-400 uppercase backdrop-blur-sm">
+      <h3
+        data-watchlist-status-target={status}
+        className={`sticky top-0 z-10 mb-4 flex items-center justify-between rounded-lg border-b border-neutral-800 bg-neutral-900/90 p-2 text-xs font-bold tracking-wider uppercase backdrop-blur-sm transition-all ${
+          isColumnDropTarget
+            ? "border-red-500/60 bg-red-950/60 text-white"
+            : "text-gray-400"
+        }`}
+      >
         {title}
         <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white">
           {items.length}
@@ -56,7 +75,14 @@ export default function KanbanColumn({
         ))}
 
         {items.length === 0 && (
-          <div className="col-span-full flex h-24 items-center justify-center rounded-xl border-2 border-dashed border-neutral-800 bg-neutral-900/30 text-sm text-neutral-600 md:h-32">
+          <div
+            data-watchlist-status-target={status}
+            className={`col-span-full flex h-24 items-center justify-center rounded-xl border-2 border-dashed bg-neutral-900/30 text-sm md:h-32 transition-all ${
+              isColumnDropTarget
+                ? "border-red-500/60 text-red-400 bg-red-950/20"
+                : "border-neutral-800 text-neutral-600"
+            }`}
+          >
             Nothing here yet
           </div>
         )}

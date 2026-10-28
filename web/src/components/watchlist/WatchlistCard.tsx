@@ -1,11 +1,11 @@
 "use client";
 
-import { memo, useState, useEffect, useRef } from "react";
+import { memo, useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { CircleCheck, RotateCcw } from "lucide-react";
 import type { WatchlistItem, WatchlistStatus } from "@cineblaze/shared";
 import Poster from "@/components/ui/Poster";
-import { useLongPress } from "@/hooks/useLongPress";
+import { useWatchlistDrag } from "@/contexts/WatchlistDragContext";
 
 export interface WatchlistCardProps {
   item: WatchlistItem;
@@ -18,9 +18,9 @@ export interface WatchlistCardProps {
 
 /**
  * Draggable watchlist entry. Dropping one card onto another reorders.
- *
- * Still a Client Component and still memoised: the kanban board re-renders on
- * every optimistic status change, and these cards are the bulk of it.
+ * Supports both desktop HTML5 drag-and-drop and mobile touch drag-and-drop.
+ * Touch & hold reveals media title/genres and the move button, and continued
+ * movement initiates touch drag.
  */
 function WatchlistCard({
   item,
@@ -29,13 +29,24 @@ function WatchlistCard({
   onDragStart,
   onDropOnCard,
 }: WatchlistCardProps) {
+  const { isTouchDragging, draggedItem, dragTarget, startTouchDrag } =
+    useWatchlistDrag();
   const [isOver, setIsOver] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const { revealed, setRevealed, handlers } = useLongPress(() => {
-    // Reveal action is handled via state
-  });
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const readyToDragRef = useRef(false);
+  const activeDragStartedRef = useRef(false);
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     if (!revealed) return;
@@ -51,13 +62,76 @@ function WatchlistCard({
     document.addEventListener("pointerdown", handleOutsideClick);
     return () =>
       document.removeEventListener("pointerdown", handleOutsideClick);
-  }, [revealed, setRevealed]);
+  }, [revealed]);
+
+  useEffect(() => {
+    return () => clearLongPress();
+  }, [clearLongPress]);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    activeDragStartedRef.current = false;
+
+    if (revealed) {
+      // If already revealed, touching and dragging can start immediately
+      readyToDragRef.current = true;
+    } else {
+      readyToDragRef.current = false;
+      clearLongPress();
+      longPressTimerRef.current = setTimeout(() => {
+        setRevealed(true);
+        readyToDragRef.current = true;
+        if (typeof navigator !== "undefined" && navigator.vibrate) {
+          navigator.vibrate(40);
+        }
+      }, 450);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (!touchStartRef.current || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
+    const distance = Math.hypot(dx, dy);
+
+    // If hold hasn't triggered yet, cancel if moved > 10px (normal scroll gesture)
+    if (!readyToDragRef.current) {
+      if (distance > 10) {
+        clearLongPress();
+        touchStartRef.current = null;
+      }
+      return;
+    }
+
+    // Long press triggered (or already revealed): if moved > 8px, start mobile drag!
+    if (!activeDragStartedRef.current && distance > 8) {
+      activeDragStartedRef.current = true;
+      startTouchDrag(item, { x: touch.clientX, y: touch.clientY });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    clearLongPress();
+    touchStartRef.current = null;
+    readyToDragRef.current = false;
+  };
+
+  const isThisItemDragging = isTouchDragging && draggedItem?.id === item.id;
+  const isThisItemDropTarget =
+    isTouchDragging && dragTarget?.type === "card" && dragTarget.id === item.id;
 
   return (
     <div
       ref={cardRef}
       draggable
-      {...handlers}
+      data-watchlist-card-id={item.id}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onContextMenu={(e) => {
         // Prevent default context menu on long-press in mobile browsers
         e.preventDefault();
@@ -81,16 +155,19 @@ function WatchlistCard({
         setIsOver(false);
         onDropOnCard(item.id);
       }}
-      className={`group relative aspect-[2/3] overflow-hidden rounded-lg cursor-grab touch-manipulation active:cursor-grabbing select-none ${
-        isOver ? "z-10 scale-[1.02] ring-2 ring-blue-500/50" : ""
-      } ${isDragging ? "opacity-50" : "opacity-100"} ${
-        revealed ? "touch-none" : ""
-      }`}
+      className={`group relative aspect-[2/3] overflow-hidden rounded-lg cursor-grab touch-manipulation active:cursor-grabbing select-none transition-transform duration-150 ${
+        isOver || isThisItemDropTarget
+          ? "z-10 scale-[1.03] ring-2 ring-blue-500/80 shadow-lg shadow-blue-500/20"
+          : ""
+      } ${
+        isDragging || isThisItemDragging ? "opacity-40 scale-95" : "opacity-100"
+      } ${revealed ? "touch-none" : ""}`}
     >
       <Poster
         path={item.poster_path}
         alt={`${item.title} poster`}
         sizes="(max-width: 768px) 30vw, 160px"
+        className="pointer-events-none select-none"
       />
 
       <div
@@ -145,6 +222,9 @@ function WatchlistCard({
           e.stopPropagation();
           onMove(item.id, moveTo);
         }}
+        onTouchStart={(e) => {
+          e.stopPropagation();
+        }}
         aria-label={
           moveTo === "watched"
             ? `Mark ${item.title} as watched`
@@ -176,6 +256,11 @@ function WatchlistCard({
       <Link
         href={`/${item.media_type}/${item.id}`}
         draggable={false}
+        onClick={(e) => {
+          if (activeDragStartedRef.current) {
+            e.preventDefault();
+          }
+        }}
         className="absolute inset-0 z-10 rounded-lg focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
       >
         <span className="sr-only">View details for {item.title}</span>
