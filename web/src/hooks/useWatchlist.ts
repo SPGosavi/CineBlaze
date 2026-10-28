@@ -27,7 +27,7 @@ export interface WatchlistState {
   add: (item: SanitizedMedia, status?: WatchlistStatus) => Promise<void>;
   remove: (id: number) => Promise<void>;
   setStatus: (id: number, status: WatchlistStatus) => Promise<void>;
-  reorder: (targetId: number) => Promise<void>;
+  reorder: (targetId: number, fromId?: number) => Promise<void>;
   onDragStart: (event: React.DragEvent<HTMLElement>, id: number) => void;
   onDragOver: (event: React.DragEvent<HTMLElement>) => void;
   onDropInColumn: (
@@ -217,9 +217,9 @@ export function useWatchlist(user: User | null): WatchlistState {
   );
 
   const reorder = useCallback(
-    async (targetId: number) => {
+    async (targetId: number, fromId?: number) => {
       if (!firebaseInitialized || uid === null) return;
-      const sourceId = dragItem.current;
+      const sourceId = fromId ?? dragItem.current;
       if (sourceId === null || sourceId === targetId) return;
 
       const previous = watchlistRef.current;
@@ -238,6 +238,8 @@ export function useWatchlist(user: User | null): WatchlistState {
         console.error(writeError);
         setStore({ uid, items: previous });
         setError("Could not reorder your watchlist.");
+      } finally {
+        dragItem.current = null;
       }
     },
     [uid]
