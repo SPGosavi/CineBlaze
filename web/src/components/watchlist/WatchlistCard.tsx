@@ -157,7 +157,7 @@ function WatchlistCard({
       }}
       className={`group relative aspect-[2/3] overflow-hidden rounded-lg cursor-grab touch-manipulation active:cursor-grabbing select-none transition-transform duration-150 ${
         isOver || isThisItemDropTarget
-          ? "z-10 scale-[1.03] ring-2 ring-blue-500/80 shadow-lg shadow-blue-500/20"
+          ? "z-10 scale-[1.03] ring-2 ring-red-600/70 shadow-lg shadow-red-950/40"
           : ""
       } ${
         isDragging || isThisItemDragging ? "opacity-40 scale-95" : "opacity-100"

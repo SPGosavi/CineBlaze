@@ -44,7 +44,7 @@ export default function KanbanColumn({
       onDrop={(event) => onDropInColumn(event, status)}
       className={`flex h-auto min-w-full flex-1 flex-col rounded-xl border bg-neutral-900/50 p-4 transition-all md:h-full md:min-w-[280px] ${
         isColumnDropTarget
-          ? "border-red-500/80 ring-2 ring-red-500/40"
+          ? "border-red-600/70 ring-2 ring-red-600/30"
           : "border-neutral-800/50"
       } ${className}`}
     >
@@ -52,7 +52,7 @@ export default function KanbanColumn({
         data-watchlist-status-target={status}
         className={`sticky top-0 z-10 mb-4 flex items-center justify-between rounded-lg border-b border-neutral-800 bg-neutral-900/90 p-2 text-xs font-bold tracking-wider uppercase backdrop-blur-sm transition-all ${
           isColumnDropTarget
-            ? "border-red-500/60 bg-red-950/60 text-white"
+            ? "border-red-600/60 bg-red-950/60 text-white"
             : "text-gray-400"
         }`}
       >
@@ -79,7 +79,7 @@ export default function KanbanColumn({
             data-watchlist-status-target={status}
             className={`col-span-full flex h-24 items-center justify-center rounded-xl border-2 border-dashed bg-neutral-900/30 text-sm md:h-32 transition-all ${
               isColumnDropTarget
-                ? "border-red-500/60 text-red-400 bg-red-950/20"
+                ? "border-red-600/60 text-red-300/80 bg-red-950/20"
                 : "border-neutral-800 text-neutral-600"
             }`}
           >
