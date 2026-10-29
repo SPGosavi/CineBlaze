@@ -61,7 +61,7 @@ function MobileStatusTabs({
   onDragOver,
   onDropInColumn,
 }: MobileStatusTabsProps) {
-  const { isTouchDragging, dragTarget } = useWatchlistDrag();
+  const { isTouchDragging, draggedItem, dragTarget } = useWatchlistDrag();
 
   return (
     <div
@@ -73,7 +73,9 @@ function MobileStatusTabs({
         const isDropTarget =
           isTouchDragging &&
           dragTarget?.type === "status" &&
-          dragTarget.status === status;
+          dragTarget.status === status &&
+          draggedItem !== null &&
+          draggedItem.status !== status;
 
         return (
           <button

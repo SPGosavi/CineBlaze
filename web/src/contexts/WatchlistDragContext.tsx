@@ -138,11 +138,11 @@ export function WatchlistDragProvider({
         if (cardId && cardId !== current.id) {
           target = { type: "card", id: cardId };
         }
-      } else if (statusEl) {
+      } else if (statusEl && current) {
         const status = statusEl.getAttribute(
           "data-watchlist-status-target"
         ) as WatchlistStatus;
-        if (status) {
+        if (status && status !== current.status) {
           target = { type: "status", status };
         }
       }
