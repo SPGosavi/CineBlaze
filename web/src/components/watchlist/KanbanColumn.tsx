@@ -31,11 +31,13 @@ export default function KanbanColumn({
   onDropInColumn,
   onDropOnCard,
 }: KanbanColumnProps) {
-  const { isTouchDragging, dragTarget } = useWatchlistDrag();
+  const { isTouchDragging, draggedItem, dragTarget } = useWatchlistDrag();
   const isColumnDropTarget =
     isTouchDragging &&
     dragTarget?.type === "status" &&
-    dragTarget.status === status;
+    dragTarget.status === status &&
+    draggedItem !== null &&
+    draggedItem.status !== status;
 
   return (
     <section
