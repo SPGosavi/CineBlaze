@@ -49,7 +49,6 @@ interface WatchlistDragProviderProps {
   children: ReactNode;
   onReorder: (targetId: number, sourceId: number) => Promise<void>;
   onSetStatus: (id: number, status: WatchlistStatus) => Promise<void>;
-  onStatusChange?: (status: WatchlistStatus) => void;
 }
 
 /**
@@ -64,7 +63,6 @@ export function WatchlistDragProvider({
   children,
   onReorder,
   onSetStatus,
-  onStatusChange,
 }: WatchlistDragProviderProps) {
   const [isTouchDragging, setIsTouchDragging] = useState(false);
   const [draggedItem, setDraggedItem] = useState<WatchlistItem | null>(null);
@@ -179,7 +177,6 @@ export function WatchlistDragProvider({
         } else if (target.type === "status") {
           if (current.status !== target.status) {
             void onSetStatus(current.id, target.status);
-            onStatusChange?.(target.status);
             if (typeof navigator !== "undefined" && navigator.vibrate) {
               navigator.vibrate(40);
             }
@@ -205,7 +202,7 @@ export function WatchlistDragProvider({
       window.removeEventListener("touchend", handleWindowTouchEnd);
       window.removeEventListener("touchcancel", handleWindowTouchEnd);
     };
-  }, [isTouchDragging, onReorder, onSetStatus, onStatusChange]);
+  }, [isTouchDragging, onReorder, onSetStatus]);
 
   return (
     <WatchlistDragContext.Provider
@@ -219,7 +216,7 @@ export function WatchlistDragProvider({
     >
       {children}
 
-      {/* Floating touch drag preview */}
+      {/* Floating touch drag preview with reduced brightness red ring */}
       {isTouchDragging && draggedItem && touchPos && (
         <div
           className="pointer-events-none fixed z-50 select-none transition-transform duration-75 ease-out"
@@ -231,7 +228,7 @@ export function WatchlistDragProvider({
             height: "155px",
           }}
         >
-          <div className="relative h-full w-full overflow-hidden rounded-xl bg-neutral-900 shadow-2xl shadow-black ring-2 ring-red-500">
+          <div className="relative h-full w-full overflow-hidden rounded-xl bg-neutral-900 shadow-2xl shadow-black ring-2 ring-red-600/70">
             <Poster
               path={draggedItem.poster_path}
               alt={`${draggedItem.title} poster preview`}

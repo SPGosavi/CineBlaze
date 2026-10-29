@@ -91,7 +91,7 @@ function MobileStatusTabs({
             }}
             className={`relative flex-1 rounded-lg px-6 py-2.5 text-sm font-bold transition-all ${
               isDropTarget
-                ? "ring-2 ring-red-500 bg-red-600/30 text-white scale-105 shadow-lg shadow-red-900/40"
+                ? "ring-2 ring-red-600/70 bg-red-950/40 text-white scale-105 shadow-lg shadow-red-950/40"
                 : mobileStatus === status
                   ? "bg-neutral-800 text-white shadow-lg"
                   : "text-gray-500 hover:bg-white/5 hover:text-white"
@@ -99,7 +99,7 @@ function MobileStatusTabs({
           >
             {status === "want" ? "Want to watch" : "Watched"}
             {isDropTarget && (
-              <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-black tracking-wider uppercase text-white shadow-md animate-pulse">
+              <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-red-700/90 px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase text-white shadow-md">
                 Drop to move
               </span>
             )}
@@ -220,11 +220,7 @@ export default function WatchlistBoard() {
   }
 
   return (
-    <WatchlistDragProvider
-      onReorder={reorder}
-      onSetStatus={setStatus}
-      onStatusChange={setMobileStatus}
-    >
+    <WatchlistDragProvider onReorder={reorder} onSetStatus={setStatus}>
       <div className="animate-fade-in relative flex h-full flex-col pb-20 md:pb-0">
         <header className="mb-8 flex flex-col items-start justify-between gap-6 rounded-2xl border border-neutral-800 bg-neutral-900/50 p-6 md:flex-row md:items-center">
           <div className="flex flex-col gap-2">
