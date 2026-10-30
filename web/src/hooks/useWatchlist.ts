@@ -12,11 +12,13 @@ import {
 import type { User } from "firebase/auth";
 import type {
   SanitizedMedia,
+  UserEventRequest,
   WatchlistItem,
   WatchlistStatus,
 } from "@cineblaze/shared";
 import { firebaseInitialized, requireDb } from "@/lib/firebase";
 import { sanitizeMedia } from "@/lib/sanitize";
+import api from "@/lib/api";
 
 export interface WatchlistState {
   watchlist: WatchlistItem[];
@@ -173,6 +175,17 @@ export function useWatchlist(user: User | null): WatchlistState {
           { items: arrayUnion(entry) },
           { merge: true }
         );
+
+        const eventAction: UserEventRequest["action"] =
+          status === "watched" ? "watched" : "watchlisted";
+        const payload: UserEventRequest = {
+          action: eventAction,
+          tmdbId: entry.id,
+          mediaType: entry.media_type,
+          title: entry.title,
+          genres: entry.genres,
+        };
+        void api.post("/events", payload).catch(() => {});
       } catch (writeError) {
         console.error(writeError);
         setError("Could not add that title.");
@@ -207,6 +220,20 @@ export function useWatchlist(user: User | null): WatchlistState {
       setStore({ uid, items: next });
       try {
         await updateDoc(watchlistDocRef(uid), { items: next });
+
+        if (status === "watched") {
+          const watched = next.find((item) => item.id === id);
+          if (watched) {
+            const payload: UserEventRequest = {
+              action: "watched",
+              tmdbId: watched.id,
+              mediaType: watched.media_type,
+              title: watched.title,
+              genres: watched.genres,
+            };
+            void api.post("/events", payload).catch(() => {});
+          }
+        }
       } catch (writeError) {
         console.error(writeError);
         setStore({ uid, items: previous });

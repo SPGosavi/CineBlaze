@@ -5,6 +5,7 @@ import { sanitizeMediaList } from "@/lib/sanitize";
 import { SITE_DESCRIPTION } from "@/lib/constants";
 import SearchBar from "@/components/search/SearchBar";
 import MoodChips from "@/components/search/MoodChips";
+import ForYouShelf from "@/components/personalization/ForYouShelf";
 import Shelf from "@/components/media/Shelf";
 import { TrendingRowSkeleton } from "@/components/ui/Skeleton";
 import { FailedToLoad } from "@/components/ui/StatePanels";
@@ -108,6 +109,7 @@ export default function DiscoverPage() {
       </section>
 
       <div className="space-y-10">
+        <ForYouShelf />
         {SHELVES.map(({ key, title }, index) => (
           <Suspense key={key} fallback={<TrendingRowSkeleton />}>
             <TrendingShelf shelf={key} title={title} priority={index === 0} />
