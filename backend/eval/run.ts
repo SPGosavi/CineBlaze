@@ -66,6 +66,26 @@ interface EvalSummary {
   avgGroundingCharsPerCase: number;
   avgGroundingPopulatedSourcesPerCase: number;
   resolvedBy: Record<string, number>;
+  byMode: Record<
+    string,
+    {
+      totalCases: number;
+      hitAt1Rate: number;
+      hitAt3Rate: number;
+      p50Ms: number;
+      avgPromptTokensPerCase: number;
+    }
+  >;
+  byTag: Record<
+    string,
+    {
+      totalCases: number;
+      hitAt1Rate: number;
+      hitAt3Rate: number;
+      p50Ms: number;
+      avgPromptTokensPerCase: number;
+    }
+  >;
 }
 
 interface EvalReport {
@@ -229,6 +249,48 @@ function summarize(results: EvalCaseResult[]): EvalSummary {
     resolvedBy[bucket] = (resolvedBy[bucket] ?? 0) + 1;
   }
 
+  const summarizeSlice = (
+    slice: EvalCaseResult[]
+  ): {
+    totalCases: number;
+    hitAt1Rate: number;
+    hitAt3Rate: number;
+    p50Ms: number;
+    avgPromptTokensPerCase: number;
+  } => {
+    const total = slice.length;
+    const hitAt1Count = slice.filter((r) => r.top1Hit).length;
+    const hitAt3Count = slice.filter((r) => r.top3Hit).length;
+    const promptTotal = slice.reduce((sum, r) => sum + r.promptTokens, 0);
+    return {
+      totalCases: total,
+      hitAt1Rate: total > 0 ? hitAt1Count / total : 0,
+      hitAt3Rate: total > 0 ? hitAt3Count / total : 0,
+      p50Ms: percentile(
+        slice.map((r) => r.latencyMs),
+        50
+      ),
+      avgPromptTokensPerCase: total > 0 ? promptTotal / total : 0,
+    };
+  };
+
+  const byMode: EvalSummary["byMode"] = {};
+  for (const mode of ["ai", "recommend", "direct"] as const) {
+    const slice = results.filter((r) => r.mode === mode);
+    if (slice.length > 0) byMode[mode] = summarizeSlice(slice);
+  }
+
+  const tagSet = new Set<string>();
+  for (const result of results) {
+    for (const tag of result.tags) tagSet.add(tag);
+  }
+
+  const byTag: EvalSummary["byTag"] = {};
+  for (const tag of [...tagSet].sort()) {
+    const slice = results.filter((r) => r.tags.includes(tag));
+    if (slice.length > 0) byTag[tag] = summarizeSlice(slice);
+  }
+
   return {
     totalCases,
     hitAt1,
@@ -247,6 +309,8 @@ function summarize(results: EvalCaseResult[]): EvalSummary {
     avgGroundingPopulatedSourcesPerCase:
       totalCases > 0 ? totalPopulatedSources / totalCases : 0,
     resolvedBy,
+    byMode,
+    byTag,
   };
 }
 
@@ -288,6 +352,24 @@ function printSummary(summary: EvalSummary): void {
     `grounding populated sources avg per case: ${summary.avgGroundingPopulatedSourcesPerCase.toFixed(2)}`
   );
   console.log(`resolvedBy: ${JSON.stringify(summary.resolvedBy)}`);
+
+  console.log("\n--- By Mode ---");
+  for (const [mode, slice] of Object.entries(summary.byMode)) {
+    console.log(
+      `${mode}: cases=${slice.totalCases} hit@1=${(slice.hitAt1Rate * 100).toFixed(1)}% hit@3=${(slice.hitAt3Rate * 100).toFixed(1)}% p50=${slice.p50Ms}ms avgPrompt=${slice.avgPromptTokensPerCase.toFixed(1)}`
+    );
+  }
+
+  const topTags = Object.entries(summary.byTag)
+    .sort((a, b) => b[1].totalCases - a[1].totalCases)
+    .slice(0, 10);
+
+  console.log("\n--- By Tag (top 10 by case count) ---");
+  for (const [tag, slice] of topTags) {
+    console.log(
+      `${tag}: cases=${slice.totalCases} hit@1=${(slice.hitAt1Rate * 100).toFixed(1)}% hit@3=${(slice.hitAt3Rate * 100).toFixed(1)}% p50=${slice.p50Ms}ms avgPrompt=${slice.avgPromptTokensPerCase.toFixed(1)}`
+    );
+  }
 }
 
 function printDiff(prev: EvalSummary, next: EvalSummary): void {
@@ -315,6 +397,28 @@ function printDiff(prev: EvalSummary, next: EvalSummary): void {
   console.log(
     `avg grounding chars: ${prev.avgGroundingCharsPerCase.toFixed(1)} -> ${next.avgGroundingCharsPerCase.toFixed(1)} (${(next.avgGroundingCharsPerCase - prev.avgGroundingCharsPerCase).toFixed(1)})`
   );
+
+  const prevSemantic = prev.resolvedBy["semantic"] ?? 0;
+  const nextSemantic = next.resolvedBy["semantic"] ?? 0;
+  console.log(
+    `resolvedBy.semantic: ${prevSemantic} -> ${nextSemantic} (${nextSemantic - prevSemantic})`
+  );
+
+  const compareTag = (tag: string) => {
+    const left = prev.byTag?.[tag];
+    const right = next.byTag?.[tag];
+    if (!left && !right) return;
+    const leftRate = left?.hitAt3Rate ?? 0;
+    const rightRate = right?.hitAt3Rate ?? 0;
+    console.log(
+      `tag:${tag} hit@3: ${(leftRate * 100).toFixed(1)}% -> ${(rightRate * 100).toFixed(1)}% (${((rightRate - leftRate) * 100).toFixed(1)}pp)`
+    );
+  };
+
+  compareTag("recommend");
+  compareTag("mood");
+  compareTag("franchise");
+  compareTag("regional");
 }
 
 async function main(): Promise<void> {
