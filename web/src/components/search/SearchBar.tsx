@@ -25,8 +25,8 @@ const SEARCH_MODE_META = [
     mode: "recommend",
     label: "Recommend me",
     Icon: Wand2,
-    placeholder: "e.g. A Tamil thriller from the 2010s",
-    hint: "Tell us a genre, language or era.",
+    placeholder: "What are you in the mood for?",
+    hint: "Share a mood, genre, language, or era.",
   },
 ] as const;
 

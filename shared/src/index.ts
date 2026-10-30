@@ -138,6 +138,23 @@ export function isSearchMode(value: unknown): value is SearchMode {
   );
 }
 
+export const MOOD_TAGS = [
+  "dark-mysterious",
+  "feel-good",
+  "mind-bending",
+  "heartwarming",
+  "intense-thrilling",
+  "nostalgic",
+  "adventurous",
+  "romantic",
+  "thought-provoking",
+  "funny-lighthearted",
+  "eerie-unsettling",
+  "epic",
+] as const;
+
+export type MoodTag = (typeof MOOD_TAGS)[number];
+
 /** Output of extractStructuredParams — decomposed user query */
 export interface StructuredParams {
   language: string | null;
@@ -145,6 +162,7 @@ export interface StructuredParams {
   actors: string[];
   directors: string[];
   plot_keywords: string | null;
+  mood_tags: MoodTag[];
   media_types: MediaType[];
   era: string | null;
   is_generic: boolean;
