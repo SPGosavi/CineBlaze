@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import type { Request, Response } from "express";
 import type { EnrichedMedia } from "../src/types/index.js";
 import { CacheKeys, invalidatePrefix } from "../src/cache/index.js";
+import { closeCache } from "../src/cache/index.js";
+import { closeDatabase } from "../src/db/index.js";
 import {
   directSearch,
   findMovies,
@@ -41,6 +43,8 @@ interface EvalCaseResult {
   topTmdbIds: number[];
   top1Hit: boolean;
   top3Hit: boolean;
+  failed: boolean;
+  error: string | null;
   promptTokens: number;
   completionTokens: number;
   groundingSources: {
@@ -55,6 +59,7 @@ interface EvalSummary {
   totalCases: number;
   hitAt1: number;
   hitAt3: number;
+  failedCases: number;
   hitAt1Rate: number;
   hitAt3Rate: number;
   p50Ms: number;
@@ -177,10 +182,17 @@ async function runCase(testCase: EvalCase): Promise<EvalCaseResult> {
   resetEvalTelemetry();
   const started = Date.now();
 
-  if (mode === "direct") {
-    await directSearch(req as Request<{}, {}, { query: string }>, res);
-  } else {
-    await findMovies(req, res);
+  let failed = false;
+  let errorMessage: string | null = null;
+  try {
+    if (mode === "direct") {
+      await directSearch(req as Request<{}, {}, { query: string }>, res);
+    } else {
+      await findMovies(req, res);
+    }
+  } catch (error) {
+    failed = true;
+    errorMessage = error instanceof Error ? error.message : String(error);
   }
 
   const latencyMs = Date.now() - started;
@@ -217,16 +229,100 @@ async function runCase(testCase: EvalCase): Promise<EvalCaseResult> {
     topTmdbIds: movies.slice(0, 5).map((m) => m.id),
     top1Hit,
     top3Hit,
+    failed,
+    error: errorMessage,
     promptTokens,
     completionTokens,
     groundingSources: telemetry.groundingSources,
   };
 }
 
+async function runCaseWithTimeout(
+  testCase: EvalCase,
+  timeoutMs: number
+): Promise<EvalCaseResult> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve({
+        id: testCase.id,
+        query: testCase.query,
+        mode: testCase.mode ?? "ai",
+        tags: testCase.tags,
+        expected: testCase.expected,
+        statusCode: 598,
+        resolvedBy: null,
+        latencyMs: timeoutMs,
+        resultCount: 0,
+        topTitles: [],
+        topTmdbIds: [],
+        top1Hit: false,
+        top3Hit: false,
+        failed: true,
+        error: `timeout after ${timeoutMs}ms`,
+        promptTokens: 0,
+        completionTokens: 0,
+        groundingSources: [],
+      });
+    }, timeoutMs);
+
+    void runCase(testCase)
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        resolve({
+          id: testCase.id,
+          query: testCase.query,
+          mode: testCase.mode ?? "ai",
+          tags: testCase.tags,
+          expected: testCase.expected,
+          statusCode: 599,
+          resolvedBy: null,
+          latencyMs: timeoutMs,
+          resultCount: 0,
+          topTitles: [],
+          topTmdbIds: [],
+          top1Hit: false,
+          top3Hit: false,
+          failed: true,
+          error: error instanceof Error ? error.message : String(error),
+          promptTokens: 0,
+          completionTokens: 0,
+          groundingSources: [],
+        });
+      });
+  });
+}
+
+function parseArgValue(flag: string): string | null {
+  const index = process.argv.indexOf(flag);
+  if (index === -1) return null;
+  return process.argv[index + 1] ?? null;
+}
+
+function parseArgNumber(flag: string, fallback: number): number {
+  const value = parseArgValue(flag);
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function parseArgList(flag: string): string[] {
+  const values: string[] = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === flag && process.argv[i + 1]) {
+      values.push(process.argv[i + 1]);
+    }
+  }
+  return values;
+}
+
 function summarize(results: EvalCaseResult[]): EvalSummary {
   const totalCases = results.length;
   const hitAt1 = results.filter((r) => r.top1Hit).length;
   const hitAt3 = results.filter((r) => r.top3Hit).length;
+  const failedCases = results.filter((r) => r.failed).length;
   const latencies = results.map((r) => r.latencyMs);
   const totalPromptTokens = results.reduce((sum, r) => sum + r.promptTokens, 0);
   const totalCompletionTokens = results.reduce(
@@ -295,6 +391,7 @@ function summarize(results: EvalCaseResult[]): EvalSummary {
     totalCases,
     hitAt1,
     hitAt3,
+    failedCases,
     hitAt1Rate: totalCases > 0 ? hitAt1 / totalCases : 0,
     hitAt3Rate: totalCases > 0 ? hitAt3 / totalCases : 0,
     p50Ms: percentile(latencies, 50),
@@ -332,6 +429,7 @@ async function latestReport(resultsDir: string): Promise<EvalReport | null> {
 function printSummary(summary: EvalSummary): void {
   console.log("\n=== Eval Summary ===");
   console.log(`cases: ${summary.totalCases}`);
+  console.log(`failed: ${summary.failedCases}`);
   console.log(
     `hit@1: ${summary.hitAt1}/${summary.totalCases} (${(summary.hitAt1Rate * 100).toFixed(1)}%)`
   );
@@ -423,53 +521,72 @@ function printDiff(prev: EvalSummary, next: EvalSummary): void {
 
 async function main(): Promise<void> {
   const isBaseline = process.argv.includes("--baseline");
+  const limit = parseArgNumber("--limit", 0);
+  const timeoutMs = parseArgNumber("--timeout-ms", 45_000);
+  const tags = parseArgList("--tag").map((tag) => tag.toLowerCase());
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const queriesPath = path.join(currentDir, "queries.json");
   const resultsDir = path.join(currentDir, "results");
 
-  const raw = await fs.readFile(queriesPath, "utf8");
-  const cases = JSON.parse(raw) as EvalCase[];
+  try {
+    const raw = await fs.readFile(queriesPath, "utf8");
+    let cases = JSON.parse(raw) as EvalCase[];
 
-  await fs.mkdir(resultsDir, { recursive: true });
+    if (tags.length > 0) {
+      cases = cases.filter((testCase) =>
+        testCase.tags.some((tag) => tags.includes(tag.toLowerCase()))
+      );
+    }
 
-  const previous = !isBaseline ? await latestReport(resultsDir) : null;
+    if (limit > 0) {
+      cases = cases.slice(0, limit);
+    }
 
-  await invalidatePrefix(CacheKeys.searchPrefix);
+    await fs.mkdir(resultsDir, { recursive: true });
 
-  setEvalTelemetryEnabled(true);
+    const previous = !isBaseline ? await latestReport(resultsDir) : null;
 
-  const results: EvalCaseResult[] = [];
-  for (const testCase of cases) {
-    const result = await runCase(testCase);
-    results.push(result);
-    console.log(
-      `[${result.id}] mode=${result.mode} status=${result.statusCode} resolvedBy=${result.resolvedBy ?? "(none)"} top1=${result.top1Hit ? "hit" : "miss"} top3=${result.top3Hit ? "hit" : "miss"} latency=${result.latencyMs}ms`
+    await invalidatePrefix(CacheKeys.searchPrefix);
+
+    setEvalTelemetryEnabled(true);
+
+    const results: EvalCaseResult[] = [];
+    for (const testCase of cases) {
+      const result = await runCaseWithTimeout(testCase, timeoutMs);
+      results.push(result);
+      console.log(
+        `[${result.id}] mode=${result.mode} status=${result.statusCode} resolvedBy=${result.resolvedBy ?? "(none)"} top1=${result.top1Hit ? "hit" : "miss"} top3=${result.top3Hit ? "hit" : "miss"} latency=${result.latencyMs}ms${result.failed ? ` failed=${result.error}` : ""}`
+      );
+    }
+
+    setEvalTelemetryEnabled(false);
+
+    const report: EvalReport = {
+      generatedAt: new Date().toISOString(),
+      baseline: isBaseline,
+      summary: summarize(results),
+      cases: results,
+    };
+
+    const timestamp = report.generatedAt.replace(/[:.]/g, "-");
+    const outputPath = path.join(
+      resultsDir,
+      `${isBaseline ? "baseline" : "run"}-${timestamp}.json`
     );
+    await fs.writeFile(outputPath, JSON.stringify(report, null, 2), "utf8");
+
+    printSummary(report.summary);
+
+    if (previous) {
+      printDiff(previous.summary, report.summary);
+    }
+
+    console.log(`\nSaved report: ${outputPath}`);
+  } finally {
+    setEvalTelemetryEnabled(false);
+    await closeCache();
+    await closeDatabase();
   }
-
-  setEvalTelemetryEnabled(false);
-
-  const report: EvalReport = {
-    generatedAt: new Date().toISOString(),
-    baseline: isBaseline,
-    summary: summarize(results),
-    cases: results,
-  };
-
-  const timestamp = report.generatedAt.replace(/[:.]/g, "-");
-  const outputPath = path.join(
-    resultsDir,
-    `${isBaseline ? "baseline" : "run"}-${timestamp}.json`
-  );
-  await fs.writeFile(outputPath, JSON.stringify(report, null, 2), "utf8");
-
-  printSummary(report.summary);
-
-  if (previous) {
-    printDiff(previous.summary, report.summary);
-  }
-
-  console.log(`\nSaved report: ${outputPath}`);
 }
 
 main().catch((error) => {

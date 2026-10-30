@@ -1,0 +1,513 @@
+{
+  "generatedAt": "2026-10-30T19:31:44.850Z",
+  "baseline": false,
+  "summary": {
+    "totalCases": 10,
+    "hitAt1": 1,
+    "hitAt3": 1,
+    "failedCases": 0,
+    "hitAt1Rate": 0.1,
+    "hitAt3Rate": 0.1,
+    "p50Ms": 1986,
+    "p95Ms": 5460,
+    "totalPromptTokens": 6339,
+    "totalCompletionTokens": 1768,
+    "avgPromptTokensPerCase": 633.9,
+    "avgCompletionTokensPerCase": 176.8,
+    "avgGroundingCharsPerCase": 390.2,
+    "avgGroundingPopulatedSourcesPerCase": 0.4,
+    "resolvedBy": {
+      "title": 1,
+      "none": 4,
+      "(none)": 4,
+      "ai-generic": 1
+    },
+    "byMode": {
+      "ai": {
+        "totalCases": 5,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 3000,
+        "avgPromptTokensPerCase": 748.6
+      },
+      "recommend": {
+        "totalCases": 4,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 1048,
+        "avgPromptTokensPerCase": 649
+      },
+      "direct": {
+        "totalCases": 1,
+        "hitAt1Rate": 1,
+        "hitAt3Rate": 1,
+        "p50Ms": 5460,
+        "avgPromptTokensPerCase": 0
+      }
+    },
+    "byTag": {
+      "conversational": {
+        "totalCases": 2,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 1206,
+        "avgPromptTokensPerCase": 739
+      },
+      "english": {
+        "totalCases": 3,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 3000,
+        "avgPromptTokensPerCase": 758.3333333333334
+      },
+      "franchise": {
+        "totalCases": 2,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 2653,
+        "avgPromptTokensPerCase": 726
+      },
+      "heist": {
+        "totalCases": 1,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 1342,
+        "avgPromptTokensPerCase": 646
+      },
+      "hindi": {
+        "totalCases": 1,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 1342,
+        "avgPromptTokensPerCase": 646
+      },
+      "known-hard": {
+        "totalCases": 1,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 1986,
+        "avgPromptTokensPerCase": 649
+      },
+      "malayalam": {
+        "totalCases": 1,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 1048,
+        "avgPromptTokensPerCase": 646
+      },
+      "plot": {
+        "totalCases": 3,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 3059,
+        "avgPromptTokensPerCase": 763.6666666666666
+      },
+      "recommend": {
+        "totalCases": 4,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 1048,
+        "avgPromptTokensPerCase": 649
+      },
+      "regional": {
+        "totalCases": 6,
+        "hitAt1Rate": 0.16666666666666666,
+        "hitAt3Rate": 0.16666666666666666,
+        "p50Ms": 1206,
+        "avgPromptTokensPerCase": 569.6666666666666
+      },
+      "regression": {
+        "totalCases": 2,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 1986,
+        "avgPromptTokensPerCase": 734
+      },
+      "sequel": {
+        "totalCases": 2,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 2653,
+        "avgPromptTokensPerCase": 726
+      },
+      "tamil": {
+        "totalCases": 2,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 1034,
+        "avgPromptTokensPerCase": 652
+      },
+      "telugu": {
+        "totalCases": 1,
+        "hitAt1Rate": 1,
+        "hitAt3Rate": 1,
+        "p50Ms": 5460,
+        "avgPromptTokensPerCase": 0
+      },
+      "title": {
+        "totalCases": 1,
+        "hitAt1Rate": 1,
+        "hitAt3Rate": 1,
+        "p50Ms": 5460,
+        "avgPromptTokensPerCase": 0
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "title-pushpa",
+      "query": "Pushpa",
+      "mode": "direct",
+      "tags": ["title", "regional", "telugu"],
+      "expected": {
+        "titles": ["Pushpa"]
+      },
+      "statusCode": 200,
+      "resolvedBy": "title",
+      "latencyMs": 5460,
+      "resultCount": 10,
+      "topTitles": [
+        "Pushpa Impossible",
+        "Pushpa: The Rise",
+        "Pushpa 2 - The Rule",
+        "Feminist Fathima",
+        "Gol Maal"
+      ],
+      "topTmdbIds": [203769, 690957, 857598, 1377377, 30066],
+      "top1Hit": true,
+      "top3Hit": true,
+      "failed": false,
+      "error": null,
+      "promptTokens": 0,
+      "completionTokens": 0,
+      "groundingSources": []
+    },
+    {
+      "id": "plot-telugu-sandalwood",
+      "query": "telugu sandalwood movie about red sandalwood smuggling",
+      "mode": "ai",
+      "tags": ["plot", "regional", "regression"],
+      "expected": {
+        "titles": ["Pushpa"]
+      },
+      "statusCode": 200,
+      "resolvedBy": "none",
+      "latencyMs": 3259,
+      "resultCount": 0,
+      "topTitles": [],
+      "topTmdbIds": [],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 819,
+      "completionTokens": 242,
+      "groundingSources": [
+        {
+          "label": "tmdb-keyword-discover",
+          "ms": 258,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "tmdb-multi",
+          "ms": 265,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "wiki-raw-query",
+          "ms": 274,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "wiki-keywords",
+          "ms": 281,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "ddg",
+          "ms": 787,
+          "chars": 929,
+          "populated": true
+        }
+      ]
+    },
+    {
+      "id": "plot-south-indian-dementia-veteran",
+      "query": "south indian movie about an old army veteran with dementia",
+      "mode": "ai",
+      "tags": ["plot", "regional", "regression", "known-hard"],
+      "expected": {
+        "titles": []
+      },
+      "statusCode": 200,
+      "resolvedBy": "none",
+      "latencyMs": 1986,
+      "resultCount": 0,
+      "topTitles": [],
+      "topTmdbIds": [],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 649,
+      "completionTokens": 190,
+      "groundingSources": [
+        {
+          "label": "wiki-keywords",
+          "ms": 91,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "wiki-raw-query",
+          "ms": 92,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "tmdb-multi",
+          "ms": 271,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "tmdb-keyword-discover",
+          "ms": 270,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "ddg",
+          "ms": 820,
+          "chars": 890,
+          "populated": true
+        }
+      ]
+    },
+    {
+      "id": "recommend-tamil-thriller-2010s",
+      "query": "recommend a tamil thriller from the 2010s",
+      "mode": "recommend",
+      "tags": ["recommend", "regional", "tamil"],
+      "expected": {
+        "titles": ["Ratsasan", "Vikram Vedha", "Thani Oruvan"]
+      },
+      "statusCode": 500,
+      "resolvedBy": null,
+      "latencyMs": 1034,
+      "resultCount": 0,
+      "topTitles": [],
+      "topTmdbIds": [],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 649,
+      "completionTokens": 191,
+      "groundingSources": []
+    },
+    {
+      "id": "recommend-hindi-comedy-heist",
+      "query": "recommend a hindi comedy heist movie",
+      "mode": "recommend",
+      "tags": ["recommend", "hindi", "heist"],
+      "expected": {
+        "titles": ["Hera Pheri", "Phir Hera Pheri"]
+      },
+      "statusCode": 500,
+      "resolvedBy": null,
+      "latencyMs": 1342,
+      "resultCount": 0,
+      "topTitles": [],
+      "topTmdbIds": [],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 646,
+      "completionTokens": 156,
+      "groundingSources": []
+    },
+    {
+      "id": "franchise-dark-knight-sequel",
+      "query": "sequel to batman begins",
+      "mode": "ai",
+      "tags": ["franchise", "sequel", "english"],
+      "expected": {
+        "tmdbIds": [155],
+        "titles": ["The Dark Knight"]
+      },
+      "statusCode": 200,
+      "resolvedBy": "none",
+      "latencyMs": 3000,
+      "resultCount": 0,
+      "topTitles": [],
+      "topTmdbIds": [],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 809,
+      "completionTokens": 243,
+      "groundingSources": [
+        {
+          "label": "wiki-raw-query",
+          "ms": 90,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "wiki-keywords",
+          "ms": 91,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "tmdb-multi",
+          "ms": 268,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "tmdb-keyword-discover",
+          "ms": 267,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "ddg",
+          "ms": 708,
+          "chars": 1038,
+          "populated": true
+        }
+      ]
+    },
+    {
+      "id": "franchise-iron-man-sequel",
+      "query": "movie after iron man",
+      "mode": "ai",
+      "tags": ["franchise", "sequel", "english"],
+      "expected": {
+        "tmdbIds": [10138],
+        "titles": ["Iron Man 2"]
+      },
+      "statusCode": 200,
+      "resolvedBy": "ai-generic",
+      "latencyMs": 2653,
+      "resultCount": 1,
+      "topTitles": [
+        "The Three Musketeers: Pilot Episode - The Man in the Iron Mask"
+      ],
+      "topTmdbIds": [728619],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 643,
+      "completionTokens": 140,
+      "groundingSources": []
+    },
+    {
+      "id": "recommend-malayalam-crime",
+      "query": "recommend a malayalam crime thriller",
+      "mode": "recommend",
+      "tags": ["recommend", "regional", "malayalam"],
+      "expected": {
+        "titles": ["Drishyam", "Mumbai Police", "Anjaam Pathiraa"]
+      },
+      "statusCode": 500,
+      "resolvedBy": null,
+      "latencyMs": 1048,
+      "resultCount": 0,
+      "topTitles": [],
+      "topTmdbIds": [],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 646,
+      "completionTokens": 158,
+      "groundingSources": []
+    },
+    {
+      "id": "conversational-inception-refine",
+      "query": "inception; refine with: mind-bending, dream heist",
+      "mode": "ai",
+      "tags": ["conversational", "plot", "english"],
+      "expected": {
+        "tmdbIds": [27205],
+        "titles": ["Inception"]
+      },
+      "statusCode": 200,
+      "resolvedBy": "none",
+      "latencyMs": 3059,
+      "resultCount": 0,
+      "topTitles": [],
+      "topTmdbIds": [],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 823,
+      "completionTokens": 251,
+      "groundingSources": [
+        {
+          "label": "wiki-keywords",
+          "ms": 244,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "wiki-raw-query",
+          "ms": 248,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "tmdb-keyword-discover",
+          "ms": 257,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "tmdb-multi",
+          "ms": 326,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "ddg",
+          "ms": 830,
+          "chars": 1045,
+          "populated": true
+        }
+      ]
+    },
+    {
+      "id": "conversational-recommend-tamil-thriller",
+      "query": "recommend me something; refine with: tamil thriller, from the 2010s",
+      "mode": "recommend",
+      "tags": ["conversational", "recommend", "regional", "tamil"],
+      "expected": {
+        "titles": ["Ratsasan", "Vikram Vedha", "Thani Oruvan"]
+      },
+      "statusCode": 500,
+      "resolvedBy": null,
+      "latencyMs": 1206,
+      "resultCount": 0,
+      "topTitles": [],
+      "topTmdbIds": [],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 655,
+      "completionTokens": 197,
+      "groundingSources": []
+    }
+  ]
+}
