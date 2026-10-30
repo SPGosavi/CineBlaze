@@ -184,6 +184,12 @@ export function useWatchlist(user: User | null): WatchlistState {
           mediaType: entry.media_type,
           title: entry.title,
           genres: entry.genres,
+          languageCode: entry.original_language || undefined,
+          releaseYear: Number(entry.release_date?.slice(0, 4)) || undefined,
+          voteAverage:
+            typeof entry.vote_average === "number"
+              ? entry.vote_average
+              : undefined,
         };
         void api.post("/events", payload).catch(() => {});
       } catch (writeError) {
@@ -230,6 +236,13 @@ export function useWatchlist(user: User | null): WatchlistState {
               mediaType: watched.media_type,
               title: watched.title,
               genres: watched.genres,
+              languageCode: watched.original_language || undefined,
+              releaseYear:
+                Number(watched.release_date?.slice(0, 4)) || undefined,
+              voteAverage:
+                typeof watched.vote_average === "number"
+                  ? watched.vote_average
+                  : undefined,
             };
             void api.post("/events", payload).catch(() => {});
           }
