@@ -11,6 +11,7 @@ import {
   getMediaById,
   getMediaDetails,
   getMediaExtras,
+  submitSearchSelection,
 } from "../controllers/searchController.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import {
@@ -22,6 +23,7 @@ import {
   mediaByIdParamsSchema,
   mediaDetailsSchema,
   mediaExtrasSchema,
+  searchSelectionSchema,
   trendingPlatformParamsSchema,
 } from "../middleware/validate.js";
 import { RATE_LIMIT_AI_PER_HOUR, RATE_LIMIT_TMDB_PER_HOUR } from "../config.js";
@@ -99,6 +101,12 @@ router.post(
   tmdbLimiter,
   validateBody(mediaExtrasSchema),
   getMediaExtras
+);
+router.post(
+  "/search-selection",
+  tmdbLimiter,
+  validateBody(searchSelectionSchema),
+  submitSearchSelection
 );
 
 export default router;

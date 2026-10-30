@@ -74,6 +74,7 @@ async function SearchResults({
             key={`${item.media_type}-${item.id}`}
             item={item}
             priority={index < 5}
+            searchQuery={query}
           />
         ))}
       </div>

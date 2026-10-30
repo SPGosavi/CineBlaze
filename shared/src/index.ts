@@ -195,6 +195,12 @@ export interface MediaExtrasRequest {
   media_type: MediaType;
 }
 
+/** POST /api/search-selection */
+export interface SearchSelectionRequest {
+  query: string;
+  selectedResultId: number;
+}
+
 // ─── Responses ──────────────────────────────────────────────────────────────
 
 /** POST /api/find-movies */
@@ -215,6 +221,11 @@ export interface TrendingResponse {
 /** POST /api/media-extras */
 export interface MediaExtrasResponse {
   providers?: WatchProvider[];
+}
+
+/** POST /api/search-selection */
+export interface SearchSelectionResponse {
+  recorded: boolean;
 }
 
 /**
