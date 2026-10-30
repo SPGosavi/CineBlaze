@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  customType,
   decimal,
   index,
   integer,
@@ -8,9 +9,28 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+
+const vector = customType<{ data: number[]; driverData: string }>({
+  dataType(config) {
+    const dimensions =
+      (config as { dimensions?: number } | undefined)?.dimensions ?? 768;
+    return `vector(${dimensions})`;
+  },
+  toDriver(value) {
+    return `[${value.join(",")}]`;
+  },
+  fromDriver(value) {
+    if (!value) return [];
+    return value
+      .slice(1, -1)
+      .split(",")
+      .map((part) => Number(part));
+  },
+});
 
 /**
  * Users, mirrored from Firebase Auth.
@@ -144,6 +164,43 @@ export const userTasteProfiles = pgTable("user_taste_profiles", {
   }).defaultNow(),
 });
 
+/**
+ * Content embeddings for semantic fallback and similarity retrieval.
+ *
+ * Stored per TMDB id/media type and updated opportunistically from live search
+ * traffic, so the index grows with real usage before a full backfill job lands.
+ */
+export const mediaEmbeddings = pgTable(
+  "media_embeddings",
+  {
+    id: serial("id").primaryKey(),
+    tmdbId: integer("tmdb_id").notNull(),
+    mediaType: varchar("media_type", { length: 10 })
+      .notNull()
+      .$type<(typeof mediaTypeValues)[number]>(),
+    title: varchar("title", { length: 500 }).notNull(),
+    overview: text("overview"),
+    releaseDate: varchar("release_date", { length: 20 }),
+    posterPath: varchar("poster_path", { length: 255 }),
+    voteAverage: decimal("vote_average", {
+      precision: 4,
+      scale: 2,
+    }),
+    originalLanguage: varchar("original_language", { length: 10 }),
+    genres: text("genres").array(),
+    embedding: vector("embedding", { dimensions: 768 }).notNull(),
+    source: varchar("source", { length: 30 }).default("search"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("media_embeddings_tmdb_media_unique").on(
+      table.tmdbId,
+      table.mediaType
+    ),
+    index("media_embeddings_updated_idx").on(table.updatedAt.desc()),
+  ]
+);
+
 export const usersRelations = relations(users, ({ many, one }) => ({
   watchHistory: many(watchHistory),
   searchQueries: many(searchQueries),
@@ -174,3 +231,5 @@ export type NewWatchHistoryEntry = typeof watchHistory.$inferInsert;
 export type SearchQuery = typeof searchQueries.$inferSelect;
 export type NewSearchQuery = typeof searchQueries.$inferInsert;
 export type TasteProfile = typeof userTasteProfiles.$inferSelect;
+export type MediaEmbedding = typeof mediaEmbeddings.$inferSelect;
+export type NewMediaEmbedding = typeof mediaEmbeddings.$inferInsert;
