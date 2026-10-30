@@ -40,6 +40,35 @@ import {
 
 const log = childLogger("search");
 
+const MOOD_TO_GENRES: Record<string, string[]> = {
+  "dark-mysterious": ["Thriller", "Mystery", "Crime"],
+  "feel-good": ["Comedy", "Family", "Romance"],
+  "mind-bending": ["Sci-Fi", "Mystery", "Thriller"],
+  heartwarming: ["Drama", "Family", "Romance"],
+  "intense-thrilling": ["Action", "Thriller", "Crime"],
+  nostalgic: ["Drama", "Romance"],
+  adventurous: ["Adventure", "Action", "Fantasy"],
+  romantic: ["Romance", "Drama"],
+  "thought-provoking": ["Drama", "Sci-Fi", "Documentary"],
+  "funny-lighthearted": ["Comedy", "Family"],
+  "eerie-unsettling": ["Horror", "Thriller", "Mystery"],
+  epic: ["Adventure", "Action", "War"],
+};
+
+function mergeMoodGenres(
+  genres: string[],
+  moods: string[] | undefined
+): string[] {
+  const output = [...genres];
+  for (const mood of moods || []) {
+    const mapped = MOOD_TO_GENRES[mood] || [];
+    for (const genre of mapped) {
+      if (!output.includes(genre)) output.push(genre);
+    }
+  }
+  return output;
+}
+
 /**
  * `GET /api/media/:mediaType/:id` — full record for a single title.
  *
@@ -432,7 +461,11 @@ export const findMovies = async (
 
         const languageCodes = getLanguageCodes(structuredParams.language);
         const languageCode = languageCodes[0] || "";
-        const genreIds = getGenreIds(structuredParams.genres);
+        const moodAwareGenres = mergeMoodGenres(
+          structuredParams.genres,
+          structuredParams.mood_tags
+        );
+        const genreIds = getGenreIds(moodAwareGenres);
         const preferredType = structuredParams.media_types[0] || "movie";
 
         const discoverResults = await fetchRecommendPool(

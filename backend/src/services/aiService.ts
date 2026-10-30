@@ -11,6 +11,7 @@ import type {
   StructuredParams,
   AiSuggestion,
   MediaType,
+  MoodTag,
   WikiSearchResponse,
   TmdbPaginatedResponse,
 } from "../types/index.js";
@@ -42,9 +43,10 @@ Rules:
 3. "actors" — array of actor names mentioned. Use [] if none.
 4. "directors" — array of director names mentioned. Use [] if none.
 5. "plot_keywords" — concise plot description stripped of actor/language/genre info. Use null if the query is just an actor/genre listing.
-6. "media_types" — ["movie"] if user says movie/film, ["tv"] if user says show/series/season, ["movie", "tv"] if unspecified.
-7. "era" — decade or year range if mentioned (e.g. "90s", "2020s"). Use null if not mentioned.
-8. "is_generic" — true if the query is just an actor name, genre, or simple browsing query with NO specific plot. false otherwise.
+6. "mood_tags" — array from this list only: ["dark-mysterious","feel-good","mind-bending","heartwarming","intense-thrilling","nostalgic","adventurous","romantic","thought-provoking","funny-lighthearted","eerie-unsettling","epic"]. Use [] if no mood is implied.
+7. "media_types" — ["movie"] if user says movie/film, ["tv"] if user says show/series/season, ["movie", "tv"] if unspecified.
+8. "era" — decade or year range if mentioned (e.g. "90s", "2020s"). Use null if not mentioned.
+9. "is_generic" — true if the query is just an actor name, genre, or simple browsing query with NO specific plot. false otherwise.
 
 Output a valid JSON object ONLY. No markdown, no commentary.
 
@@ -68,6 +70,26 @@ Query: "${query}"`;
               actors: { type: "array", items: { type: "string" } },
               directors: { type: "array", items: { type: "string" } },
               plot_keywords: { type: ["string", "null"] },
+              mood_tags: {
+                type: "array",
+                items: {
+                  type: "string",
+                  enum: [
+                    "dark-mysterious",
+                    "feel-good",
+                    "mind-bending",
+                    "heartwarming",
+                    "intense-thrilling",
+                    "nostalgic",
+                    "adventurous",
+                    "romantic",
+                    "thought-provoking",
+                    "funny-lighthearted",
+                    "eerie-unsettling",
+                    "epic",
+                  ],
+                },
+              },
               media_types: {
                 type: "array",
                 items: { type: "string", enum: ["movie", "tv"] },
@@ -81,6 +103,7 @@ Query: "${query}"`;
               "actors",
               "directors",
               "plot_keywords",
+              "mood_tags",
               "media_types",
               "era",
               "is_generic",
@@ -100,6 +123,7 @@ Query: "${query}"`;
       actors: result.actors,
       directors: result.directors,
       plot_keywords: result.plot_keywords ?? null,
+      mood_tags: result.mood_tags as MoodTag[],
       media_types: result.media_types as MediaType[],
       era: result.era ?? null,
       is_generic: result.is_generic,
@@ -120,6 +144,7 @@ function getDefaultParams(): StructuredParams {
     actors: [],
     directors: [],
     plot_keywords: null,
+    mood_tags: [],
     media_types: ["movie", "tv"],
     era: null,
     is_generic: false,
@@ -142,6 +167,24 @@ const structuredParamsSchema = z.object({
   actors: z.array(z.string()).default([]),
   directors: z.array(z.string()).default([]),
   plot_keywords: z.string().nullable().optional(),
+  mood_tags: z
+    .array(
+      z.enum([
+        "dark-mysterious",
+        "feel-good",
+        "mind-bending",
+        "heartwarming",
+        "intense-thrilling",
+        "nostalgic",
+        "adventurous",
+        "romantic",
+        "thought-provoking",
+        "funny-lighthearted",
+        "eerie-unsettling",
+        "epic",
+      ])
+    )
+    .default([]),
   media_types: z.array(z.enum(["movie", "tv"])).default(["movie", "tv"]),
   era: z.string().nullable().optional(),
   is_generic: z.boolean().default(false),
@@ -458,6 +501,8 @@ async function getStableContext(
   if (params.actors.length > 0) keywordParts.push(params.actors[0]);
   if (params.plot_keywords) keywordParts.push(params.plot_keywords);
   if (params.genres.length > 0) keywordParts.push(params.genres[0]);
+  if (params.mood_tags.length > 0)
+    keywordParts.push(params.mood_tags[0].replace(/-/g, " "));
   const keywords = keywordParts.length > 0 ? keywordParts.join(" ") : userQuery;
 
   const wikiUrl = (q: string) =>
@@ -819,6 +864,10 @@ async function makeGroqRequest(
     constraints.push(`- Directed by: ${params.directors.join(", ")}`);
   if (params.genres.length > 0)
     constraints.push(`- Genre: ${params.genres.join(", ")}`);
+  if (params.mood_tags.length > 0)
+    constraints.push(
+      `- Mood/Vibe: ${params.mood_tags.map((m) => m.replace(/-/g, " ")).join(", ")}`
+    );
   if (params.plot_keywords)
     constraints.push(`- Plot elements: ${params.plot_keywords}`);
   if (params.era) constraints.push(`- Era/Period: ${params.era}`);

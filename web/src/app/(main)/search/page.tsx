@@ -54,6 +54,12 @@ async function SearchResults({
   }
 
   const items = sanitizeMediaList(result.data);
+  const lowerQuery = query.toLowerCase();
+  const looksMoodDriven =
+    mode === "recommend" &&
+    /(mood|vibe|feel|dark|mysterious|mind|thrill|heartwarm|epic|romantic|nostalgic)/i.test(
+      lowerQuery
+    );
 
   return (
     <>
@@ -68,6 +74,11 @@ async function SearchResults({
             : "matches"}{" "}
         for <span className="font-medium text-gray-300">“{query}”</span>
       </p>
+      {looksMoodDriven ? (
+        <p className="px-1 text-xs text-orange-300/80">
+          Mood-matched picks based on your vibe query.
+        </p>
+      ) : null}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-6 lg:grid-cols-4 xl:grid-cols-5">
         {items.map((item, index) => (
           <MediaCard

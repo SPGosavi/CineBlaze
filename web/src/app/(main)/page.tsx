@@ -4,6 +4,7 @@ import { getTrending } from "@/lib/server-api";
 import { sanitizeMediaList } from "@/lib/sanitize";
 import { SITE_DESCRIPTION } from "@/lib/constants";
 import SearchBar from "@/components/search/SearchBar";
+import MoodChips from "@/components/search/MoodChips";
 import Shelf from "@/components/media/Shelf";
 import { TrendingRowSkeleton } from "@/components/ui/Skeleton";
 import { FailedToLoad } from "@/components/ui/StatePanels";
@@ -102,6 +103,7 @@ export default function DiscoverPage() {
             will handle the rest.
           </p>
           <SearchBar />
+          <MoodChips />
         </div>
       </section>
 
