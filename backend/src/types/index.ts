@@ -92,11 +92,22 @@ export interface TmdbDetailResponse {
   vote_average?: number;
   original_language?: string;
   genres?: { id: number; name: string }[];
+  belongs_to_collection?: {
+    id: number;
+    name?: string;
+  } | null;
   created_by?: { name: string }[];
   credits?: {
     cast?: { name: string; order?: number }[];
     crew?: { name: string; job: string }[];
   };
+}
+
+/** Raw TMDB collection response (`/collection/{id}`) */
+export interface TmdbCollectionResponse {
+  id: number;
+  name?: string;
+  parts?: TmdbRawResult[];
 }
 
 /** Raw TMDB watch providers response */

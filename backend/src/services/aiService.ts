@@ -8,6 +8,7 @@ import {
   GROQ_REASONING_EFFORT,
   GROUNDING_SOURCE_TIMEOUT_MS,
   GROUNDING_TOTAL_TIMEOUT_MS,
+  GROUNDING_SOURCES,
   TMDB_API_KEY,
 } from "../config.js";
 import { fetchWithTimeout, bestEffort } from "../utils/http.js";
@@ -31,6 +32,10 @@ import {
 } from "../eval/telemetry.js";
 
 const log = childLogger("ai");
+
+function sourceEnabled(name: string): boolean {
+  return GROUNDING_SOURCES.has(name);
+}
 
 // ─── Groq Request Helper (retry + backoff + fallback model) ────────────────
 
@@ -495,6 +500,64 @@ async function fetchLanguageFilteredDiscover(
   }
 }
 
+async function fetchKeywordMatchedDiscover(
+  plotKeywords: string,
+  languageCode: string | null,
+  genreIds: number[],
+  mediaTypes: MediaType[]
+): Promise<string> {
+  try {
+    const keywordSearchUrl = `https://api.themoviedb.org/3/search/keyword?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(plotKeywords)}&page=1`;
+    const keywordRes = await fetchWithTimeout(
+      keywordSearchUrl,
+      GROUNDING_SOURCE_TIMEOUT_MS
+    );
+    if (!keywordRes.ok) return "";
+
+    const keywordData = (await keywordRes.json()) as {
+      results?: { id: number; name: string }[];
+    };
+    const keywordIds = (keywordData.results || []).slice(0, 3).map((k) => k.id);
+    if (keywordIds.length === 0) return "";
+
+    const withKeywords = keywordIds.join("|");
+    const withGenres =
+      genreIds.length > 0 ? `&with_genres=${genreIds.join(",")}` : "";
+    const withLanguage = languageCode
+      ? `&with_original_language=${encodeURIComponent(languageCode)}`
+      : "";
+
+    const outputs = await Promise.all(
+      mediaTypes.map(async (mediaType) => {
+        const discoverUrl = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${TMDB_API_KEY}&with_keywords=${withKeywords}${withGenres}${withLanguage}&sort_by=popularity.desc&page=1`;
+        const discoverRes = await fetchWithTimeout(
+          discoverUrl,
+          GROUNDING_SOURCE_TIMEOUT_MS
+        );
+        if (!discoverRes.ok) return "";
+
+        const discoverData =
+          (await discoverRes.json()) as TmdbPaginatedResponse;
+        return (discoverData.results || [])
+          .slice(0, 5)
+          .map(
+            (r: any) =>
+              `[TMDB Keyword Match] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}) [${mediaType}]: ${r.overview || ""}`
+          )
+          .join("\n");
+      })
+    );
+
+    return outputs.filter(Boolean).join("\n");
+  } catch (e: any) {
+    log.warn(
+      { err: String(e.message) },
+      "[Context] Keyword-matched discover failed:"
+    );
+    return "";
+  }
+}
+
 // ─── Enhanced Context Gathering ─────────────────────────────────────────────
 
 /**
@@ -541,32 +604,39 @@ async function getStableContext(
    * source stalled the entire search, because none of the fetches had a
    * deadline.
    */
-  const sources: { label: string; run: () => Promise<string> }[] = [
-    {
-      label: "wiki-keywords",
-      run: async () =>
-        formatWiki(
-          (await (
-            await fetchWithTimeout(
-              wikiUrl(keywords),
-              GROUNDING_SOURCE_TIMEOUT_MS
-            )
-          ).json()) as WikiSearchResponse
-        ),
-    },
-    {
-      label: "wiki-raw-query",
-      run: async () =>
-        formatWiki(
-          (await (
-            await fetchWithTimeout(
-              wikiUrl(userQuery),
-              GROUNDING_SOURCE_TIMEOUT_MS
-            )
-          ).json()) as WikiSearchResponse
-        ),
-    },
-    {
+  const sources: { label: string; run: () => Promise<string> }[] = [];
+
+  if (sourceEnabled("wiki")) {
+    sources.push(
+      {
+        label: "wiki-keywords",
+        run: async () =>
+          formatWiki(
+            (await (
+              await fetchWithTimeout(
+                wikiUrl(keywords),
+                GROUNDING_SOURCE_TIMEOUT_MS
+              )
+            ).json()) as WikiSearchResponse
+          ),
+      },
+      {
+        label: "wiki-raw-query",
+        run: async () =>
+          formatWiki(
+            (await (
+              await fetchWithTimeout(
+                wikiUrl(userQuery),
+                GROUNDING_SOURCE_TIMEOUT_MS
+              )
+            ).json()) as WikiSearchResponse
+          ),
+      }
+    );
+  }
+
+  if (sourceEnabled("tmdb")) {
+    sources.push({
       label: "tmdb-multi",
       run: async () => {
         const res = await fetchWithTimeout(
@@ -583,14 +653,17 @@ async function getStableContext(
           )
           .join("\n");
       },
-    },
-    {
+    });
+  }
+
+  if (sourceEnabled("ddg")) {
+    sources.push({
       label: "ddg",
       run: () => fetchDDGLite(userQuery),
-    },
-  ];
+    });
+  }
 
-  if (params.actors.length > 0) {
+  if (sourceEnabled("actor") && params.actors.length > 0) {
     sources.push({
       label: "actor-filmography",
       run: () =>
@@ -604,67 +677,71 @@ async function getStableContext(
 
   // One discover call per language, capped so an umbrella term like "indian"
   // cannot fan out into a dozen parallel requests.
-  const MAX_DISCOVER_SOURCES = 4;
-  let discoverCount = 0;
-  outer: for (const code of languageCodes) {
-    for (const mt of params.media_types) {
-      if (discoverCount >= MAX_DISCOVER_SOURCES) break outer;
-      discoverCount++;
-      sources.push({
-        label: `discover-${code}-${mt}`,
-        run: () => fetchLanguageFilteredDiscover(code, genreIds, mt),
-      });
+  if (sourceEnabled("discover") && params.is_generic) {
+    const MAX_DISCOVER_SOURCES = 4;
+    let discoverCount = 0;
+    outer: for (const code of languageCodes) {
+      for (const mt of params.media_types) {
+        if (discoverCount >= MAX_DISCOVER_SOURCES) break outer;
+        discoverCount++;
+        sources.push({
+          label: `discover-${code}-${mt}`,
+          run: () => fetchLanguageFilteredDiscover(code, genreIds, mt),
+        });
+      }
     }
   }
 
-  if (params.plot_keywords && languageCode) {
+  if (sourceEnabled("keyword") && params.plot_keywords) {
     sources.push({
-      label: "tmdb-plot-search",
-      run: async () => {
-        const res = await fetchWithTimeout(
-          `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(params.plot_keywords as string)}&language=en-US&page=1`,
-          GROUNDING_SOURCE_TIMEOUT_MS
-        );
-        const data = (await res.json()) as any;
-        return (data.results || [])
-          .slice(0, 5)
-          .map(
-            (r: any) =>
-              `[TMDB Plot Match] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}): ${r.overview}`
-          )
-          .join("\n");
-      },
+      label: "tmdb-keyword-discover",
+      run: () =>
+        fetchKeywordMatchedDiscover(
+          params.plot_keywords as string,
+          languageCode,
+          genreIds,
+          params.media_types
+        ),
     });
   }
 
   const started = Date.now();
 
-  // bestEffort never rejects, so Promise.all is safe here: a failed or slow
-  // source contributes an empty string instead of taking the search down.
-  const settled = await Promise.race([
-    Promise.all(
-      sources.map(async (s) => {
-        const sourceStart = Date.now();
-        const out = await bestEffort(
-          s.label,
-          GROUNDING_SOURCE_TIMEOUT_MS,
-          "",
-          () => s.run()
-        );
-        const chars = out?.trim().length ?? 0;
-        recordEvalGroundingSource({
-          label: s.label,
-          ms: Date.now() - sourceStart,
-          chars,
-          populated: chars > 0,
-        });
-        return out;
-      })
-    ),
-    new Promise<string[]>((resolve) =>
-      setTimeout(() => resolve([]), GROUNDING_TOTAL_TIMEOUT_MS)
+  // Keep partial successes if the aggregate timeout wins the race.
+  const settled: string[] = new Array(sources.length).fill("");
+  const sourceTasks = sources.map(async (s, index) => {
+    const sourceStart = Date.now();
+    const out = await bestEffort(s.label, GROUNDING_SOURCE_TIMEOUT_MS, "", () =>
+      s.run()
+    );
+    settled[index] = out;
+    const chars = out?.trim().length ?? 0;
+    recordEvalGroundingSource({
+      label: s.label,
+      ms: Date.now() - sourceStart,
+      chars,
+      populated: chars > 0,
+    });
+    return out;
+  });
+
+  const allDone = await Promise.race([
+    Promise.all(sourceTasks).then(() => true),
+    new Promise<boolean>((resolve) =>
+      setTimeout(() => resolve(false), GROUNDING_TOTAL_TIMEOUT_MS)
     ),
   ]);
+
+  if (!allDone) {
+    log.warn(
+      JSON.stringify({
+        tag: "grounding",
+        source: "total",
+        status: "timeout",
+        ms: Date.now() - started,
+      })
+    );
+  }
 
   const parts = settled.filter((p) => p && p.trim().length > 0);
 
@@ -716,10 +793,11 @@ export async function callGroqSimilar(
     Rules:
     1. Match Media Type (${mediaType}).
     2. Prioritize similarity in these dimensions (in order):
-       a. Thematic/plot similarity — stories with similar narrative arcs or themes
-       b. Genre overlap — same genre combination
-       c. Cast/director overlap — other works by the same actors or director
-       d. Tone and style — similar mood, pacing, cinematographic approach
+       a. Franchise/collection continuity first (sequels, prequels, same saga) when applicable
+       b. Thematic/plot similarity — stories with similar narrative arcs or themes
+       c. Genre overlap — same genre combination
+       d. Cast/director overlap — other works by the same actors or director
+       e. Tone and style — similar mood, pacing, cinematographic approach
     3. Return REAL titles only. Do not invent movies.
     4. Prefer titles from the same language/region as the source.
     5. Provide a valid JSON object with a "results" key containing the array of matches. No markdown, no commentary.
@@ -843,7 +921,8 @@ async function makeGroqRequest(
 
   const hintRules = hasHints
     ? `2. **HINT PRIORITY**: The "REAL-WORLD DATABASE HINTS" section contains actual entries from TMDB, Wikipedia, and actor filmographies. Treat these as strong candidates and prefer them when they match the user's description.
-    3. **VERIFY AGAINST HINTS**: If your best guess does not appear in the hints, satisfy yourself that it is a real title before returning it. A title absent from the hints is still valid if you are confident it exists.`
+    3. **VERIFY AGAINST HINTS**: If your best guess does not appear in the hints, satisfy yourself that it is a real title before returning it. A title absent from the hints is still valid if you are confident it exists.
+    4. **HINT MISMATCH HANDLING**: If hints are present but clearly irrelevant to the specific plot details, do not force a bad match from hints. Use your best real title match instead.`
     : `2. **NO HINTS AVAILABLE**: External lookups returned nothing for this query. Answer from your own knowledge of cinema.
     3. **DO NOT RETURN AN EMPTY LIST** merely because there are no hints. Return your best match and let the caller verify it. Only return an empty list if the description genuinely matches no film or show you know of.`;
 
