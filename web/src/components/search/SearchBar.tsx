@@ -55,6 +55,8 @@ export interface SearchBarProps {
   defaultQuery?: string;
   autoFocus?: boolean;
   defaultMode?: SearchMode;
+  /** Keeps conversational refinements URL-stable across submissions. */
+  defaultRefinements?: string[];
 }
 
 /**
@@ -72,6 +74,7 @@ export default function SearchBar({
   defaultQuery = "",
   autoFocus = false,
   defaultMode = "ai",
+  defaultRefinements = [],
 }: SearchBarProps) {
   const [mode, setMode] = useState<SearchMode>(defaultMode);
 
@@ -81,6 +84,9 @@ export default function SearchBar({
   return (
     <Form action="/search" className="group relative mx-auto max-w-2xl">
       <input type="hidden" name="mode" value={mode} />
+      {defaultRefinements.map((refinement) => (
+        <input key={refinement} type="hidden" name="r" value={refinement} />
+      ))}
 
       <div className="mb-4 sm:mb-5 flex w-full justify-center">
         <div

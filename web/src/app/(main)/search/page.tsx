@@ -5,9 +5,54 @@ import { findMovies } from "@/lib/server-api";
 import { SearchMode, isSearchMode } from "@cineblaze/shared";
 import { sanitizeMediaList } from "@/lib/sanitize";
 import SearchBar from "@/components/search/SearchBar";
+import SearchRefinements from "@/components/search/SearchRefinements";
 import MediaCard from "@/components/media/MediaCard";
 import { MediaGridSkeleton } from "@/components/ui/Skeleton";
 import { EmptyResults, FailedToLoad } from "@/components/ui/StatePanels";
+import type { SanitizedMedia } from "@cineblaze/shared";
+
+function parseRefinements(param: string | string[] | undefined): string[] {
+  const values = Array.isArray(param) ? param : param ? [param] : [];
+  return Array.from(
+    new Set(
+      values
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .slice(0, 4)
+    )
+  );
+}
+
+function toEffectiveQuery(query: string, refinements: string[]): string {
+  if (refinements.length === 0) return query;
+  return `${query}; refine with: ${refinements.join(", ")}`;
+}
+
+function buildAttributionTags(
+  item: SanitizedMedia,
+  mode: SearchMode,
+  baseQuery: string,
+  refinements: string[]
+): string[] {
+  const tags: string[] = [];
+  const combined = `${baseQuery} ${refinements.join(" ")}`.toLowerCase();
+
+  for (const genre of item.genres || []) {
+    if (combined.includes(genre.toLowerCase())) tags.push(genre);
+  }
+
+  const year = item.release_date?.slice(0, 4) || "";
+  if (year) {
+    const decade = `${year.slice(0, 3)}0s`;
+    if (combined.includes(decade.toLowerCase()) || combined.includes(year)) {
+      tags.push(decade);
+    }
+  }
+
+  if (mode === "recommend") tags.push("recommended");
+
+  return Array.from(new Set(tags)).slice(0, 3);
+}
 
 /**
  * Titles the tab with the query so a shared link reads sensibly.
@@ -38,12 +83,16 @@ export async function generateMetadata(
 
 async function SearchResults({
   query,
+  effectiveQuery,
   mode,
+  refinements,
 }: {
   query: string;
+  effectiveQuery: string;
   mode: SearchMode;
+  refinements: string[];
 }) {
-  const result = await findMovies(query, mode);
+  const result = await findMovies(effectiveQuery, mode);
 
   if (result.status === "failed") {
     return <FailedToLoad what="those results" reason={result.reason} />;
@@ -74,6 +123,11 @@ async function SearchResults({
             : "matches"}{" "}
         for <span className="font-medium text-gray-300">“{query}”</span>
       </p>
+      {refinements.length > 0 ? (
+        <p className="px-1 text-xs text-gray-400">
+          Refined with: {refinements.join(" • ")}
+        </p>
+      ) : null}
       {looksMoodDriven ? (
         <p className="px-1 text-xs text-orange-300/80">
           Mood-matched picks based on your vibe query.
@@ -86,6 +140,12 @@ async function SearchResults({
             item={item}
             priority={index < 5}
             searchQuery={query}
+            attributionTags={buildAttributionTags(
+              item,
+              mode,
+              query,
+              refinements
+            )}
           />
         ))}
       </div>
@@ -105,9 +165,11 @@ async function SearchResults({
  * query echoed back and retype it without waiting.
  */
 export default async function SearchPage(props: PageProps<"/search">) {
-  const { q, mode: modeParam } = await props.searchParams;
+  const { q, mode: modeParam, r: refinementsParam } = await props.searchParams;
   const query = typeof q === "string" ? q.trim() : "";
   const mode = isSearchMode(modeParam) ? modeParam : "ai";
+  const refinements = parseRefinements(refinementsParam);
+  const effectiveQuery = toEffectiveQuery(query, refinements);
 
   return (
     <div className="animate-fade-in space-y-8 pb-24 md:pb-10">
@@ -116,7 +178,19 @@ export default async function SearchPage(props: PageProps<"/search">) {
           <Zap className="fill-orange-500 text-orange-500" size={20} />
           Results
         </h1>
-        <SearchBar defaultQuery={query} autoFocus={!query} defaultMode={mode} />
+        <SearchBar
+          defaultQuery={query}
+          autoFocus={!query}
+          defaultMode={mode}
+          defaultRefinements={refinements}
+        />
+        {query ? (
+          <SearchRefinements
+            query={query}
+            mode={mode}
+            refinements={refinements}
+          />
+        ) : null}
       </div>
 
       {query ? (
@@ -126,8 +200,16 @@ export default async function SearchPage(props: PageProps<"/search">) {
             re-suspends and shows the skeleton, rather than leaving the
             previous results on screen while the new ones load.
           */}
-          <Suspense key={`${mode}:${query}`} fallback={<MediaGridSkeleton />}>
-            <SearchResults query={query} mode={mode} />
+          <Suspense
+            key={`${mode}:${query}:${refinements.join("|")}`}
+            fallback={<MediaGridSkeleton />}
+          >
+            <SearchResults
+              query={query}
+              effectiveQuery={effectiveQuery}
+              mode={mode}
+              refinements={refinements}
+            />
           </Suspense>
         </div>
       ) : (
