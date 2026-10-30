@@ -228,6 +228,12 @@ export interface UserEventRequest {
   mediaType: MediaType;
   title: string;
   genres?: string[];
+  /** Optional ISO 639-1 language code, e.g. "en", "ta". */
+  languageCode?: string;
+  /** Optional release year, e.g. 2019. */
+  releaseYear?: number;
+  /** Optional TMDB vote average (0-10). */
+  voteAverage?: number;
 }
 
 // ─── Responses ──────────────────────────────────────────────────────────────
