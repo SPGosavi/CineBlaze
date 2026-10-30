@@ -19,7 +19,17 @@ export * from "@cineblaze/shared";
 export interface GroqChatOptions {
   temperature?: number;
   maxTokens?: number;
-  responseFormat?: { type: string } | null;
+  responseFormat?:
+    | { type: "json_object" }
+    | {
+        type: "json_schema";
+        json_schema: {
+          name: string;
+          schema: Record<string, unknown>;
+          strict?: boolean;
+        };
+      }
+    | null;
   label?: string;
   /**
    * How much budget the model may spend on internal reasoning before it
