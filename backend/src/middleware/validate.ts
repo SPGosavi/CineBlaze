@@ -86,6 +86,11 @@ export const directSearchSchema = z.object({
   query: z.string().trim().min(1).max(200),
 });
 
+export const searchSelectionSchema = z.object({
+  query: z.string().trim().min(1).max(500),
+  selectedResultId: tmdbIdSchema,
+});
+
 export const getSimilarSchema = z.object({
   title: z.string().trim().min(1).max(500),
   media_type: mediaTypeSchema,

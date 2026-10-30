@@ -29,9 +29,14 @@ import {
   MoviesResponse,
   EnrichedMedia,
   DirectSearchRequest,
+  SearchSelectionRequest,
 } from "../types/index.js";
 import { childLogger } from "../utils/logger.js";
-import { recordSearch, recordWatchEvent } from "../db/repositories.js";
+import {
+  recordSearch,
+  recordSearchSelection,
+  recordWatchEvent,
+} from "../db/repositories.js";
 
 const log = childLogger("search");
 
@@ -315,6 +320,23 @@ export const directSearch = async (
 
   res.setHeader("X-Resolved-By", "title");
   res.json({ movies: enriched });
+};
+
+export const submitSearchSelection = async (
+  req: Request<{}, {}, SearchSelectionRequest>,
+  res: Response
+): Promise<void> => {
+  const { query, selectedResultId } = req.body;
+
+  if (!req.user?.userId) {
+    // Anonymous traffic cannot be attached to a user profile. We still return
+    // success so the client can fire-and-forget this event.
+    res.status(202).json({ recorded: false });
+    return;
+  }
+
+  await recordSearchSelection(req.user.userId, query, selectedResultId);
+  res.status(204).end();
 };
 
 export const findMovies = async (

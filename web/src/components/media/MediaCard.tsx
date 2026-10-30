@@ -4,10 +4,12 @@ import { displayRating, releaseYear } from "@/lib/sanitize";
 import Poster from "@/components/ui/Poster";
 import WatchlistButton from "./WatchlistButton";
 import { getLanguageName } from "@/lib/language";
+import TrackedResultLink from "@/components/search/TrackedResultLink";
 
 export interface MediaCardProps {
   item: SanitizedMedia;
   priority?: boolean;
+  searchQuery?: string;
 }
 
 /**
@@ -22,7 +24,11 @@ export interface MediaCardProps {
  * The link is a full-bleed overlay rather than a wrapper, because nesting the
  * watchlist `<button>` inside an `<a>` would be invalid HTML.
  */
-export default function MediaCard({ item, priority = false }: MediaCardProps) {
+export default function MediaCard({
+  item,
+  priority = false,
+  searchQuery,
+}: MediaCardProps) {
   const year = releaseYear(item);
   const isTv = item.media_type === "tv";
   const imdb = displayRating(item.imdb_rating);
@@ -103,14 +109,24 @@ export default function MediaCard({ item, priority = false }: MediaCardProps) {
         </div>
       </div>
 
-      <Link
-        href={`/${item.media_type}/${item.id}`}
-        className="absolute inset-0 z-10 rounded-xl focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
-      >
-        <span className="sr-only">
-          View details for {item.title} ({year})
-        </span>
-      </Link>
+      {searchQuery ? (
+        <TrackedResultLink
+          href={`/${item.media_type}/${item.id}`}
+          query={searchQuery}
+          selectedResultId={item.id}
+          className="absolute inset-0 z-10 rounded-xl focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
+          srLabel={`View details for ${item.title} (${year})`}
+        />
+      ) : (
+        <Link
+          href={`/${item.media_type}/${item.id}`}
+          className="absolute inset-0 z-10 rounded-xl focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
+        >
+          <span className="sr-only">
+            View details for {item.title} ({year})
+          </span>
+        </Link>
+      )}
 
       <WatchlistButton
         item={item}

@@ -25,6 +25,10 @@ import type {
   TmdbPaginatedResponse,
 } from "../types/index.js";
 import { childLogger } from "../utils/logger.js";
+import {
+  recordEvalGroqCall,
+  recordEvalGroundingSource,
+} from "../eval/telemetry.js";
 
 const log = childLogger("ai");
 
@@ -173,6 +177,12 @@ async function groqChat(
           queryHash,
           promptTokens: usage.prompt_tokens,
           completionTokens: usage.completion_tokens,
+        });
+        recordEvalGroqCall({
+          label,
+          model,
+          promptTokens: usage.prompt_tokens ?? 0,
+          completionTokens: usage.completion_tokens ?? 0,
         });
 
         const finishReason = data.choices?.[0]?.finish_reason;
@@ -633,9 +643,23 @@ async function getStableContext(
   // source contributes an empty string instead of taking the search down.
   const settled = await Promise.race([
     Promise.all(
-      sources.map((s) =>
-        bestEffort(s.label, GROUNDING_SOURCE_TIMEOUT_MS, "", () => s.run())
-      )
+      sources.map(async (s) => {
+        const sourceStart = Date.now();
+        const out = await bestEffort(
+          s.label,
+          GROUNDING_SOURCE_TIMEOUT_MS,
+          "",
+          () => s.run()
+        );
+        const chars = out?.trim().length ?? 0;
+        recordEvalGroundingSource({
+          label: s.label,
+          ms: Date.now() - sourceStart,
+          chars,
+          populated: chars > 0,
+        });
+        return out;
+      })
     ),
     new Promise<string[]>((resolve) =>
       setTimeout(() => resolve([]), GROUNDING_TOTAL_TIMEOUT_MS)

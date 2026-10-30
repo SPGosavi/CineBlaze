@@ -1,0 +1,142 @@
+[
+  {
+    "id": "title-inception",
+    "query": "Inception",
+    "mode": "direct",
+    "expected": { "tmdbIds": [27205], "titles": ["Inception"] },
+    "tags": ["title", "movie", "english"]
+  },
+  {
+    "id": "title-interstellar",
+    "query": "Interstellar",
+    "mode": "direct",
+    "expected": { "tmdbIds": [157336], "titles": ["Interstellar"] },
+    "tags": ["title", "movie", "english"]
+  },
+  {
+    "id": "title-breaking-bad",
+    "query": "Breaking Bad",
+    "mode": "direct",
+    "expected": { "tmdbIds": [1396], "titles": ["Breaking Bad"] },
+    "tags": ["title", "tv", "english"]
+  },
+  {
+    "id": "title-pushpa",
+    "query": "Pushpa",
+    "mode": "direct",
+    "expected": { "titles": ["Pushpa"] },
+    "tags": ["title", "regional", "telugu"]
+  },
+  {
+    "id": "title-bewitched",
+    "query": "Bewitched",
+    "mode": "direct",
+    "expected": { "titles": ["Bewitched"] },
+    "tags": ["title", "tv"]
+  },
+  {
+    "id": "plot-mind-bending-dream-heist",
+    "query": "a mind-bending movie where people enter dreams to plant an idea",
+    "mode": "ai",
+    "expected": { "tmdbIds": [27205], "titles": ["Inception"] },
+    "tags": ["plot", "english", "heist"]
+  },
+  {
+    "id": "plot-space-time-love",
+    "query": "a movie where astronauts travel through a wormhole and a father communicates through time",
+    "mode": "ai",
+    "expected": { "tmdbIds": [157336], "titles": ["Interstellar"] },
+    "tags": ["plot", "english", "sci-fi"]
+  },
+  {
+    "id": "plot-serial-chemistry-teacher",
+    "query": "a teacher diagnosed with cancer starts making meth",
+    "mode": "ai",
+    "expected": { "tmdbIds": [1396], "titles": ["Breaking Bad"] },
+    "tags": ["plot", "tv", "english"]
+  },
+  {
+    "id": "plot-sitcom-witch",
+    "query": "old sitcom about a witch and her mortal husband",
+    "mode": "ai",
+    "expected": { "titles": ["Bewitched"] },
+    "tags": ["plot", "tv", "regression"]
+  },
+  {
+    "id": "plot-telugu-sandalwood",
+    "query": "telugu sandalwood movie about red sandalwood smuggling",
+    "mode": "ai",
+    "expected": { "titles": ["Pushpa"] },
+    "tags": ["plot", "regional", "regression"]
+  },
+  {
+    "id": "plot-south-indian-dementia-veteran",
+    "query": "south indian movie about an old army veteran with dementia",
+    "mode": "ai",
+    "expected": { "titles": [] },
+    "tags": ["plot", "regional", "regression", "known-hard"]
+  },
+  {
+    "id": "generic-akshay-kumar-movies",
+    "query": "akshay kumar movies",
+    "mode": "ai",
+    "expected": { "titles": ["Hera Pheri", "Housefull", "Mission Mangal"] },
+    "tags": ["generic", "actor", "hindi"]
+  },
+  {
+    "id": "generic-best-korean-thriller",
+    "query": "best korean thriller movies",
+    "mode": "ai",
+    "expected": { "titles": ["Memories of Murder", "Oldboy", "The Chaser"] },
+    "tags": ["generic", "genre", "korean"]
+  },
+  {
+    "id": "recommend-tamil-thriller-2010s",
+    "query": "recommend a tamil thriller from the 2010s",
+    "mode": "recommend",
+    "expected": { "titles": ["Ratsasan", "Vikram Vedha", "Thani Oruvan"] },
+    "tags": ["recommend", "regional", "tamil"]
+  },
+  {
+    "id": "recommend-hindi-comedy-heist",
+    "query": "recommend a hindi comedy heist movie",
+    "mode": "recommend",
+    "expected": { "titles": ["Hera Pheri", "Phir Hera Pheri"] },
+    "tags": ["recommend", "hindi", "heist"]
+  },
+  {
+    "id": "franchise-dark-knight-sequel",
+    "query": "sequel to batman begins",
+    "mode": "ai",
+    "expected": { "tmdbIds": [155], "titles": ["The Dark Knight"] },
+    "tags": ["franchise", "sequel", "english"]
+  },
+  {
+    "id": "franchise-iron-man-sequel",
+    "query": "movie after iron man",
+    "mode": "ai",
+    "expected": { "tmdbIds": [10138], "titles": ["Iron Man 2"] },
+    "tags": ["franchise", "sequel", "english"]
+  },
+  {
+    "id": "tv-time-travel-german",
+    "query": "german series about time travel and family secrets",
+    "mode": "ai",
+    "expected": { "titles": ["Dark"] },
+    "tags": ["plot", "tv", "non-english"]
+  },
+  {
+    "id": "movie-memories-childhood-love",
+    "query": "hindi movie about remembering childhood love",
+    "mode": "ai",
+    "expected": { "titles": ["Barfi", "Kabhi Alvida Naa Kehna", "Veer-Zaara"] },
+    "tags": ["plot", "hindi", "romance"]
+  },
+  {
+    "id": "recommend-malayalam-crime",
+    "query": "recommend a malayalam crime thriller",
+    "mode": "recommend",
+    "expected": { "titles": ["Drishyam", "Mumbai Police", "Anjaam Pathiraa"] },
+    "tags": ["recommend", "regional", "malayalam"]
+  }
+]
