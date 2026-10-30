@@ -26,10 +26,25 @@ async function main(): Promise<void> {
 
   try {
     logger.info("Applying migrations…");
-    await migrate(drizzle(client), { migrationsFolder: "./drizzle" });
+    await migrate(drizzle(client), {
+      migrationsFolder: "./drizzle",
+      // Some hosted Postgres roles cannot create arbitrary schemas.
+      // Keep the migration journal in `public` so migrations still run.
+      migrationsSchema: process.env.DRIZZLE_MIGRATIONS_SCHEMA || "public",
+      migrationsTable:
+        process.env.DRIZZLE_MIGRATIONS_TABLE || "__drizzle_migrations",
+    });
     logger.info("Migrations applied.");
   } catch (error) {
-    logger.error({ err: (error as Error).message }, "Migration failed");
+    const err = error as Error & { cause?: unknown };
+    logger.error(
+      {
+        err: err.message,
+        cause: err.cause,
+        stack: err.stack,
+      },
+      "Migration failed"
+    );
     process.exitCode = 1;
   } finally {
     await client.end();
