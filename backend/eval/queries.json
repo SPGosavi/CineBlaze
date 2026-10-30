@@ -138,5 +138,19 @@
     "mode": "recommend",
     "expected": { "titles": ["Drishyam", "Mumbai Police", "Anjaam Pathiraa"] },
     "tags": ["recommend", "regional", "malayalam"]
+  },
+  {
+    "id": "conversational-inception-refine",
+    "query": "inception; refine with: mind-bending, dream heist",
+    "mode": "ai",
+    "expected": { "tmdbIds": [27205], "titles": ["Inception"] },
+    "tags": ["conversational", "plot", "english"]
+  },
+  {
+    "id": "conversational-recommend-tamil-thriller",
+    "query": "recommend me something; refine with: tamil thriller, from the 2010s",
+    "mode": "recommend",
+    "expected": { "titles": ["Ratsasan", "Vikram Vedha", "Thani Oruvan"] },
+    "tags": ["conversational", "recommend", "regional", "tamil"]
   }
 ]
