@@ -21,6 +21,7 @@ import {
   indexMediaEmbeddings,
   semanticSearchByQuery,
 } from "../services/embeddingService.js";
+import { applyClickFeedbackPriors } from "../services/rankingService.js";
 import { getLanguageCodes, getGenreIds } from "../utils/languageMap.js";
 import { directSearchSchema } from "../middleware/validate.js";
 import {
@@ -409,7 +410,14 @@ export const findMovies = async (
       | "none",
     ttlSeconds: number | null
   ): Promise<void> => {
-    const response: MoviesResponse = { movies };
+    let rankedMovies = movies;
+    try {
+      rankedMovies = await applyClickFeedbackPriors(movies);
+    } catch (error) {
+      log.debug({ err: String(error) }, "Click-prior ranking skipped");
+    }
+
+    const response: MoviesResponse = { movies: rankedMovies };
     if (ttlSeconds !== null) await cache.set(cacheKey, response, ttlSeconds);
 
     // Not awaited: recording that a search happened must never be able to
@@ -417,13 +425,13 @@ export const findMovies = async (
     void recordSearch({
       userId: req.user?.userId || null,
       query: description,
-      resultsCount: movies.length,
+      resultsCount: rankedMovies.length,
       resolvedBy,
       durationMs: Date.now() - startedAt,
     });
 
-    if (movies.length > 0 && resolvedBy !== "cache") {
-      void indexMediaEmbeddings(movies, resolvedBy).catch((error) => {
+    if (rankedMovies.length > 0 && resolvedBy !== "cache") {
+      void indexMediaEmbeddings(rankedMovies, resolvedBy).catch((error) => {
         log.debug(
           { err: String(error) },
           "Embedding index update failed for response payload"
@@ -795,6 +803,12 @@ export const getSimilar = async (
     }
 
     if (finalResults.length > 0) {
+      try {
+        finalResults = await applyClickFeedbackPriors(finalResults);
+      } catch (error) {
+        log.debug({ err: String(error) }, "Click-prior ranking skipped");
+      }
+
       void indexMediaEmbeddings(finalResults, "similar").catch((error) => {
         log.debug(
           { err: String(error) },
