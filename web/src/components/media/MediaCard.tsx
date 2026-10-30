@@ -10,6 +10,7 @@ export interface MediaCardProps {
   item: SanitizedMedia;
   priority?: boolean;
   searchQuery?: string;
+  attributionTags?: string[];
 }
 
 /**
@@ -28,6 +29,7 @@ export default function MediaCard({
   item,
   priority = false,
   searchQuery,
+  attributionTags = [],
 }: MediaCardProps) {
   const year = releaseYear(item);
   const isTv = item.media_type === "tv";
@@ -92,6 +94,19 @@ export default function MediaCard({
             </span>
           ))}
         </div>
+
+        {attributionTags.length > 0 ? (
+          <div className="mb-2 flex min-h-[20px] flex-wrap gap-1">
+            {attributionTags.slice(0, 3).map((tag) => (
+              <span
+                key={tag}
+                className="rounded-xs border border-orange-400/30 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-orange-300 uppercase"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
         <div className="mt-auto flex gap-2 border-t border-neutral-700/50 pt-2">
           {imdb ? (
