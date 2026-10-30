@@ -191,6 +191,19 @@ export interface GroqApiError {
   };
 }
 
+/** Groq embeddings API response shape */
+export interface GroqEmbeddingResponse {
+  data?: {
+    embedding?: number[];
+    index?: number;
+    object?: string;
+  }[];
+  usage?: {
+    prompt_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
 /** Wikipedia search API response */
 export interface WikiSearchResponse {
   query?: {
