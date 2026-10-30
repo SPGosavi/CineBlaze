@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
-import { DATABASE_URL, IS_PRODUCTION } from "../config.js";
+import { DATABASE_URL, DATABASE_SSL_REQUIRED } from "../config.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -20,7 +20,7 @@ async function main(): Promise<void> {
   // max: 1 because migrations must run in order on a single connection.
   const client = postgres(DATABASE_URL, {
     max: 1,
-    ssl: IS_PRODUCTION ? "require" : undefined,
+    ssl: DATABASE_SSL_REQUIRED ? "require" : undefined,
     onnotice: () => {},
   });
 

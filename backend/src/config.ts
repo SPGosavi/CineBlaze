@@ -37,6 +37,42 @@ export const IS_PRODUCTION = NODE_ENV === "production";
 /** Postgres connection string (Neon, Supabase, Railway, local…). */
 export const DATABASE_URL = process.env.DATABASE_URL || null;
 
+/**
+ * Database SSL mode override.
+ *
+ * - "require": always force TLS
+ * - "disable": never force TLS
+ * - unset: auto (require TLS for non-local hosts)
+ */
+export const DATABASE_SSL_MODE =
+  process.env.DATABASE_SSL_MODE?.trim().toLowerCase() || null;
+
+function isLocalDatabaseUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return (
+      hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+    );
+  } catch {
+    // If URL parsing fails, keep the previous safe default behavior.
+    return false;
+  }
+}
+
+/**
+ * Whether postgres clients should force TLS.
+ *
+ * Hosted/serverless Postgres providers usually require TLS even in local
+ * development. Auto mode enables TLS for non-local hosts and keeps local
+ * docker/native Postgres frictionless.
+ */
+export const DATABASE_SSL_REQUIRED =
+  DATABASE_SSL_MODE === "require"
+    ? true
+    : DATABASE_SSL_MODE === "disable"
+      ? false
+      : IS_PRODUCTION || (!!DATABASE_URL && !isLocalDatabaseUrl(DATABASE_URL));
+
 /** Redis connection string. `rediss://` for Upstash and other TLS providers. */
 export const REDIS_URL = process.env.REDIS_URL || null;
 
