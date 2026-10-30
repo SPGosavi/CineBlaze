@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
-import { DATABASE_URL, IS_PRODUCTION } from "../config.js";
+import { DATABASE_URL, DATABASE_SSL_REQUIRED } from "../config.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -20,16 +20,31 @@ async function main(): Promise<void> {
   // max: 1 because migrations must run in order on a single connection.
   const client = postgres(DATABASE_URL, {
     max: 1,
-    ssl: IS_PRODUCTION ? "require" : undefined,
+    ssl: DATABASE_SSL_REQUIRED ? "require" : undefined,
     onnotice: () => {},
   });
 
   try {
     logger.info("Applying migrations…");
-    await migrate(drizzle(client), { migrationsFolder: "./drizzle" });
+    await migrate(drizzle(client), {
+      migrationsFolder: "./drizzle",
+      // Some hosted Postgres roles cannot create arbitrary schemas.
+      // Keep the migration journal in `public` so migrations still run.
+      migrationsSchema: process.env.DRIZZLE_MIGRATIONS_SCHEMA || "public",
+      migrationsTable:
+        process.env.DRIZZLE_MIGRATIONS_TABLE || "__drizzle_migrations",
+    });
     logger.info("Migrations applied.");
   } catch (error) {
-    logger.error({ err: (error as Error).message }, "Migration failed");
+    const err = error as Error & { cause?: unknown };
+    logger.error(
+      {
+        err: err.message,
+        cause: err.cause,
+        stack: err.stack,
+      },
+      "Migration failed"
+    );
     process.exitCode = 1;
   } finally {
     await client.end();

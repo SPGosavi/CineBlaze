@@ -17,6 +17,11 @@ import {
   fetchWatchProviders,
   fetchRecommendPool,
 } from "../services/tmdbService.js";
+import {
+  indexMediaEmbeddings,
+  semanticSearchByQuery,
+} from "../services/embeddingService.js";
+import { applyClickFeedbackPriors } from "../services/rankingService.js";
 import { getLanguageCodes, getGenreIds } from "../utils/languageMap.js";
 import { directSearchSchema } from "../middleware/validate.js";
 import {
@@ -28,6 +33,7 @@ import {
   StructuredParams,
   MoviesResponse,
   EnrichedMedia,
+  MediaType,
   DirectSearchRequest,
   SearchSelectionRequest,
 } from "../types/index.js";
@@ -39,6 +45,35 @@ import {
 } from "../db/repositories.js";
 
 const log = childLogger("search");
+
+const MOOD_TO_GENRES: Record<string, string[]> = {
+  "dark-mysterious": ["Thriller", "Mystery", "Crime"],
+  "feel-good": ["Comedy", "Family", "Romance"],
+  "mind-bending": ["Sci-Fi", "Mystery", "Thriller"],
+  heartwarming: ["Drama", "Family", "Romance"],
+  "intense-thrilling": ["Action", "Thriller", "Crime"],
+  nostalgic: ["Drama", "Romance"],
+  adventurous: ["Adventure", "Action", "Fantasy"],
+  romantic: ["Romance", "Drama"],
+  "thought-provoking": ["Drama", "Sci-Fi", "Documentary"],
+  "funny-lighthearted": ["Comedy", "Family"],
+  "eerie-unsettling": ["Horror", "Thriller", "Mystery"],
+  epic: ["Adventure", "Action", "War"],
+};
+
+function mergeMoodGenres(
+  genres: string[],
+  moods: string[] | undefined
+): string[] {
+  const output = [...genres];
+  for (const mood of moods || []) {
+    const mapped = MOOD_TO_GENRES[mood] || [];
+    for (const genre of mapped) {
+      if (!output.includes(genre)) output.push(genre);
+    }
+  }
+  return output;
+}
 
 /**
  * `GET /api/media/:mediaType/:id` — full record for a single title.
@@ -370,11 +405,19 @@ export const findMovies = async (
       | "ai-generic"
       | "ai"
       | "recommend"
+      | "semantic"
       | "keyword-fallback"
       | "none",
     ttlSeconds: number | null
   ): Promise<void> => {
-    const response: MoviesResponse = { movies };
+    let rankedMovies = movies;
+    try {
+      rankedMovies = await applyClickFeedbackPriors(movies);
+    } catch (error) {
+      log.debug({ err: String(error) }, "Click-prior ranking skipped");
+    }
+
+    const response: MoviesResponse = { movies: rankedMovies };
     if (ttlSeconds !== null) await cache.set(cacheKey, response, ttlSeconds);
 
     // Not awaited: recording that a search happened must never be able to
@@ -382,10 +425,19 @@ export const findMovies = async (
     void recordSearch({
       userId: req.user?.userId || null,
       query: description,
-      resultsCount: movies.length,
+      resultsCount: rankedMovies.length,
       resolvedBy,
       durationMs: Date.now() - startedAt,
     });
+
+    if (rankedMovies.length > 0 && resolvedBy !== "cache") {
+      void indexMediaEmbeddings(rankedMovies, resolvedBy).catch((error) => {
+        log.debug(
+          { err: String(error) },
+          "Embedding index update failed for response payload"
+        );
+      });
+    }
 
     res.setHeader("X-Resolved-By", resolvedBy);
     res.json(response);
@@ -404,6 +456,25 @@ export const findMovies = async (
     let aiResults: AiSuggestion[] = [];
     const isTitle = isLikelyTitleQuery(description);
     const isGeneric = isGenericBrowsingQuery(description);
+
+    const trySemanticFallback = async (
+      query: string,
+      preferredType?: MediaType
+    ): Promise<boolean> => {
+      const semantic = await semanticSearchByQuery(query, {
+        mediaType: preferredType,
+        limit: 10,
+        minSimilarity: 0.62,
+      });
+
+      if (semantic.length === 0) return false;
+
+      const enriched = await enrichWithDeepData(semantic);
+      if (enriched.length === 0) return false;
+
+      await respond(enriched, "semantic", 1800);
+      return true;
+    };
 
     // ─── Recommend Mode ─────────────────────────────────────────
     if (mode === "recommend") {
@@ -432,7 +503,11 @@ export const findMovies = async (
 
         const languageCodes = getLanguageCodes(structuredParams.language);
         const languageCode = languageCodes[0] || "";
-        const genreIds = getGenreIds(structuredParams.genres);
+        const moodAwareGenres = mergeMoodGenres(
+          structuredParams.genres,
+          structuredParams.mood_tags
+        );
+        const genreIds = getGenreIds(moodAwareGenres);
         const preferredType = structuredParams.media_types[0] || "movie";
 
         const discoverResults = await fetchRecommendPool(
@@ -589,6 +664,12 @@ export const findMovies = async (
 
     // If it's a long description and AI returned nothing, we stop here rather than showing irrelevant TMDB results
     if (!aiResults || aiResults.length === 0) {
+      const semanticResolved = await trySemanticFallback(
+        aiKeywords || description,
+        /show|series|season/i.test(description) ? "tv" : "movie"
+      );
+      if (semanticResolved) return;
+
       // Not cached: an empty result is usually a retrieval failure rather
       // than a fact about the catalogue, and caching it would pin that
       // failure in place for everyone who asks the same thing.
@@ -627,6 +708,13 @@ export const findMovies = async (
       );
       const directResults = await searchTmdbDirect(aiKeywords);
       const enriched = await enrichWithDeepData(directResults);
+      if (enriched.length === 0) {
+        const semanticResolved = await trySemanticFallback(
+          aiKeywords || description,
+          userWantsTV ? "tv" : "movie"
+        );
+        if (semanticResolved) return;
+      }
       await respond(
         enriched,
         "keyword-fallback",
@@ -712,6 +800,21 @@ export const getSimilar = async (
       if (nativeRecs.length > 0) {
         finalResults = await enrichWithDeepData(nativeRecs, 10);
       }
+    }
+
+    if (finalResults.length > 0) {
+      try {
+        finalResults = await applyClickFeedbackPriors(finalResults);
+      } catch (error) {
+        log.debug({ err: String(error) }, "Click-prior ranking skipped");
+      }
+
+      void indexMediaEmbeddings(finalResults, "similar").catch((error) => {
+        log.debug(
+          { err: String(error) },
+          "Embedding index update failed for similar results"
+        );
+      });
     }
 
     res.json({ similar: finalResults });

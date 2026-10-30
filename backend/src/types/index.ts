@@ -19,7 +19,17 @@ export * from "@cineblaze/shared";
 export interface GroqChatOptions {
   temperature?: number;
   maxTokens?: number;
-  responseFormat?: { type: string } | null;
+  responseFormat?:
+    | { type: "json_object" }
+    | {
+        type: "json_schema";
+        json_schema: {
+          name: string;
+          schema: Record<string, unknown>;
+          strict?: boolean;
+        };
+      }
+    | null;
   label?: string;
   /**
    * How much budget the model may spend on internal reasoning before it
@@ -92,11 +102,22 @@ export interface TmdbDetailResponse {
   vote_average?: number;
   original_language?: string;
   genres?: { id: number; name: string }[];
+  belongs_to_collection?: {
+    id: number;
+    name?: string;
+  } | null;
   created_by?: { name: string }[];
   credits?: {
     cast?: { name: string; order?: number }[];
     crew?: { name: string; job: string }[];
   };
+}
+
+/** Raw TMDB collection response (`/collection/{id}`) */
+export interface TmdbCollectionResponse {
+  id: number;
+  name?: string;
+  parts?: TmdbRawResult[];
 }
 
 /** Raw TMDB watch providers response */
@@ -167,6 +188,19 @@ export interface GroqApiError {
      * way to tell a truncated response apart from a malformed one.
      */
     failed_generation?: string;
+  };
+}
+
+/** Groq embeddings API response shape */
+export interface GroqEmbeddingResponse {
+  data?: {
+    embedding?: number[];
+    index?: number;
+    object?: string;
+  }[];
+  usage?: {
+    prompt_tokens?: number;
+    total_tokens?: number;
   };
 }
 

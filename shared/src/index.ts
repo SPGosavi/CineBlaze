@@ -138,6 +138,23 @@ export function isSearchMode(value: unknown): value is SearchMode {
   );
 }
 
+export const MOOD_TAGS = [
+  "dark-mysterious",
+  "feel-good",
+  "mind-bending",
+  "heartwarming",
+  "intense-thrilling",
+  "nostalgic",
+  "adventurous",
+  "romantic",
+  "thought-provoking",
+  "funny-lighthearted",
+  "eerie-unsettling",
+  "epic",
+] as const;
+
+export type MoodTag = (typeof MOOD_TAGS)[number];
+
 /** Output of extractStructuredParams — decomposed user query */
 export interface StructuredParams {
   language: string | null;
@@ -145,6 +162,7 @@ export interface StructuredParams {
   actors: string[];
   directors: string[];
   plot_keywords: string | null;
+  mood_tags: MoodTag[];
   media_types: MediaType[];
   era: string | null;
   is_generic: boolean;
@@ -201,6 +219,17 @@ export interface SearchSelectionRequest {
   selectedResultId: number;
 }
 
+export type UserEventAction = "searched" | "viewed" | "watchlisted" | "watched";
+
+/** POST /api/events */
+export interface UserEventRequest {
+  action: UserEventAction;
+  tmdbId: number;
+  mediaType: MediaType;
+  title: string;
+  genres?: string[];
+}
+
 // ─── Responses ──────────────────────────────────────────────────────────────
 
 /** POST /api/find-movies */
@@ -226,6 +255,13 @@ export interface MediaExtrasResponse {
 /** POST /api/search-selection */
 export interface SearchSelectionResponse {
   recorded: boolean;
+}
+
+/** GET /api/for-you */
+export interface ForYouResponse {
+  recommendations: EnrichedMedia[];
+  reason: string;
+  profileUsed: boolean;
 }
 
 /**

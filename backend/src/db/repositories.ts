@@ -1,16 +1,20 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "./index.js";
 import {
+  mediaEmbeddings,
   searchQueries,
   users,
   userTasteProfiles,
   watchHistory,
+  type MediaEmbedding,
+  type NewMediaEmbedding,
   type NewSearchQuery,
   type NewWatchHistoryEntry,
   type TasteProfile,
   type User,
 } from "./schema.js";
 import { childLogger } from "../utils/logger.js";
+import type { MediaType } from "../types/index.js";
 
 const log = childLogger("db:repo");
 
@@ -230,6 +234,123 @@ export async function getPopularQueries(limit = 20, sinceDays = 7) {
         )
         .groupBy(searchQueries.query)
         .orderBy(desc(sql`count(*)`))
+        .limit(limit);
+    },
+    []
+  );
+}
+
+/**
+ * How often each TMDB id was clicked from search results recently.
+ *
+ * This is the explicit relevance signal we have: users selecting a result
+ * means "this answered my query". Used as a light ranking prior.
+ */
+export async function getSelectionPriors(
+  tmdbIds: number[],
+  sinceDays = 180
+): Promise<Record<number, number>> {
+  if (tmdbIds.length === 0) return {};
+
+  return attempt(
+    "getSelectionPriors",
+    async () => {
+      const since = new Date(Date.now() - sinceDays * 86_400_000);
+      const rows = await db!
+        .select({
+          tmdbId: searchQueries.selectedResultId,
+          clicks: sql<number>`count(*)::int`,
+        })
+        .from(searchQueries)
+        .where(
+          and(
+            gte(searchQueries.createdAt, since),
+            sql`${searchQueries.selectedResultId} IS NOT NULL`,
+            inArray(searchQueries.selectedResultId, tmdbIds)
+          )
+        )
+        .groupBy(searchQueries.selectedResultId);
+
+      return rows.reduce<Record<number, number>>((acc, row) => {
+        if (typeof row.tmdbId === "number") acc[row.tmdbId] = row.clicks;
+        return acc;
+      }, {});
+    },
+    {}
+  );
+}
+
+export async function upsertMediaEmbedding(
+  entry: NewMediaEmbedding
+): Promise<void> {
+  await attempt(
+    "upsertMediaEmbedding",
+    async () => {
+      await db!
+        .insert(mediaEmbeddings)
+        .values(entry)
+        .onConflictDoUpdate({
+          target: [mediaEmbeddings.tmdbId, mediaEmbeddings.mediaType],
+          set: {
+            title: entry.title,
+            overview: entry.overview ?? null,
+            releaseDate: entry.releaseDate ?? null,
+            posterPath: entry.posterPath ?? null,
+            voteAverage: entry.voteAverage ?? null,
+            originalLanguage: entry.originalLanguage ?? null,
+            genres: entry.genres ?? null,
+            embedding: entry.embedding,
+            source: entry.source ?? "search",
+            updatedAt: new Date(),
+          },
+        });
+    },
+    undefined
+  );
+}
+
+export async function findNearestMediaEmbeddings(
+  queryEmbedding: number[],
+  options: {
+    mediaType?: MediaType;
+    limit?: number;
+    minSimilarity?: number;
+  } = {}
+): Promise<(MediaEmbedding & { similarity: number })[]> {
+  const { mediaType, limit = 10, minSimilarity = 0.6 } = options;
+  const vectorLiteral = `[${queryEmbedding.join(",")}]`;
+  const similarityExpr = sql<number>`1 - (${mediaEmbeddings.embedding} <=> ${vectorLiteral}::vector)`;
+
+  return attempt(
+    "findNearestMediaEmbeddings",
+    async () => {
+      return db!
+        .select({
+          id: mediaEmbeddings.id,
+          tmdbId: mediaEmbeddings.tmdbId,
+          mediaType: mediaEmbeddings.mediaType,
+          title: mediaEmbeddings.title,
+          overview: mediaEmbeddings.overview,
+          releaseDate: mediaEmbeddings.releaseDate,
+          posterPath: mediaEmbeddings.posterPath,
+          voteAverage: mediaEmbeddings.voteAverage,
+          originalLanguage: mediaEmbeddings.originalLanguage,
+          genres: mediaEmbeddings.genres,
+          embedding: mediaEmbeddings.embedding,
+          source: mediaEmbeddings.source,
+          updatedAt: mediaEmbeddings.updatedAt,
+          similarity: similarityExpr,
+        })
+        .from(mediaEmbeddings)
+        .where(
+          mediaType
+            ? and(
+                eq(mediaEmbeddings.mediaType, mediaType),
+                sql`${similarityExpr} >= ${minSimilarity}`
+              )
+            : sql`${similarityExpr} >= ${minSimilarity}`
+        )
+        .orderBy(sql`${similarityExpr} DESC`)
         .limit(limit);
     },
     []

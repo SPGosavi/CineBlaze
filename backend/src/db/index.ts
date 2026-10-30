@@ -1,6 +1,6 @@
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { DATABASE_URL, IS_PRODUCTION } from "../config.js";
+import { DATABASE_URL, DATABASE_SSL_REQUIRED } from "../config.js";
 import { childLogger } from "../utils/logger.js";
 import * as schema from "./schema.js";
 
@@ -20,7 +20,7 @@ if (DATABASE_URL) {
     idle_timeout: 20,
     connect_timeout: 10,
     // Neon and Supabase both require TLS; a local instance generally does not.
-    ssl: IS_PRODUCTION ? "require" : undefined,
+    ssl: DATABASE_SSL_REQUIRED ? "require" : undefined,
     onnotice: () => {},
   });
   database = drizzle(client, { schema });

@@ -91,6 +91,14 @@ export const searchSelectionSchema = z.object({
   selectedResultId: tmdbIdSchema,
 });
 
+export const userEventSchema = z.object({
+  action: z.enum(["searched", "viewed", "watchlisted", "watched"]),
+  tmdbId: tmdbIdSchema,
+  mediaType: mediaTypeSchema,
+  title: z.string().trim().min(1).max(500),
+  genres: z.array(z.string().trim().max(60)).max(20).optional(),
+});
+
 export const getSimilarSchema = z.object({
   title: z.string().trim().min(1).max(500),
   media_type: mediaTypeSchema,

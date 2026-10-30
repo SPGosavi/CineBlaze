@@ -1,226 +1,29 @@
-import fetch from "node-fetch";
 import {
-  GROQ_API_KEY,
-  GROQ_API_URL,
-  GROQ_MODEL,
-  GROQ_FALLBACK_MODEL,
-  GROQ_MAX_RETRIES,
-  GROQ_REASONING_EFFORT,
   GROUNDING_SOURCE_TIMEOUT_MS,
   GROUNDING_TOTAL_TIMEOUT_MS,
+  GROUNDING_SOURCES,
   TMDB_API_KEY,
 } from "../config.js";
 import { fetchWithTimeout, bestEffort } from "../utils/http.js";
-import { sleep, backoffDelay } from "../utils/retry.js";
 import { getLanguageCodes, getGenreIds } from "../utils/languageMap.js";
 import type {
   ChatMessage,
-  GroqChatOptions,
   StructuredParams,
   AiSuggestion,
-  GroqApiResponse,
-  GroqApiError,
   MediaType,
+  MoodTag,
   WikiSearchResponse,
   TmdbPaginatedResponse,
 } from "../types/index.js";
 import { childLogger } from "../utils/logger.js";
-import {
-  recordEvalGroqCall,
-  recordEvalGroundingSource,
-} from "../eval/telemetry.js";
+import { recordEvalGroundingSource } from "../eval/telemetry.js";
+import { groqChat } from "./llm/groq.js";
+import { z } from "zod";
 
 const log = childLogger("ai");
 
-// ─── Groq Request Helper (retry + backoff + fallback model) ────────────────
-
-/** Cheap non-cryptographic hash (djb2) used only to correlate log lines for the same query. */
-function hashString(str: string): string {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash * 33) ^ str.charCodeAt(i);
-  }
-  return (hash >>> 0).toString(16);
-}
-
-function logGroqCall(info: Record<string, unknown>): void {
-  log.debug({ payload: JSON.stringify(info) }, `[Groq]`);
-}
-
-/**
- * Single entry point for every Groq chat-completion call in this file.
- *
- * Behavior:
- * - Retries up to `GROQ_MAX_RETRIES` times per model with exponential backoff + jitter.
- * - On HTTP 429, honors the `Retry-After` header if present instead of the default backoff.
- * - On HTTP 5xx (or if all retries on the primary model are exhausted), falls back to
- *   `GROQ_FALLBACK_MODEL` and retries there before giving up.
- * - Logs one structured line per attempt: { label, model, attempt, latencyMs, status, tokens, queryHash }.
- *
- * @param messages
- * @param opts
- * @returns raw text content of the model's reply
- * @throws if every model/attempt combination fails
- */
-async function groqChat(
-  messages: ChatMessage[],
-  opts: GroqChatOptions = {}
-): Promise<string> {
-  const {
-    temperature = 0.1,
-    maxTokens = 2048,
-    responseFormat = null,
-    label = "groqChat",
-    reasoningEffort = GROQ_REASONING_EFFORT,
-  } = opts;
-
-  const lastUserMessage =
-    [...messages].reverse().find((m) => m.role === "user")?.content || "";
-  const queryHash = hashString(lastUserMessage);
-
-  const models: string[] = [GROQ_MODEL, GROQ_FALLBACK_MODEL].filter(
-    Boolean
-  ) as string[];
-  let lastError: Error | undefined;
-
-  for (const model of models) {
-    for (let attempt = 1; attempt <= GROQ_MAX_RETRIES; attempt++) {
-      const start = Date.now();
-      try {
-        const body: any = {
-          model,
-          messages,
-          temperature,
-          max_tokens: maxTokens,
-          stream: false,
-        };
-        if (responseFormat) body.response_format = responseFormat;
-        // Reasoning tokens count against max_tokens on the gpt-oss models,
-        // so capping the reasoning budget is what leaves room for the answer.
-        if (reasoningEffort) body.reasoning_effort = reasoningEffort;
-
-        const response = await fetch(GROQ_API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${GROQ_API_KEY}`,
-          },
-          body: JSON.stringify(body),
-        });
-
-        const latencyMs = Date.now() - start;
-
-        if (response.status === 429) {
-          const retryAfterHeader = Number(response.headers.get("retry-after"));
-          const waitMs =
-            Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
-              ? retryAfterHeader * 1000
-              : backoffDelay(attempt);
-          logGroqCall({
-            label,
-            model,
-            attempt,
-            latencyMs,
-            status: 429,
-            queryHash,
-          });
-          lastError = new Error("Groq API rate limit (429) exceeded");
-          if (attempt < GROQ_MAX_RETRIES) {
-            await sleep(waitMs);
-            continue;
-          }
-          break; // exhausted retries on this model, try fallback
-        }
-
-        if (!response.ok) {
-          const errorBody = (await response
-            .json()
-            .catch(() => ({}))) as GroqApiError;
-          const message =
-            errorBody.error?.message || `Groq API error: ${response.status}`;
-          const failedGeneration = errorBody.error?.failed_generation;
-          logGroqCall({
-            label,
-            model,
-            attempt,
-            latencyMs,
-            status: response.status,
-            error: message,
-            queryHash,
-          });
-          // Without this, a truncated response and a genuinely malformed one
-          // look identical in the logs, which is what made this class of
-          // failure so hard to pin down.
-          if (failedGeneration) {
-            log.warn(
-              `[Groq] failed_generation (${failedGeneration.length} chars, label=${label}): ${failedGeneration.slice(0, 300)}`
-            );
-          }
-          lastError = new Error(message);
-
-          // Retry on 5xx (transient); don't retry on 4xx other than 429 (bad request won't fix itself)
-          if (response.status >= 500 && attempt < GROQ_MAX_RETRIES) {
-            await sleep(backoffDelay(attempt));
-            continue;
-          }
-          break; // move to fallback model
-        }
-
-        const data = (await response.json()) as GroqApiResponse;
-        const usage = data.usage || {};
-        logGroqCall({
-          label,
-          model,
-          attempt,
-          latencyMs,
-          status: 200,
-          queryHash,
-          promptTokens: usage.prompt_tokens,
-          completionTokens: usage.completion_tokens,
-        });
-        recordEvalGroqCall({
-          label,
-          model,
-          promptTokens: usage.prompt_tokens ?? 0,
-          completionTokens: usage.completion_tokens ?? 0,
-        });
-
-        const finishReason = data.choices?.[0]?.finish_reason;
-        if (finishReason === "length") {
-          // The model ran out of budget mid-answer. Outside JSON mode this
-          // returns silently truncated (often empty) content rather than an
-          // error, so it has to be surfaced explicitly.
-          log.warn(
-            `[Groq] Response truncated: hit max_tokens=${maxTokens} (label=${label}, model=${model}). Raise maxTokens or lower reasoningEffort.`
-          );
-        }
-
-        const content = data.choices?.[0]?.message?.content;
-        if (!content) {
-          lastError = new Error("Groq API returned an empty response");
-          break;
-        }
-        return content;
-      } catch (e: any) {
-        const latencyMs = Date.now() - start;
-        logGroqCall({
-          label,
-          model,
-          attempt,
-          latencyMs,
-          error: e.message,
-          queryHash,
-        });
-        lastError = e;
-        if (attempt < GROQ_MAX_RETRIES) {
-          await sleep(backoffDelay(attempt));
-          continue;
-        }
-      }
-    }
-  }
-
-  throw lastError || new Error("Groq request failed for an unknown reason");
+function sourceEnabled(name: string): boolean {
+  return GROUNDING_SOURCES.has(name);
 }
 
 // ─── Structured Parameter Extraction ────────────────────────────────────────
@@ -240,9 +43,10 @@ Rules:
 3. "actors" — array of actor names mentioned. Use [] if none.
 4. "directors" — array of director names mentioned. Use [] if none.
 5. "plot_keywords" — concise plot description stripped of actor/language/genre info. Use null if the query is just an actor/genre listing.
-6. "media_types" — ["movie"] if user says movie/film, ["tv"] if user says show/series/season, ["movie", "tv"] if unspecified.
-7. "era" — decade or year range if mentioned (e.g. "90s", "2020s"). Use null if not mentioned.
-8. "is_generic" — true if the query is just an actor name, genre, or simple browsing query with NO specific plot. false otherwise.
+6. "mood_tags" — array from this list only: ["dark-mysterious","feel-good","mind-bending","heartwarming","intense-thrilling","nostalgic","adventurous","romantic","thought-provoking","funny-lighthearted","eerie-unsettling","epic"]. Use [] if no mood is implied.
+7. "media_types" — ["movie"] if user says movie/film, ["tv"] if user says show/series/season, ["movie", "tv"] if unspecified.
+8. "era" — decade or year range if mentioned (e.g. "90s", "2020s"). Use null if not mentioned.
+9. "is_generic" — true if the query is just an actor name, genre, or simple browsing query with NO specific plot. false otherwise.
 
 Output a valid JSON object ONLY. No markdown, no commentary.
 
@@ -252,25 +56,77 @@ Query: "${query}"`;
     const content = await groqChat([{ role: "user", content: prompt }], {
       temperature: 0.05,
       maxTokens: 1024,
-      responseFormat: { type: "json_object" },
+      responseFormat: {
+        type: "json_schema",
+        json_schema: {
+          name: "structured_params",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              language: { type: ["string", "null"] },
+              genres: { type: "array", items: { type: "string" } },
+              actors: { type: "array", items: { type: "string" } },
+              directors: { type: "array", items: { type: "string" } },
+              plot_keywords: { type: ["string", "null"] },
+              mood_tags: {
+                type: "array",
+                items: {
+                  type: "string",
+                  enum: [
+                    "dark-mysterious",
+                    "feel-good",
+                    "mind-bending",
+                    "heartwarming",
+                    "intense-thrilling",
+                    "nostalgic",
+                    "adventurous",
+                    "romantic",
+                    "thought-provoking",
+                    "funny-lighthearted",
+                    "eerie-unsettling",
+                    "epic",
+                  ],
+                },
+              },
+              media_types: {
+                type: "array",
+                items: { type: "string", enum: ["movie", "tv"] },
+              },
+              era: { type: ["string", "null"] },
+              is_generic: { type: "boolean" },
+            },
+            required: [
+              "language",
+              "genres",
+              "actors",
+              "directors",
+              "plot_keywords",
+              "mood_tags",
+              "media_types",
+              "era",
+              "is_generic",
+            ],
+          },
+        },
+      },
       label: "extractStructuredParams",
     });
 
-    const parsed = JSON.parse(
-      content.replace(/```json|```/g, "").trim()
-    ) as Record<string, unknown>;
-    log.debug({ payload: JSON.stringify(parsed) }, `[AI] Structured Params:`);
+    const parsed = parseJsonObjectSafe(content, "extractStructuredParams");
+    const result = structuredParamsSchema.parse(parsed);
+    log.debug({ payload: JSON.stringify(result) }, `[AI] Structured Params:`);
     return {
-      language: (parsed.language as string) || null,
-      genres: Array.isArray(parsed.genres) ? parsed.genres : [],
-      actors: Array.isArray(parsed.actors) ? parsed.actors : [],
-      directors: Array.isArray(parsed.directors) ? parsed.directors : [],
-      plot_keywords: (parsed.plot_keywords as string) || null,
-      media_types: Array.isArray(parsed.media_types)
-        ? (parsed.media_types as MediaType[])
-        : (["movie", "tv"] as MediaType[]),
-      era: (parsed.era as string) || null,
-      is_generic: !!parsed.is_generic,
+      language: result.language ?? null,
+      genres: result.genres,
+      actors: result.actors,
+      directors: result.directors,
+      plot_keywords: result.plot_keywords ?? null,
+      mood_tags: result.mood_tags as MoodTag[],
+      media_types: result.media_types as MediaType[],
+      era: result.era ?? null,
+      is_generic: result.is_generic,
     };
   } catch (e: any) {
     log.warn(
@@ -288,10 +144,78 @@ function getDefaultParams(): StructuredParams {
     actors: [],
     directors: [],
     plot_keywords: null,
+    mood_tags: [],
     media_types: ["movie", "tv"],
     era: null,
     is_generic: false,
   };
+}
+
+class LlmResponseValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly details?: unknown
+  ) {
+    super(message);
+    this.name = "LlmResponseValidationError";
+  }
+}
+
+const structuredParamsSchema = z.object({
+  language: z.string().nullable().optional(),
+  genres: z.array(z.string()).default([]),
+  actors: z.array(z.string()).default([]),
+  directors: z.array(z.string()).default([]),
+  plot_keywords: z.string().nullable().optional(),
+  mood_tags: z
+    .array(
+      z.enum([
+        "dark-mysterious",
+        "feel-good",
+        "mind-bending",
+        "heartwarming",
+        "intense-thrilling",
+        "nostalgic",
+        "adventurous",
+        "romantic",
+        "thought-provoking",
+        "funny-lighthearted",
+        "eerie-unsettling",
+        "epic",
+      ])
+    )
+    .default([]),
+  media_types: z.array(z.enum(["movie", "tv"])).default(["movie", "tv"]),
+  era: z.string().nullable().optional(),
+  is_generic: z.boolean().default(false),
+});
+
+const suggestionItemSchema = z.object({
+  title: z.string().min(1),
+  year: z.string().optional().default(""),
+  media_type: z.enum(["movie", "tv"]).optional(),
+});
+
+const suggestionsEnvelopeSchema = z.object({
+  results: z.array(suggestionItemSchema).max(5).default([]),
+});
+
+function parseJsonObjectSafe(
+  text: string | null | undefined,
+  label: string
+): unknown {
+  if (!text) {
+    throw new LlmResponseValidationError(`${label}: empty response content`);
+  }
+
+  const cleaned = text.replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(cleaned) as unknown;
+  } catch {
+    throw new LlmResponseValidationError(`${label}: malformed JSON`, {
+      payload: cleaned.substring(0, 300),
+    });
+  }
 }
 
 // ─── Main AI Search (Single-Pass) ───────────────────────────────────────────
@@ -495,6 +419,64 @@ async function fetchLanguageFilteredDiscover(
   }
 }
 
+async function fetchKeywordMatchedDiscover(
+  plotKeywords: string,
+  languageCode: string | null,
+  genreIds: number[],
+  mediaTypes: MediaType[]
+): Promise<string> {
+  try {
+    const keywordSearchUrl = `https://api.themoviedb.org/3/search/keyword?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(plotKeywords)}&page=1`;
+    const keywordRes = await fetchWithTimeout(
+      keywordSearchUrl,
+      GROUNDING_SOURCE_TIMEOUT_MS
+    );
+    if (!keywordRes.ok) return "";
+
+    const keywordData = (await keywordRes.json()) as {
+      results?: { id: number; name: string }[];
+    };
+    const keywordIds = (keywordData.results || []).slice(0, 3).map((k) => k.id);
+    if (keywordIds.length === 0) return "";
+
+    const withKeywords = keywordIds.join("|");
+    const withGenres =
+      genreIds.length > 0 ? `&with_genres=${genreIds.join(",")}` : "";
+    const withLanguage = languageCode
+      ? `&with_original_language=${encodeURIComponent(languageCode)}`
+      : "";
+
+    const outputs = await Promise.all(
+      mediaTypes.map(async (mediaType) => {
+        const discoverUrl = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${TMDB_API_KEY}&with_keywords=${withKeywords}${withGenres}${withLanguage}&sort_by=popularity.desc&page=1`;
+        const discoverRes = await fetchWithTimeout(
+          discoverUrl,
+          GROUNDING_SOURCE_TIMEOUT_MS
+        );
+        if (!discoverRes.ok) return "";
+
+        const discoverData =
+          (await discoverRes.json()) as TmdbPaginatedResponse;
+        return (discoverData.results || [])
+          .slice(0, 5)
+          .map(
+            (r: any) =>
+              `[TMDB Keyword Match] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}) [${mediaType}]: ${r.overview || ""}`
+          )
+          .join("\n");
+      })
+    );
+
+    return outputs.filter(Boolean).join("\n");
+  } catch (e: any) {
+    log.warn(
+      { err: String(e.message) },
+      "[Context] Keyword-matched discover failed:"
+    );
+    return "";
+  }
+}
+
 // ─── Enhanced Context Gathering ─────────────────────────────────────────────
 
 /**
@@ -519,6 +501,8 @@ async function getStableContext(
   if (params.actors.length > 0) keywordParts.push(params.actors[0]);
   if (params.plot_keywords) keywordParts.push(params.plot_keywords);
   if (params.genres.length > 0) keywordParts.push(params.genres[0]);
+  if (params.mood_tags.length > 0)
+    keywordParts.push(params.mood_tags[0].replace(/-/g, " "));
   const keywords = keywordParts.length > 0 ? keywordParts.join(" ") : userQuery;
 
   const wikiUrl = (q: string) =>
@@ -541,32 +525,39 @@ async function getStableContext(
    * source stalled the entire search, because none of the fetches had a
    * deadline.
    */
-  const sources: { label: string; run: () => Promise<string> }[] = [
-    {
-      label: "wiki-keywords",
-      run: async () =>
-        formatWiki(
-          (await (
-            await fetchWithTimeout(
-              wikiUrl(keywords),
-              GROUNDING_SOURCE_TIMEOUT_MS
-            )
-          ).json()) as WikiSearchResponse
-        ),
-    },
-    {
-      label: "wiki-raw-query",
-      run: async () =>
-        formatWiki(
-          (await (
-            await fetchWithTimeout(
-              wikiUrl(userQuery),
-              GROUNDING_SOURCE_TIMEOUT_MS
-            )
-          ).json()) as WikiSearchResponse
-        ),
-    },
-    {
+  const sources: { label: string; run: () => Promise<string> }[] = [];
+
+  if (sourceEnabled("wiki")) {
+    sources.push(
+      {
+        label: "wiki-keywords",
+        run: async () =>
+          formatWiki(
+            (await (
+              await fetchWithTimeout(
+                wikiUrl(keywords),
+                GROUNDING_SOURCE_TIMEOUT_MS
+              )
+            ).json()) as WikiSearchResponse
+          ),
+      },
+      {
+        label: "wiki-raw-query",
+        run: async () =>
+          formatWiki(
+            (await (
+              await fetchWithTimeout(
+                wikiUrl(userQuery),
+                GROUNDING_SOURCE_TIMEOUT_MS
+              )
+            ).json()) as WikiSearchResponse
+          ),
+      }
+    );
+  }
+
+  if (sourceEnabled("tmdb")) {
+    sources.push({
       label: "tmdb-multi",
       run: async () => {
         const res = await fetchWithTimeout(
@@ -583,14 +574,17 @@ async function getStableContext(
           )
           .join("\n");
       },
-    },
-    {
+    });
+  }
+
+  if (sourceEnabled("ddg")) {
+    sources.push({
       label: "ddg",
       run: () => fetchDDGLite(userQuery),
-    },
-  ];
+    });
+  }
 
-  if (params.actors.length > 0) {
+  if (sourceEnabled("actor") && params.actors.length > 0) {
     sources.push({
       label: "actor-filmography",
       run: () =>
@@ -604,67 +598,71 @@ async function getStableContext(
 
   // One discover call per language, capped so an umbrella term like "indian"
   // cannot fan out into a dozen parallel requests.
-  const MAX_DISCOVER_SOURCES = 4;
-  let discoverCount = 0;
-  outer: for (const code of languageCodes) {
-    for (const mt of params.media_types) {
-      if (discoverCount >= MAX_DISCOVER_SOURCES) break outer;
-      discoverCount++;
-      sources.push({
-        label: `discover-${code}-${mt}`,
-        run: () => fetchLanguageFilteredDiscover(code, genreIds, mt),
-      });
+  if (sourceEnabled("discover") && params.is_generic) {
+    const MAX_DISCOVER_SOURCES = 4;
+    let discoverCount = 0;
+    outer: for (const code of languageCodes) {
+      for (const mt of params.media_types) {
+        if (discoverCount >= MAX_DISCOVER_SOURCES) break outer;
+        discoverCount++;
+        sources.push({
+          label: `discover-${code}-${mt}`,
+          run: () => fetchLanguageFilteredDiscover(code, genreIds, mt),
+        });
+      }
     }
   }
 
-  if (params.plot_keywords && languageCode) {
+  if (sourceEnabled("keyword") && params.plot_keywords) {
     sources.push({
-      label: "tmdb-plot-search",
-      run: async () => {
-        const res = await fetchWithTimeout(
-          `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(params.plot_keywords as string)}&language=en-US&page=1`,
-          GROUNDING_SOURCE_TIMEOUT_MS
-        );
-        const data = (await res.json()) as any;
-        return (data.results || [])
-          .slice(0, 5)
-          .map(
-            (r: any) =>
-              `[TMDB Plot Match] ${r.title || r.name} (${(r.release_date || r.first_air_date || "N/A").substring(0, 4)}): ${r.overview}`
-          )
-          .join("\n");
-      },
+      label: "tmdb-keyword-discover",
+      run: () =>
+        fetchKeywordMatchedDiscover(
+          params.plot_keywords as string,
+          languageCode,
+          genreIds,
+          params.media_types
+        ),
     });
   }
 
   const started = Date.now();
 
-  // bestEffort never rejects, so Promise.all is safe here: a failed or slow
-  // source contributes an empty string instead of taking the search down.
-  const settled = await Promise.race([
-    Promise.all(
-      sources.map(async (s) => {
-        const sourceStart = Date.now();
-        const out = await bestEffort(
-          s.label,
-          GROUNDING_SOURCE_TIMEOUT_MS,
-          "",
-          () => s.run()
-        );
-        const chars = out?.trim().length ?? 0;
-        recordEvalGroundingSource({
-          label: s.label,
-          ms: Date.now() - sourceStart,
-          chars,
-          populated: chars > 0,
-        });
-        return out;
-      })
-    ),
-    new Promise<string[]>((resolve) =>
-      setTimeout(() => resolve([]), GROUNDING_TOTAL_TIMEOUT_MS)
+  // Keep partial successes if the aggregate timeout wins the race.
+  const settled: string[] = new Array(sources.length).fill("");
+  const sourceTasks = sources.map(async (s, index) => {
+    const sourceStart = Date.now();
+    const out = await bestEffort(s.label, GROUNDING_SOURCE_TIMEOUT_MS, "", () =>
+      s.run()
+    );
+    settled[index] = out;
+    const chars = out?.trim().length ?? 0;
+    recordEvalGroundingSource({
+      label: s.label,
+      ms: Date.now() - sourceStart,
+      chars,
+      populated: chars > 0,
+    });
+    return out;
+  });
+
+  const allDone = await Promise.race([
+    Promise.all(sourceTasks).then(() => true),
+    new Promise<boolean>((resolve) =>
+      setTimeout(() => resolve(false), GROUNDING_TOTAL_TIMEOUT_MS)
     ),
   ]);
+
+  if (!allDone) {
+    log.warn(
+      JSON.stringify({
+        tag: "grounding",
+        source: "total",
+        status: "timeout",
+        ms: Date.now() - started,
+      })
+    );
+  }
 
   const parts = settled.filter((p) => p && p.trim().length > 0);
 
@@ -716,14 +714,15 @@ export async function callGroqSimilar(
     Rules:
     1. Match Media Type (${mediaType}).
     2. Prioritize similarity in these dimensions (in order):
-       a. Thematic/plot similarity — stories with similar narrative arcs or themes
-       b. Genre overlap — same genre combination
-       c. Cast/director overlap — other works by the same actors or director
-       d. Tone and style — similar mood, pacing, cinematographic approach
+       a. Franchise/collection continuity first (sequels, prequels, same saga) when applicable
+       b. Thematic/plot similarity — stories with similar narrative arcs or themes
+       c. Genre overlap — same genre combination
+       d. Cast/director overlap — other works by the same actors or director
+       e. Tone and style — similar mood, pacing, cinematographic approach
     3. Return REAL titles only. Do not invent movies.
     4. Prefer titles from the same language/region as the source.
     5. Provide a valid JSON object with a "results" key containing the array of matches. No markdown, no commentary.
-    Format: {"results": [{"title": "Title", "year": "YYYY", "media_type": "${mediaType}"}]`;
+    Format: {"results": [{"title": "Title", "year": "YYYY", "media_type": "${mediaType}"}]}`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -734,10 +733,37 @@ export async function callGroqSimilar(
     const content = await groqChat(messages, {
       temperature: 0.3,
       maxTokens: 2048,
-      responseFormat: { type: "json_object" },
+      responseFormat: {
+        type: "json_schema",
+        json_schema: {
+          name: "similar_suggestions",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              results: {
+                type: "array",
+                maxItems: 5,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    title: { type: "string" },
+                    year: { type: "string" },
+                    media_type: { type: "string", enum: ["movie", "tv"] },
+                  },
+                  required: ["title", "year"],
+                },
+              },
+            },
+            required: ["results"],
+          },
+        },
+      },
       label: "callGroqSimilar",
     });
-    return parseJsonSafe(content);
+    return parseSuggestionsSafe(content, "callGroqSimilar");
   } catch (e: any) {
     log.error({ err: String(e.message) }, "[AI Similar] Error:");
     throw e;
@@ -769,7 +795,7 @@ export async function callGroqRecommend(
     2. Rank them by how well they match the user's request.
     3. Return ONLY titles that exist in the candidate pool. Do not invent titles or bring in outside titles.
     4. Provide a valid JSON object with a "results" key containing the array of matches. No markdown, no commentary.
-    Format: {"results": [{"title": "Title", "year": "YYYY", "media_type": "movie or tv"}]}]}`;
+    Format: {"results": [{"title": "Title", "year": "YYYY", "media_type": "movie or tv"}]}`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -780,10 +806,37 @@ export async function callGroqRecommend(
     const content = await groqChat(messages, {
       temperature: 0.1,
       maxTokens: 2048,
-      responseFormat: { type: "json_object" },
+      responseFormat: {
+        type: "json_schema",
+        json_schema: {
+          name: "ranked_recommendations",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              results: {
+                type: "array",
+                maxItems: 5,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    title: { type: "string" },
+                    year: { type: "string" },
+                    media_type: { type: "string", enum: ["movie", "tv"] },
+                  },
+                  required: ["title", "year"],
+                },
+              },
+            },
+            required: ["results"],
+          },
+        },
+      },
       label: "callGroqRecommend",
     });
-    return parseJsonSafe(content);
+    return parseSuggestionsSafe(content, "callGroqRecommend");
   } catch (e: any) {
     log.error({ err: String(e.message) }, "[AI Recommend] Error:");
     throw e;
@@ -811,6 +864,10 @@ async function makeGroqRequest(
     constraints.push(`- Directed by: ${params.directors.join(", ")}`);
   if (params.genres.length > 0)
     constraints.push(`- Genre: ${params.genres.join(", ")}`);
+  if (params.mood_tags.length > 0)
+    constraints.push(
+      `- Mood/Vibe: ${params.mood_tags.map((m) => m.replace(/-/g, " ")).join(", ")}`
+    );
   if (params.plot_keywords)
     constraints.push(`- Plot elements: ${params.plot_keywords}`);
   if (params.era) constraints.push(`- Era/Period: ${params.era}`);
@@ -843,7 +900,8 @@ async function makeGroqRequest(
 
   const hintRules = hasHints
     ? `2. **HINT PRIORITY**: The "REAL-WORLD DATABASE HINTS" section contains actual entries from TMDB, Wikipedia, and actor filmographies. Treat these as strong candidates and prefer them when they match the user's description.
-    3. **VERIFY AGAINST HINTS**: If your best guess does not appear in the hints, satisfy yourself that it is a real title before returning it. A title absent from the hints is still valid if you are confident it exists.`
+    3. **VERIFY AGAINST HINTS**: If your best guess does not appear in the hints, satisfy yourself that it is a real title before returning it. A title absent from the hints is still valid if you are confident it exists.
+    4. **HINT MISMATCH HANDLING**: If hints are present but clearly irrelevant to the specific plot details, do not force a bad match from hints. Use your best real title match instead.`
     : `2. **NO HINTS AVAILABLE**: External lookups returned nothing for this query. Answer from your own knowledge of cinema.
     3. **DO NOT RETURN AN EMPTY LIST** merely because there are no hints. Return your best match and let the caller verify it. Only return an empty list if the description genuinely matches no film or show you know of.`;
 
@@ -865,7 +923,7 @@ async function makeGroqRequest(
     ${externalContext}
 
     Output Requirement: Provide a valid JSON object with a "results" key containing the array of matches. Do not include markdown wraps or extra commentary.
-    Format: {"results": [{"title": "Exact Title", "year": "YYYY", "media_type": "movie or tv"}]}]}`;
+    Format: {"results": [{"title": "Exact Title", "year": "YYYY", "media_type": "movie or tv"}]}`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -878,48 +936,63 @@ async function makeGroqRequest(
   const content = await groqChat(messages, {
     temperature: 0.1,
     maxTokens: 2048,
-    responseFormat: { type: "json_object" },
+    responseFormat: {
+      type: "json_schema",
+      json_schema: {
+        name: "identified_titles",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            results: {
+              type: "array",
+              maxItems: 5,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  title: { type: "string" },
+                  year: { type: "string" },
+                  media_type: { type: "string", enum: ["movie", "tv"] },
+                },
+                required: ["title", "year"],
+              },
+            },
+          },
+          required: ["results"],
+        },
+      },
+    },
     label: "makeGroqRequest",
   });
 
   log.debug(`[AI] Raw Response: ${content?.substring(0, 200)}...`);
-  return parseJsonSafe(content);
+  return parseSuggestionsSafe(content, "makeGroqRequest");
 }
 
 // ─── JSON Parser ────────────────────────────────────────────────────────────
 
-/**
- * Extracts an array of result objects out of an LLM's raw text reply.
- */
-function parseJsonSafe(text: string | null | undefined): AiSuggestion[] {
-  if (!text) {
-    log.warn("[AI] parseJsonSafe called with empty content");
-    return [];
-  }
-  const cleaned = text.replace(/```json|```/g, "").trim();
+function parseSuggestionsSafe(
+  text: string | null | undefined,
+  label: string
+): AiSuggestion[] {
   try {
-    const jsonParsed = JSON.parse(cleaned) as any;
-    if (Array.isArray(jsonParsed))
-      return jsonParsed.slice(0, 5) as AiSuggestion[];
-    if (jsonParsed.movies && Array.isArray(jsonParsed.movies))
-      return jsonParsed.movies.slice(0, 5) as AiSuggestion[];
-    if (jsonParsed.results && Array.isArray(jsonParsed.results))
-      return jsonParsed.results.slice(0, 5) as AiSuggestion[];
-    if (typeof jsonParsed === "object") {
-      const keys = Object.keys(jsonParsed);
-      if (keys.length === 1 && Array.isArray(jsonParsed[keys[0]]))
-        return jsonParsed[keys[0]].slice(0, 5) as AiSuggestion[];
-    }
-    // Valid JSON, but not a shape we recognize — treat as "no matches", not an error.
+    const parsed = parseJsonObjectSafe(text, label);
+    const envelope = suggestionsEnvelopeSchema.parse(parsed);
+    return envelope.results;
+  } catch (error) {
+    const err = error as Error;
     log.warn(
-      { payload: cleaned.substring(0, 200) },
-      "[AI] parseJsonSafe: valid JSON but unrecognized shape"
-    );
-    return [];
-  } catch (e: any) {
-    log.warn(
-      { payload: cleaned.substring(0, 200) },
-      "[AI] parseJsonSafe: malformed JSON from model"
+      {
+        label,
+        err: err.message,
+        details:
+          error instanceof LlmResponseValidationError
+            ? error.details
+            : undefined,
+      },
+      "[AI] Suggestion payload validation failed"
     );
     return [];
   }

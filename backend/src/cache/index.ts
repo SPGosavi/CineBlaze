@@ -44,6 +44,8 @@ export const CacheKeys = {
   detailsPrefix: "details:",
   ratings: (title: string, year: string | undefined) =>
     `ratings:${title}:${year ?? ""}`,
+  forYou: (userId: string, count: number) => `forYou:${userId}:${count}`,
+  forYouPrefix: "forYou:",
 } as const;
 
 /**
