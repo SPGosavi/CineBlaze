@@ -219,6 +219,17 @@ export interface SearchSelectionRequest {
   selectedResultId: number;
 }
 
+export type UserEventAction = "searched" | "viewed" | "watchlisted" | "watched";
+
+/** POST /api/events */
+export interface UserEventRequest {
+  action: UserEventAction;
+  tmdbId: number;
+  mediaType: MediaType;
+  title: string;
+  genres?: string[];
+}
+
 // ─── Responses ──────────────────────────────────────────────────────────────
 
 /** POST /api/find-movies */
@@ -244,6 +255,13 @@ export interface MediaExtrasResponse {
 /** POST /api/search-selection */
 export interface SearchSelectionResponse {
   recorded: boolean;
+}
+
+/** GET /api/for-you */
+export interface ForYouResponse {
+  recommendations: EnrichedMedia[];
+  reason: string;
+  profileUsed: boolean;
 }
 
 /**
