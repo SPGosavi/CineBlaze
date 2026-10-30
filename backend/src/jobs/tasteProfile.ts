@@ -24,6 +24,9 @@ const ACTION_WEIGHTS: Record<string, number> = {
   watched: 2,
 };
 
+const META_LANGUAGE_PREFIX = "__lang:";
+const META_RATING_PREFIX = "__rating:";
+
 function decayFactor(timestamp: Date | null): number {
   if (!timestamp) return 0.5;
   const ageDays = (Date.now() - timestamp.getTime()) / 86_400_000;
@@ -57,14 +60,39 @@ export async function computeTasteProfile(userId: string): Promise<void> {
   if (history.length === 0) return;
 
   const genreWeights = new Map<string, number>();
+  const languageWeights = new Map<string, number>();
+  let weightedRatingSum = 0;
+  let weightedRatingWeight = 0;
 
   for (const entry of history) {
     const weight =
       (ACTION_WEIGHTS[entry.action] ?? 0.5) * decayFactor(entry.createdAt);
-    for (const genre of entry.genres ?? []) {
-      genreWeights.set(genre, (genreWeights.get(genre) ?? 0) + weight);
+    for (const token of entry.genres ?? []) {
+      if (token.startsWith(META_LANGUAGE_PREFIX)) {
+        const code = token.slice(META_LANGUAGE_PREFIX.length).toLowerCase();
+        if (code) {
+          languageWeights.set(code, (languageWeights.get(code) ?? 0) + weight);
+        }
+        continue;
+      }
+
+      if (token.startsWith(META_RATING_PREFIX)) {
+        const raw = Number(token.slice(META_RATING_PREFIX.length));
+        if (Number.isFinite(raw)) {
+          weightedRatingSum += raw * weight;
+          weightedRatingWeight += weight;
+        }
+        continue;
+      }
+
+      genreWeights.set(token, (genreWeights.get(token) ?? 0) + weight);
     }
   }
+
+  const avgRatingPreference =
+    weightedRatingWeight > 0
+      ? (weightedRatingSum / weightedRatingWeight).toFixed(1)
+      : null;
 
   await saveTasteProfile(userId, {
     topGenres: topN(genreWeights, 10).map(({ key, weight }) => ({
@@ -73,8 +101,8 @@ export async function computeTasteProfile(userId: string): Promise<void> {
     })),
     topActors: [],
     topDirectors: [],
-    preferredLanguages: [],
-    avgRatingPreference: null,
+    preferredLanguages: topN(languageWeights, 5).map(({ key }) => key),
+    avgRatingPreference,
   });
 }
 

@@ -97,6 +97,13 @@ export const userEventSchema = z.object({
   mediaType: mediaTypeSchema,
   title: z.string().trim().min(1).max(500),
   genres: z.array(z.string().trim().max(60)).max(20).optional(),
+  languageCode: z
+    .string()
+    .trim()
+    .regex(/^[a-z]{2}$/i)
+    .optional(),
+  releaseYear: z.number().int().min(1888).max(2100).optional(),
+  voteAverage: z.number().min(0).max(10).optional(),
 });
 
 export const getSimilarSchema = z.object({
