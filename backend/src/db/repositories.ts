@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "./index.js";
 import {
   mediaEmbeddings,
@@ -237,6 +237,46 @@ export async function getPopularQueries(limit = 20, sinceDays = 7) {
         .limit(limit);
     },
     []
+  );
+}
+
+/**
+ * How often each TMDB id was clicked from search results recently.
+ *
+ * This is the explicit relevance signal we have: users selecting a result
+ * means "this answered my query". Used as a light ranking prior.
+ */
+export async function getSelectionPriors(
+  tmdbIds: number[],
+  sinceDays = 180
+): Promise<Record<number, number>> {
+  if (tmdbIds.length === 0) return {};
+
+  return attempt(
+    "getSelectionPriors",
+    async () => {
+      const since = new Date(Date.now() - sinceDays * 86_400_000);
+      const rows = await db!
+        .select({
+          tmdbId: searchQueries.selectedResultId,
+          clicks: sql<number>`count(*)::int`,
+        })
+        .from(searchQueries)
+        .where(
+          and(
+            gte(searchQueries.createdAt, since),
+            sql`${searchQueries.selectedResultId} IS NOT NULL`,
+            inArray(searchQueries.selectedResultId, tmdbIds)
+          )
+        )
+        .groupBy(searchQueries.selectedResultId);
+
+      return rows.reduce<Record<number, number>>((acc, row) => {
+        if (typeof row.tmdbId === "number") acc[row.tmdbId] = row.clicks;
+        return acc;
+      }, {});
+    },
+    {}
   );
 }
 
