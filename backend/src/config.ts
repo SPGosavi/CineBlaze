@@ -155,6 +155,21 @@ export const GROUNDING_SOURCE_TIMEOUT_MS =
 export const GROUNDING_TOTAL_TIMEOUT_MS =
   Number(process.env.GROUNDING_TOTAL_TIMEOUT_MS) || 2500;
 
+/**
+ * Comma-separated grounding source toggles for safe A/B retrieval experiments.
+ *
+ * Example:
+ *   GROUNDING_SOURCES=wiki,tmdb,keyword,actor,discover
+ *
+ * When unset, all sources stay enabled.
+ */
+export const GROUNDING_SOURCES = new Set(
+  (process.env.GROUNDING_SOURCES || "wiki,tmdb,ddg,actor,discover,keyword")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+);
+
 // ─── TMDB ───────────────────────────────────────────────────────────────────
 
 /**

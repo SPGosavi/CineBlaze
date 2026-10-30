@@ -23,6 +23,7 @@ import {
   TmdbDetailResponse,
   TmdbWatchProvidersResponse,
   OmdbResponse,
+  TmdbCollectionResponse,
 } from "../types/index.js";
 import {
   fetchCombinedJustWatchOffers,
@@ -346,6 +347,15 @@ export async function getNativeTmdbRecommendations(
     .replace(/\(\d{4}\)/g, "")
     .trim();
 
+  // First try deterministic sequel/franchise expansion for movies.
+  if (mediaType === "movie") {
+    const fromCollection = await fetchCollectionRecommendations(
+      cleanTitle,
+      year
+    );
+    if (fromCollection.length > 0) return fromCollection;
+  }
+
   let searchResult = await performTmdbSearch(cleanTitle, year, mediaType);
   if (!searchResult)
     searchResult = await performTmdbSearch(cleanTitle, null, mediaType);
@@ -468,10 +478,53 @@ export async function fetchEnrichedData(
     genres: details.genres,
     director: details.director,
     cast: details.cast,
-    imdb_rating: (omdbData as any).imdb,
-    rotten_tomatoes: (omdbData as any).rotten,
+    imdb_rating: omdbData.imdb,
+    rotten_tomatoes: omdbData.rt,
     providers: providers,
   } as EnrichedMedia;
+}
+
+async function fetchCollectionRecommendations(
+  title: string,
+  year?: string
+): Promise<BasicTmdbResult[]> {
+  const seed =
+    (await performTmdbSearch(title, year, "movie")) ||
+    (await performTmdbSearch(title, null, "movie"));
+  if (!seed) return [];
+
+  try {
+    const detailUrl = `https://api.themoviedb.org/3/movie/${seed.id}?api_key=${TMDB_API_KEY}`;
+    const detailRes = await fetchWithTimeout(detailUrl, TMDB_TIMEOUT_MS);
+    if (!detailRes.ok) return [];
+
+    const detail = (await detailRes.json()) as TmdbDetailResponse;
+    const collectionId = detail.belongs_to_collection?.id;
+    if (!collectionId) return [];
+
+    const collectionUrl = `https://api.themoviedb.org/3/collection/${collectionId}?api_key=${TMDB_API_KEY}&language=en-US`;
+    const collectionRes = await fetchWithTimeout(
+      collectionUrl,
+      TMDB_TIMEOUT_MS
+    );
+    if (!collectionRes.ok) return [];
+
+    const collection = (await collectionRes.json()) as TmdbCollectionResponse;
+    const parts = Array.isArray(collection.parts) ? collection.parts : [];
+
+    return parts
+      .filter((part) => part.id !== seed.id)
+      .sort((a, b) => {
+        const ay = Number((a.release_date || "0").slice(0, 4)) || 0;
+        const by = Number((b.release_date || "0").slice(0, 4)) || 0;
+        return ay - by;
+      })
+      .slice(0, 10)
+      .map((part) => formatTmdbResult(part, "movie"))
+      .filter((item): item is BasicTmdbResult => item !== null);
+  } catch {
+    return [];
+  }
 }
 
 async function fetchTmdbRobust(
