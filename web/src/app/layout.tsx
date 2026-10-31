@@ -1,20 +1,28 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
+import { Geist, Geist_Mono } from "next/font/google";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/constants";
 import Providers from "./providers";
 import WebVitals from "@/components/analytics/WebVitals";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
+});
+
+const boska = localFont({
+  src: "./fonts/Boska-Medium.woff2",
+  variable: "--font-boska",
+  display: "swap",
+  weight: "500",
 });
 
 export const metadata: Metadata = {
@@ -63,7 +71,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
+  themeColor: "#191716",
   colorScheme: "dark",
 };
 
@@ -74,9 +82,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       // Next 16 no longer neutralises `scroll-behavior: smooth` during
       // navigation unless this attribute is present.
       data-scroll-behavior="smooth"
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${geist.variable} ${geistMono.variable} ${boska.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-black">
+      <body className="min-h-full bg-paper text-ink">
         {/*
           The app shell lives in the `(main)` route group's layout rather than
           here, so /login can render full-bleed without a sidebar wrapped
