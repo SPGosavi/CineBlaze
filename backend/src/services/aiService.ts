@@ -389,8 +389,11 @@ async function fetchLanguageFilteredDiscover(
   mediaType: MediaType = "movie"
 ): Promise<string> {
   try {
+    // Pipe = OR in TMDB's discover API (comma = AND, which would require a
+    // movie to carry every listed genre at once — see fetchRecommendPool for
+    // the full story). Grounding wants "any of these genres", not all.
     const genreParam =
-      genreIds.length > 0 ? `&with_genres=${genreIds.join(",")}` : "";
+      genreIds.length > 0 ? `&with_genres=${genreIds.join("|")}` : "";
     const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${TMDB_API_KEY}&with_original_language=${languageCode}${genreParam}&sort_by=popularity.desc&page=1`;
 
     log.debug(
@@ -440,8 +443,9 @@ async function fetchKeywordMatchedDiscover(
     if (keywordIds.length === 0) return "";
 
     const withKeywords = keywordIds.join("|");
+    // Pipe = OR here too; see the note in fetchLanguageFilteredDiscover.
     const withGenres =
-      genreIds.length > 0 ? `&with_genres=${genreIds.join(",")}` : "";
+      genreIds.length > 0 ? `&with_genres=${genreIds.join("|")}` : "";
     const withLanguage = languageCode
       ? `&with_original_language=${encodeURIComponent(languageCode)}`
       : "";
