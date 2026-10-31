@@ -15,12 +15,12 @@
   --color-error: oklch(72% 0.15 27);
   --color-success: oklch(76% 0.13 150);
 
-  --heat-0: oklch(12% 0.012 40);
-  --heat-1: oklch(22% 0.07 22);
-  --heat-2: oklch(40% 0.16 27);
-  --heat-3: oklch(60% 0.21 36);
-  --heat-4: oklch(76% 0.19 56);
-  --heat-5: oklch(89% 0.14 78);
+  --heat-0: oklch(13% 0.012 40);
+  --heat-1: oklch(61% 0.16 25);
+  --heat-2: oklch(67% 0.18 32);
+  --heat-3: oklch(74% 0.2 45);
+  --heat-4: oklch(82% 0.18 65);
+  --heat-5: oklch(92% 0.09 85);
   --heat-6: oklch(98% 0.04 95);
 
   --color-heat-0: var(--heat-0);
