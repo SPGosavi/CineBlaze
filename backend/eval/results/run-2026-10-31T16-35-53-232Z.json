@@ -1,0 +1,248 @@
+{
+  "generatedAt": "2026-10-31T16:35:53.232Z",
+  "baseline": false,
+  "summary": {
+    "totalCases": 4,
+    "hitAt1": 1,
+    "hitAt3": 2,
+    "failedCases": 0,
+    "hitAt1Rate": 0.25,
+    "hitAt3Rate": 0.5,
+    "p50Ms": 4959,
+    "p95Ms": 10473,
+    "totalPromptTokens": 9231,
+    "totalCompletionTokens": 1996,
+    "avgPromptTokensPerCase": 2307.75,
+    "avgCompletionTokensPerCase": 499,
+    "avgGroundingCharsPerCase": 713.25,
+    "avgGroundingPopulatedSourcesPerCase": 1,
+    "resolvedBy": {
+      "ai": 2,
+      "recommend": 2
+    },
+    "byMode": {
+      "recommend": {
+        "totalCases": 4,
+        "hitAt1Rate": 0.25,
+        "hitAt3Rate": 0.5,
+        "p50Ms": 4959,
+        "avgPromptTokensPerCase": 2307.75
+      }
+    },
+    "byTag": {
+      "conversational": {
+        "totalCases": 1,
+        "hitAt1Rate": 1,
+        "hitAt3Rate": 1,
+        "p50Ms": 8296,
+        "avgPromptTokensPerCase": 2025
+      },
+      "heist": {
+        "totalCases": 1,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 4959,
+        "avgPromptTokensPerCase": 2510
+      },
+      "hindi": {
+        "totalCases": 1,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 4959,
+        "avgPromptTokensPerCase": 2510
+      },
+      "malayalam": {
+        "totalCases": 1,
+        "hitAt1Rate": 0,
+        "hitAt3Rate": 0,
+        "p50Ms": 3850,
+        "avgPromptTokensPerCase": 2179
+      },
+      "recommend": {
+        "totalCases": 4,
+        "hitAt1Rate": 0.25,
+        "hitAt3Rate": 0.5,
+        "p50Ms": 4959,
+        "avgPromptTokensPerCase": 2307.75
+      },
+      "regional": {
+        "totalCases": 3,
+        "hitAt1Rate": 0.3333333333333333,
+        "hitAt3Rate": 0.6666666666666666,
+        "p50Ms": 8296,
+        "avgPromptTokensPerCase": 2240.3333333333335
+      },
+      "tamil": {
+        "totalCases": 2,
+        "hitAt1Rate": 0.5,
+        "hitAt3Rate": 1,
+        "p50Ms": 8296,
+        "avgPromptTokensPerCase": 2271
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "recommend-tamil-thriller-2010s",
+      "query": "recommend a tamil thriller from the 2010s",
+      "mode": "recommend",
+      "tags": ["recommend", "regional", "tamil"],
+      "expected": {
+        "titles": ["Ratsasan", "Vikram Vedha", "Thani Oruvan"]
+      },
+      "statusCode": 200,
+      "resolvedBy": "ai",
+      "latencyMs": 10473,
+      "resultCount": 3,
+      "topTitles": ["Dhuruvangal Pathinaaru", "Maya", "Vikram Vedha"],
+      "topTmdbIds": [414523, 1450624, 432139],
+      "top1Hit": false,
+      "top3Hit": true,
+      "failed": false,
+      "error": null,
+      "promptTokens": 2517,
+      "completionTokens": 562,
+      "groundingSources": [
+        {
+          "label": "wiki-raw-query",
+          "ms": 385,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "wiki-keywords",
+          "ms": 445,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "tmdb-multi",
+          "ms": 662,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "discover-ta-movie",
+          "ms": 667,
+          "chars": 775,
+          "populated": true
+        },
+        {
+          "label": "ddg",
+          "ms": 1017,
+          "chars": 701,
+          "populated": true
+        }
+      ]
+    },
+    {
+      "id": "recommend-hindi-comedy-heist",
+      "query": "recommend a hindi comedy heist movie",
+      "mode": "recommend",
+      "tags": ["recommend", "hindi", "heist"],
+      "expected": {
+        "titles": ["Hera Pheri", "Phir Hera Pheri"]
+      },
+      "statusCode": 200,
+      "resolvedBy": "ai",
+      "latencyMs": 4959,
+      "resultCount": 1,
+      "topTitles": ["Special 26"],
+      "topTmdbIds": [165904],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 2510,
+      "completionTokens": 570,
+      "groundingSources": [
+        {
+          "label": "wiki-keywords",
+          "ms": 268,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "wiki-raw-query",
+          "ms": 270,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "discover-hi-movie",
+          "ms": 517,
+          "chars": 773,
+          "populated": true
+        },
+        {
+          "label": "tmdb-multi",
+          "ms": 539,
+          "chars": 0,
+          "populated": false
+        },
+        {
+          "label": "ddg",
+          "ms": 766,
+          "chars": 604,
+          "populated": true
+        }
+      ]
+    },
+    {
+      "id": "recommend-malayalam-crime",
+      "query": "recommend a malayalam crime thriller",
+      "mode": "recommend",
+      "tags": ["recommend", "regional", "malayalam"],
+      "expected": {
+        "titles": ["Drishyam", "Mumbai Police", "Anjaam Pathiraa"]
+      },
+      "statusCode": 200,
+      "resolvedBy": "recommend",
+      "latencyMs": 3850,
+      "resultCount": 5,
+      "topTitles": [
+        "Ayyappanum Koshiyum",
+        "Malik",
+        "Vandae Maatharam",
+        "I, Nobody",
+        "Salute"
+      ],
+      "topTmdbIds": [657996, 665133, 69432, 1339676, 803666],
+      "top1Hit": false,
+      "top3Hit": false,
+      "failed": false,
+      "error": null,
+      "promptTokens": 2179,
+      "completionTokens": 374,
+      "groundingSources": []
+    },
+    {
+      "id": "conversational-recommend-tamil-thriller",
+      "query": "recommend me something; refine with: tamil thriller, from the 2010s",
+      "mode": "recommend",
+      "tags": ["conversational", "recommend", "regional", "tamil"],
+      "expected": {
+        "titles": ["Ratsasan", "Vikram Vedha", "Thani Oruvan"]
+      },
+      "statusCode": 200,
+      "resolvedBy": "recommend",
+      "latencyMs": 8296,
+      "resultCount": 5,
+      "topTitles": [
+        "Vikram Vedha",
+        "Yuddham Sei",
+        "Dhuruvangal Pathinaaru",
+        "Nibunan",
+        "Kaithi"
+      ],
+      "topTmdbIds": [432139, 70988, 414523, 411612, 587030],
+      "top1Hit": true,
+      "top3Hit": true,
+      "failed": false,
+      "error": null,
+      "promptTokens": 2025,
+      "completionTokens": 490,
+      "groundingSources": []
+    }
+  ]
+}
