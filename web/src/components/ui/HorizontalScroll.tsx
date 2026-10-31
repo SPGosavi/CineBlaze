@@ -50,14 +50,13 @@ export default function HorizontalScroll({
         type="button"
         aria-label="Scroll left"
         onClick={() => scroll("left")}
-        className={`absolute left-0 top-0 bottom-0 z-20 w-8 md:w-12 bg-linear-to-r from-black via-black/70 to-transparent flex items-center justify-center transition-opacity duration-300 ${
+        className={`absolute left-0 top-0 bottom-0 z-20 w-10 md:w-14 bg-gradient-to-r from-paper via-paper/80 to-transparent flex items-center justify-start pl-1 transition-opacity duration-short focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px] ${
           showLeft ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
-        <ChevronLeft
-          size={32}
-          className="text-white drop-shadow-lg hover:text-red-500 transition-colors"
-        />
+        <span className="p-1 rounded-full bg-paper-2/90 border border-rule text-ink hover:text-accent hover:border-muted/50 transition-colors">
+          <ChevronLeft size={24} aria-hidden="true" />
+        </span>
       </button>
 
       <div
@@ -72,14 +71,13 @@ export default function HorizontalScroll({
         type="button"
         aria-label="Scroll right"
         onClick={() => scroll("right")}
-        className={`absolute right-0 top-0 bottom-0 z-20 w-8 md:w-12 bg-linear-to-l from-black via-black/70 to-transparent flex items-center justify-center transition-opacity duration-300 ${
+        className={`absolute right-0 top-0 bottom-0 z-20 w-10 md:w-14 bg-gradient-to-l from-paper via-paper/80 to-transparent flex items-center justify-end pr-1 transition-opacity duration-short focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px] ${
           showRight ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
-        <ChevronRight
-          size={32}
-          className="text-white drop-shadow-lg hover:text-red-500 transition-colors"
-        />
+        <span className="p-1 rounded-full bg-paper-2/90 border border-rule text-ink hover:text-accent hover:border-muted/50 transition-colors">
+          <ChevronRight size={24} aria-hidden="true" />
+        </span>
       </button>
     </div>
   );

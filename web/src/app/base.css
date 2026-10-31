@@ -29,6 +29,18 @@ body {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
+:where(a, button, [role="button"]):active,
+:active {
+  transform: translateY(1px);
+}
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 a {
   color: inherit;
   text-decoration-thickness: 1px;
