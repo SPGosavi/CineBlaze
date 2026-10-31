@@ -1,0 +1,99 @@
+@theme static {
+  --color-*: initial;
+  --font-*: initial;
+
+  --color-paper: oklch(13% 0.012 40);
+  --color-paper-2: oklch(17.5% 0.016 40);
+  --color-paper-3: oklch(22% 0.018 40);
+  --color-ink: oklch(94% 0.02 80);
+  --color-ink-2: oklch(84% 0.025 70);
+  --color-muted: oklch(72% 0.03 60);
+  --color-rule: oklch(96% 0.01 80 / 0.12);
+  --color-accent: oklch(70% 0.2 45);
+  --color-accent-ink: oklch(14% 0.02 40);
+  --color-focus: oklch(76% 0.19 56);
+  --color-error: oklch(72% 0.15 27);
+  --color-success: oklch(76% 0.13 150);
+
+  --heat-0: oklch(12% 0.012 40);
+  --heat-1: oklch(22% 0.07 22);
+  --heat-2: oklch(40% 0.16 27);
+  --heat-3: oklch(60% 0.21 36);
+  --heat-4: oklch(76% 0.19 56);
+  --heat-5: oklch(89% 0.14 78);
+  --heat-6: oklch(98% 0.04 95);
+
+  --color-heat-0: var(--heat-0);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
+  --color-heat-5: var(--heat-5);
+  --color-heat-6: var(--heat-6);
+
+  --font-display: var(--font-boska), "Boska", "Iowan Old Style", Georgia, serif;
+  --font-body: var(--font-geist), "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-outlier: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.2rem;
+  --text-xl: 1.44rem;
+  --text-2xl: 1.728rem;
+  --text-3xl: 2.074rem;
+
+  --tracking-display: -0.02em;
+
+  --radius-card: 28px;
+  --radius-well: 16px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 50px 90px -30px oklch(8% 0.01 40 / 0.5);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+:root {
+  color-scheme: dark;
+  --space-3xs: 2px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --space-3xl: 96px;
+  --space-4xl: 144px;
+
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+
+  --container: 1440px;
+  --gutter: 64px;
+  --gap-columns: 32px;
+  --section-gap-s: 120px;
+  --section-gap: 144px;
+  --section-gap-l: 176px;
+
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-sticky-nav: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  --rule-hair: 1px;
+  --display-weight: 500;
+  --text-display-s: 1.44rem;
+  --text-display: 1.728rem;
+  --text-section: 1.2rem;
+  --text-title: 1rem;
+  --text-lead: 1rem;
+}

@@ -1,21 +1,17 @@
+/* Hallmark · v2.0.0 · redesign: full · scope: app · genre: atmospheric
+ * theme: Kiln (deal 2/3, seed cineblaze-ai-powered-movie-discovery-3370·3bdfe915·2026-10-31·r0) · kiln: ember
+ * shape: app screen · signature: the title row, its rating keyed to the heat ramp
+ * ramp: rating → heat step (the measured quantity Kiln's ramp marks here)
+ * surface: committed dark · built: the project · redesign: full
+ * axes: dark/high-contrast-serif/warm · posture: full-palette · contrast: pass
+ * pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: variety, vary shelf poster sizes on discover
+ * hero-review: pending · finish-review: pending */
 @import "tailwindcss";
-
-/*
- * Tailwind v4 is CSS-first: there is no tailwind.config.js. Theme values and
- * custom utilities are declared here instead.
- *
- * The Phase 2 app referenced `animate-fade-in`, `scrollbar-hide`,
- * `scrollbar-thin` and `pb-safe` but its tailwind.config.js had an empty
- * `theme.extend` and only defined the scrollbar rules via an injected <style>
- * tag. The animation classes therefore did nothing at all. They are defined
- * properly here so the markup means what it says.
- */
+@import "./tokens.css";
+@import "./base.css" layer(base);
 
 @theme {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
-
-  --animate-fade-in: fade-in 0.25s ease-out;
+  --animate-fade-in: fade-in 0.25s var(--ease-out, ease-out);
 
   @keyframes fade-in {
     from {
@@ -59,35 +55,25 @@
   }
 }
 
-:root {
-  color-scheme: dark;
-}
-
-html,
-body {
-  background-color: #000;
-  color: #f3f4f6;
-}
-
-/* App-wide scrollbar styling. Was an injected <style> tag in Phase 2. */
+/* App-wide scrollbar styling. */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a0a;
+  background: var(--color-paper);
 }
 ::-webkit-scrollbar-thumb {
-  background: #262626;
+  background: var(--color-paper-3);
   border-radius: 4px;
-  border: 1px solid #0a0a0a;
+  border: 1px solid var(--color-paper);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #dc2626;
+  background: var(--color-accent);
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: #262626 #0a0a0a;
+  scrollbar-color: var(--color-paper-3) var(--color-paper);
 }
 
 @utility scrollbar-hide {
