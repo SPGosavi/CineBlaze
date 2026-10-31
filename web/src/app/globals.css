@@ -5,7 +5,14 @@
  * surface: committed dark · built: the project · redesign: full
  * axes: dark/high-contrast-serif/warm · posture: full-palette · contrast: pass
  * pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: variety, vary shelf poster sizes on discover
- * hero-review: pending · finish-review: pending */
+ * hero-review: fix · 0 findings · 0 unresolved · finish-review: subagent · 0 findings · gap: none */
+/* Hallmark · reworded "ignite your next obsession." to "Describe a plot, a vibe, or a scene stuck in your head." · 19 names the opener */
+/* Hallmark · reworded "results" to "Matching titles" · 54 plain section heading */
+/* Hallmark · reworded "stream" to "Stream" · 54 plain section heading */
+/* Hallmark · reworded "rent / buy" to "Rent / Buy" · 54 plain section heading */
+/* Hallmark · dropped /movie/1339713, /tv/200875, /tv/247718, /movie/577922, https://www.themoviedb.org/movie/27205-inception/watch?locale=IN · dynamic TMDB trending feed and provider shifts */
+/* Hallmark · dropped 2025, 100(2014, 2020 · dynamic TMDB title years and scores */
+/* Hallmark · dropped image · placeholder SVG data URL replaced external placeholder image service */
 @import "tailwindcss";
 @import "./tokens.css";
 @import "./base.css" layer(base);

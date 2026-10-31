@@ -154,14 +154,19 @@ function WatchlistCard({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
+      onContextMenu={(e) => {
+        // Prevent default context menu on long-press in mobile browsers
+        e.preventDefault();
+      }}
       onDragStart={(event) => {
+        event.dataTransfer.setData("text/plain", String(item.id));
+        event.dataTransfer.effectAllowed = "move";
         setIsDragging(true);
         onDragStart(event, item.id);
       }}
       onDragEnd={() => setIsDragging(false)}
       onDragOver={(event) => {
         event.preventDefault();
-        event.stopPropagation();
         setIsOver(true);
       }}
       onDragLeave={() => setIsOver(false)}

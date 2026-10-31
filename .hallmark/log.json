@@ -1,0 +1,21 @@
+[
+  {
+    "mode": "redesign",
+    "depth": "full",
+    "scope": "app",
+    "theme": "kiln",
+    "genre": "atmospheric",
+    "shape": "app screen",
+    "signature": "the title row, rating keyed to the heat ramp",
+    "axes": "dark/high-contrast-serif/warm",
+    "nav": "project sidebar (kept)",
+    "footer": "credit line",
+    "imagery": "TMDB posters (real)",
+    "photos": "none from the library",
+    "entry": "the search line",
+    "sections": "discover, search, detail, watchlist, settings, login",
+    "waived": [],
+    "prompt": "CineBlaze AI movie discovery",
+    "timestamp": "2026-11-01T02:11:00.000Z"
+  }
+]
