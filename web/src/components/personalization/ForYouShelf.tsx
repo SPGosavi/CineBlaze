@@ -7,6 +7,8 @@ import type { EnrichedMedia, ForYouResponse } from "@cineblaze/shared";
 import { useAuthContext } from "@/contexts/AuthContext";
 import api from "@/lib/api";
 import { PLACEHOLDER_IMAGE, TMDB_IMAGE_BASE_URL } from "@/lib/constants";
+import Frame from "@/components/ui/Frame";
+import Label from "@/components/ui/Label";
 
 export default function ForYouShelf() {
   const { user, loading } = useAuthContext();
@@ -43,11 +45,10 @@ export default function ForYouShelf() {
   if (state.status === "error") {
     return (
       <section className="space-y-2">
-        <div className="flex items-center gap-2 px-1">
-          <div className="h-5 w-1 rounded-full bg-orange-500" />
-          <h2 className="text-lg font-bold text-gray-200">For You</h2>
+        <div className="border-b border-rule pb-2">
+          <h2 className="font-display font-medium text-lg text-ink">For you</h2>
         </div>
-        <p className="px-1 text-sm text-gray-500">
+        <p className="text-sm font-body text-muted">
           Could not load personalized picks right now.
         </p>
       </section>
@@ -57,12 +58,11 @@ export default function ForYouShelf() {
   if (state.status !== "ready") {
     return (
       <section className="space-y-2">
-        <div className="flex items-center gap-2 px-1">
-          <div className="h-5 w-1 rounded-full bg-orange-500" />
-          <h2 className="text-lg font-bold text-gray-200">For You</h2>
+        <div className="border-b border-rule pb-2">
+          <h2 className="font-display font-medium text-lg text-ink">For you</h2>
         </div>
-        <p className="px-1 text-sm text-gray-500">
-          Finding your personalized picks...
+        <p className="text-sm font-body text-muted">
+          Finding your personalized picks…
         </p>
       </section>
     );
@@ -73,13 +73,17 @@ export default function ForYouShelf() {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center gap-2 px-1">
-        <div className="h-5 w-1 rounded-full bg-orange-500" />
-        <h2 className="text-lg font-bold text-gray-200">For You</h2>
+      <div className="border-b border-rule pb-2 flex items-baseline justify-between">
+        <h2 className="font-display font-medium text-lg text-ink">For you</h2>
+        <Label size="xs">{items.length} recommendations</Label>
       </div>
-      <p className="px-1 text-xs text-orange-300/90">{state.data.reason}</p>
+      {state.data.reason && (
+        <Label size="xs" className="block text-accent">
+          {state.data.reason}
+        </Label>
+      )}
 
-      <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
         {items.slice(0, 10).map((item) => (
           <ForYouCard key={`${item.media_type}-${item.id}`} item={item} />
         ))}
@@ -96,18 +100,18 @@ function ForYouCard({ item }: { item: EnrichedMedia }) {
   return (
     <Link
       href={`/${item.media_type}/${item.id}`}
-      className="group w-[140px] shrink-0 space-y-2"
+      className="group w-[140px] shrink-0 space-y-1.5 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 rounded-xl"
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-neutral-700/70 bg-neutral-900">
+      <Frame aspectRatio="poster">
         <Image
           src={src}
           alt={`${item.title} poster`}
           fill
           sizes="140px"
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
+          className="object-cover transition-opacity duration-short group-hover:opacity-90"
         />
-      </div>
-      <p className="line-clamp-2 text-xs font-medium text-gray-200">
+      </Frame>
+      <p className="line-clamp-2 text-xs font-display font-medium text-ink group-hover:text-accent transition-colors">
         {item.title}
       </p>
     </Link>

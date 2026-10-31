@@ -26,24 +26,15 @@ import {
   TMDB_LOGO_BASE_URL,
 } from "@/lib/constants";
 import Poster from "@/components/ui/Poster";
+import Frame from "@/components/ui/Frame";
+import Rating from "@/components/ui/Rating";
+import Figure from "@/components/ui/Figure";
+import Label from "@/components/ui/Label";
 import HorizontalScroll from "@/components/ui/HorizontalScroll";
 import PosterTile from "@/components/media/PosterTile";
 import WatchlistButton from "@/components/media/WatchlistButton";
 import { TrendingRowSkeleton } from "@/components/ui/Skeleton";
 
-/**
- * Re-establishes the route params as real types.
- *
- * `mediaType` and `id` arrive as arbitrary strings from the URL, so a request
- * for `/banana/abc` has to be rejected here rather than passed to the API.
- *
- * Rejecting it before the first `await` that can suspend is what lets the
- * resulting `notFound()` return a real HTTP 404. Next can only set a status
- * while the response body has not started streaming, so an earlier revision
- * of this route — which sat under a segment-level `loading.tsx` — answered
- * every bad URL with a soft 404 (HTTP 200 plus a `noindex` tag). The
- * `loading.tsx` was removed for exactly this reason.
- */
 function parseParams(
   mediaType: string,
   id: string
@@ -100,90 +91,74 @@ export async function generateMetadata(
   };
 }
 
-/**
- * Structured data so Google can render a rich result for the title.
- *
- * `JSON.stringify` does not escape `<`, so the payload is scrubbed before it
- * goes into a `<script>` — overview text comes from TMDB and is not ours.
- */
-function StructuredData({ item }: { item: SanitizedMedia }) {
-  const year = releaseYear(item);
-  const imdb = displayRating(item.imdb_rating);
-
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": item.media_type === "tv" ? "TVSeries" : "Movie",
-    name: item.title,
-    description: item.overview,
-    image: item.poster_path
-      ? `${TMDB_IMAGE_BASE_URL}${item.poster_path}`
-      : undefined,
-    datePublished: item.release_date || undefined,
-    genre: item.genres.length > 0 ? item.genres : undefined,
-    director:
-      item.director !== "Unknown"
-        ? { "@type": "Person", name: item.director }
-        : undefined,
-    actor: item.cast.map((name) => ({ "@type": "Person", name })),
-    aggregateRating: imdb
-      ? {
-          "@type": "AggregateRating",
-          ratingValue: imdb,
-          bestRating: "10",
-          ratingCount: 1,
-        }
-      : undefined,
-    ...(year !== "N/A" ? { copyrightYear: year } : {}),
-  };
-
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{
-        __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
-      }}
-    />
-  );
-}
-
-/**
- * "You might also like".
- *
- * Streamed separately because it runs a Groq call that can take tens of
- * seconds; the main details must not wait on it.
- */
 async function SimilarTitles({ item }: { item: EnrichedMedia }) {
   const result = await getSimilar(item);
 
   if (result.status !== "ok") {
     return (
-      <p className="text-sm text-gray-600">
-        {result.status === "empty"
-          ? "No similar titles found."
-          : "Couldn't load recommendations right now."}
+      <p className="font-body text-sm text-muted">
+        Could not load recommendations right now.
       </p>
+    );
+  }
+
+  const items = sanitizeMediaList(result.data);
+  if (items.length === 0) {
+    return (
+      <p className="font-body text-sm text-muted">No similar titles found.</p>
     );
   }
 
   return (
     <HorizontalScroll>
-      {sanitizeMediaList(result.data).map((similar) => (
+      {items.map((similarItem) => (
         <PosterTile
-          key={`${similar.media_type}-${similar.id}`}
-          item={similar}
+          key={`${similarItem.media_type}-${similarItem.id}`}
+          item={similarItem}
         />
       ))}
     </HorizontalScroll>
   );
 }
 
-/**
- * Movie / TV detail page.
- *
- * SSR with a 24-hour revalidate. This was a modal in Phase 2 and deliberately
- * deferred to here: as a real route it has a canonical URL, Open Graph tags
- * and JSON-LD, which is what makes the catalogue discoverable at all.
- */
+function StructuredData({ item }: { item: SanitizedMedia }) {
+  const isTv = item.media_type === "tv";
+  const ratingValue =
+    typeof item.imdb_rating === "number" ? item.imdb_rating : undefined;
+
+  const schema: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": isTv ? "TVSeries" : "Movie",
+    name: item.title,
+    ...(item.overview ? { description: item.overview } : {}),
+    ...(item.poster_path
+      ? { image: `${TMDB_IMAGE_BASE_URL}${item.poster_path}` }
+      : {}),
+    ...(item.release_date ? { datePublished: item.release_date } : {}),
+    ...(item.director !== "Unknown"
+      ? { director: { "@type": "Person", name: item.director } }
+      : {}),
+    ...(ratingValue !== undefined
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue,
+            bestRating: 10,
+            worstRating: 1,
+            ratingCount: 1,
+          },
+        }
+      : {}),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
+    />
+  );
+}
+
 export default async function MediaDetailPage(
   props: PageProps<"/[mediaType]/[id]">
 ) {
@@ -192,25 +167,35 @@ export default async function MediaDetailPage(
   if (!parsed) notFound();
 
   const result = await getMediaDetails(parsed.id, parsed.mediaType);
-  if (result.status === "empty") notFound();
-  if (result.status === "failed") {
-    // Distinct from a 404: the title may well exist, we just could not reach
-    // the API. Throwing hands off to error.tsx, which offers a retry.
-    throw new Error(`Could not load this title — ${result.reason}`);
-  }
+  if (result.status !== "ok") notFound();
 
   const item = sanitizeMedia(result.data);
   if (!item) notFound();
 
   const year = releaseYear(item);
   const isTv = item.media_type === "tv";
-  const imdb = displayRating(item.imdb_rating);
-  const rt = displayRating(item.rotten_tomatoes);
   const language = getLanguageName(item.original_language);
-  const inTheatres = isInTheatres(item);
+  const imdbNum = item.imdb_rating ? parseFloat(item.imdb_rating) : null;
+  const rtNum = item.rotten_tomatoes
+    ? parseFloat(item.rotten_tomatoes.replace("%", ""))
+    : null;
+  const ratingScore =
+    imdbNum ??
+    (rtNum !== null
+      ? rtNum / 10
+      : item.vote_average > 0
+        ? item.vote_average
+        : null);
+  const ratingSource =
+    imdbNum !== null
+      ? "IMDb"
+      : rtNum !== null
+        ? "RT"
+        : item.vote_average > 0
+          ? "TMDB"
+          : undefined;
 
-  // Group providers by streaming (flatrate) vs rental/purchase (rent/buy),
-  // replicating TMDB's Watch Provider categories and under-poster banner.
+  const inTheatres = isInTheatres(item);
   const flatrateProviders = item.providers.filter(
     (p) => p.type === "flatrate" || !p.type
   );
@@ -226,67 +211,48 @@ export default async function MediaDetailPage(
   });
 
   return (
-    <article className="isolate animate-fade-in pb-24 md:pb-10">
-      {item.poster_path && (
-        <div
-          aria-hidden
-          className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-[60vh] overflow-hidden md:hidden"
-        >
-          <Image
-            src={`${TMDB_IMAGE_BASE_URL}${item.poster_path}`}
-            alt=""
-            fill
-            priority={false}
-            sizes="100vw"
-            className="scale-125 object-cover opacity-80 blur-3xl"
-          />
-          <div className="absolute inset-0 bg-linear-to-b from-black/60 via-black/70 to-black" />
-        </div>
-      )}
+    <article className="space-y-12 pb-20 md:pb-10 font-body text-ink">
       <StructuredData item={item} />
 
-      <div className="grid gap-8 md:grid-cols-[minmax(0,300px)_1fr]">
-        <div className="relative mx-auto aspect-2/3 w-48 overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl md:mx-0 md:w-full">
-          <Poster
-            path={item.poster_path}
-            alt={`${item.title} poster`}
-            priority
-            sizes="(max-width: 768px) 192px, 300px"
-          />
+      {/* Editorial Top Presentation: Poster in Frame beside Header */}
+      <div className="grid gap-8 md:grid-cols-[minmax(0,280px)_1fr] items-start">
+        <div className="mx-auto w-48 sm:w-64 md:w-full">
+          <Frame aspectRatio="poster" hasScrim>
+            <Poster
+              path={item.poster_path}
+              alt={`${item.title} poster`}
+              priority
+              sizes="(max-width: 768px) 256px, 320px"
+            />
+          </Frame>
         </div>
 
-        <div className="flex flex-col">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <span
-              className={`rounded px-2 py-0.5 text-xs font-black tracking-wider text-white uppercase ${
-                isTv ? "bg-orange-600" : "bg-red-600"
-              }`}
-            >
-              {isTv ? "Series" : "Movie"}
+        <div className="flex flex-col space-y-5">
+          {/* Metadata badges & ratings */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="rounded-full border border-rule bg-paper-2 px-3 py-0.5 text-xs font-medium text-ink">
+              {isTv ? "Series" : "Film"}
             </span>
-            <span className="font-mono font-medium text-gray-400">{year}</span>
-            {imdb && (
-              <span className="rounded border border-yellow-400/20 bg-yellow-400/10 px-2 py-0.5 font-bold text-yellow-400">
-                IMDb {imdb}
-              </span>
-            )}
-            {rt && (
-              <span className="rounded border border-red-400/20 bg-red-400/10 px-2 py-0.5 font-bold text-red-400">
-                RT {rt}
-              </span>
+
+            {year && <Figure value={year} size="sm" className="text-muted" />}
+
+            {ratingScore != null && (
+              <Rating score={ratingScore} source={ratingSource} size="md" />
             )}
           </div>
 
-          <h1 className="text-3xl leading-tight font-black tracking-tight text-white md:text-5xl">
+          {/* Title in Boska at Display Scale */}
+          <h1 className="font-display text-3xl md:text-5xl font-medium tracking-tight text-ink leading-[1.05]">
             {item.title}
           </h1>
 
+          {/* Genres */}
           {item.genres.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {item.genres.map((genre) => (
                 <span
                   key={genre}
-                  className="rounded-md border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-xs font-bold tracking-wider text-orange-400 uppercase"
+                  className="rounded-full border border-rule bg-paper-2 px-3 py-1 text-xs font-medium text-ink/90"
                 >
                   {genre}
                 </span>
@@ -294,79 +260,77 @@ export default async function MediaDetailPage(
             </div>
           )}
 
+          {/* Director & Language */}
           {(item.director !== "Unknown" || language) && (
-            <p className="mt-3 text-sm text-gray-400">
+            <p className="text-sm font-body text-muted max-w-[48ch]">
               {item.director !== "Unknown" && (
                 <>
                   Directed by{" "}
-                  <span className="font-semibold text-white">
-                    {item.director}
-                  </span>
+                  <span className="font-medium text-ink">{item.director}</span>
                 </>
               )}
               {item.director !== "Unknown" && language && (
-                <span aria-hidden className="mx-2 text-neutral-600">
+                <span aria-hidden="true" className="mx-2 text-rule">
                   ·
                 </span>
               )}
-              {language && <span className="text-gray-300">{language}</span>}
+              {language && <span>{language}</span>}
             </p>
           )}
 
+          {/* Cast — clean Geist list (no nested box chips) */}
           {item.cast.length > 0 && (
-            <section className="mt-6">
-              <h2 className="mb-2 text-[10px] font-bold tracking-widest text-gray-500 uppercase">
+            <section className="space-y-1.5 pt-2">
+              <Label as="h2" size="xs">
                 Starring
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {item.cast.map((actor) => (
-                  <span
-                    key={actor}
-                    className="rounded-full border border-neutral-700 bg-neutral-800 px-3 py-1 text-sm text-gray-300"
-                  >
-                    {actor}
-                  </span>
-                ))}
-              </div>
+              </Label>
+              <p className="text-sm font-body text-ink/90 leading-relaxed max-w-[48ch]">
+                {item.cast.slice(0, 10).join(", ")}
+              </p>
             </section>
           )}
 
-          <section className="mt-6">
-            <h2 className="mb-2 text-[10px] font-bold tracking-widest text-gray-500 uppercase">
+          {/* Synopsis — measured prose (Gate 25 capped measure) */}
+          <section className="space-y-2 pt-2">
+            <Label as="h2" size="xs">
               Synopsis
-            </h2>
-            <p className="border-l-2 border-red-600 pl-4 text-sm leading-relaxed text-gray-300 md:text-base">
+            </Label>
+            <p className="text-sm md:text-base leading-relaxed text-ink/90 max-w-[48ch]">
               {item.overview || "No plot description available."}
             </p>
           </section>
 
+          {/* Watch Now — single containment layer (Gate 4) */}
           {(item.providers.length > 0 || inTheatres) && (
             <section
               id="watch-now"
-              className="mt-6 border-t border-neutral-800 pt-4"
+              className="space-y-3 pt-3 border-t border-rule"
             >
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-[10px] font-bold tracking-widest text-gray-500 uppercase">
-                  <MonitorPlay size={14} /> Watch now
-                </h2>
-                <span className="text-[10px] text-gray-500">
-                  Streaming data via{" "}
-                  <span className="font-semibold text-gray-400">JustWatch</span>
-                </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <MonitorPlay
+                    size={16}
+                    className="text-accent"
+                    aria-hidden="true"
+                  />
+                  <h2 className="font-display font-medium text-base text-ink">
+                    Watch now
+                  </h2>
+                </div>
+                <Label size="xs">Streaming via JustWatch</Label>
               </div>
 
               {inTheatres ? (
-                <span className="inline-flex items-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm font-bold text-orange-400">
-                  <Ticket size={16} aria-hidden /> In theatres now
-                </span>
+                <div className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3.5 py-1.5 text-xs font-medium text-accent">
+                  <Ticket size={14} aria-hidden="true" />
+                  <span>In theatres now</span>
+                </div>
               ) : (
-                <div className="flex flex-col gap-4">
+                <div className="space-y-3">
                   {flatrateProviders.length > 0 && (
-                    <div>
-                      <h3 className="mb-2 text-xs font-semibold text-gray-400">
-                        Stream
-                      </h3>
-                      <div className="flex flex-wrap gap-2.5">
+                    <div className="space-y-2">
+                      <Label size="xs">Stream</Label>
+                      <div className="flex flex-wrap gap-2">
                         {flatrateProviders.map((provider) => (
                           <ProviderLinkItem
                             key={`stream-${provider.name}`}
@@ -378,11 +342,9 @@ export default async function MediaDetailPage(
                   )}
 
                   {rentBuyProviders.length > 0 && (
-                    <div>
-                      <h3 className="mb-2 text-xs font-semibold text-gray-400">
-                        Rent / Buy
-                      </h3>
-                      <div className="flex flex-wrap gap-2.5">
+                    <div className="space-y-2">
+                      <Label size="xs">Rent / Buy</Label>
+                      <div className="flex flex-wrap gap-2">
                         {rentBuyProviders.map((provider) => (
                           <ProviderLinkItem
                             key={`rentbuy-${provider.name}`}
@@ -397,16 +359,21 @@ export default async function MediaDetailPage(
             </section>
           )}
 
-          <div className="mt-auto flex flex-col gap-3 pt-8 sm:flex-row">
+          {/* Primary Action Button */}
+          <div className="pt-4 max-w-xs">
             <WatchlistButton item={item} variant="full" />
           </div>
         </div>
       </div>
 
-      <section className="mt-12 border-t border-neutral-800 pt-6">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold tracking-wider text-orange-500 uppercase">
-          <Film size={14} /> You might also like
-        </h2>
+      {/* Recommendations / You might also like */}
+      <section className="space-y-4 border-t border-rule pt-8">
+        <div className="flex items-center gap-2">
+          <Film size={18} className="text-muted" aria-hidden="true" />
+          <h2 className="font-display font-medium text-xl text-ink">
+            You might also like
+          </h2>
+        </div>
         <Suspense fallback={<TrendingRowSkeleton />}>
           <SimilarTitles item={result.data} />
         </Suspense>
@@ -422,21 +389,17 @@ function ProviderLinkItem({ provider }: { provider: WatchProvider }) {
         href={provider.link}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 p-2 transition-colors hover:border-red-500/40 hover:bg-neutral-700 focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
+        className="inline-flex items-center gap-2 rounded-full border border-rule bg-paper-2 px-3 py-1.5 font-body text-xs font-medium text-ink transition-colors hover:border-muted/50 hover:bg-paper-3 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px]"
       >
         <ProviderBadge provider={provider} />
-        <ExternalLink
-          size={12}
-          aria-hidden
-          className="text-gray-500 shrink-0"
-        />
+        <ExternalLink size={12} aria-hidden="true" className="text-muted" />
         <span className="sr-only">(opens {provider.name} in a new tab)</span>
       </a>
     );
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 p-2">
+    <div className="inline-flex items-center gap-2 rounded-full border border-rule bg-paper-2 px-3 py-1.5 font-body text-xs font-medium text-ink">
       <ProviderBadge provider={provider} />
     </div>
   );
@@ -452,11 +415,11 @@ function ProviderBadge({
       <Image
         src={`${TMDB_LOGO_BASE_URL}${provider.logo}`}
         alt=""
-        width={24}
-        height={24}
-        className="rounded-md shrink-0"
+        width={18}
+        height={18}
+        className="rounded-full shrink-0"
       />
-      <span className="text-xs font-medium text-gray-300">{provider.name}</span>
+      <span>{provider.name}</span>
     </>
   );
 }

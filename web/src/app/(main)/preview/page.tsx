@@ -65,7 +65,7 @@ export default function PreviewPage() {
             <Label size="xs">Loading</Label>
             <div>
               <Button variant="ember" isLoading size="app">
-                Searching...
+                Searching…
               </Button>
             </div>
           </div>
@@ -105,7 +105,7 @@ export default function PreviewPage() {
           <div>
             <Label size="xs">Metadata Tag (12px)</Label>
             <p className="font-body text-sm mt-1">
-              2026 · 148m · Christopher Nolan
+              2026 / 148m / Christopher Nolan
             </p>
           </div>
           <div>

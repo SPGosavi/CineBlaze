@@ -24,6 +24,7 @@ export default function Poster({
   hasScrim = false,
   standalone = false,
 }: PosterProps) {
+  const isPlaceholder = !path;
   const image = (
     <Image
       src={path ? `${TMDB_IMAGE_BASE_URL}${path}` : PLACEHOLDER_IMAGE}
@@ -31,6 +32,7 @@ export default function Poster({
       fill
       sizes={sizes}
       priority={priority}
+      unoptimized={isPlaceholder}
       className={`object-cover ${className}`}
     />
   );

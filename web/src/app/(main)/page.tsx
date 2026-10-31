@@ -9,6 +9,7 @@ import ForYouShelf from "@/components/personalization/ForYouShelf";
 import Shelf from "@/components/media/Shelf";
 import { TrendingRowSkeleton } from "@/components/ui/Skeleton";
 import { FailedToLoad } from "@/components/ui/StatePanels";
+import Well from "@/components/ui/Well";
 
 export const metadata: Metadata = {
   title: "Discover what to watch next",
@@ -20,33 +21,28 @@ export const metadata: Metadata = {
 interface ShelfSpec {
   key: "all" | "netflix" | "prime";
   title: string;
+  density?: "spacious" | "compact";
 }
 
 const SHELVES: ShelfSpec[] = [
-  { key: "all", title: "Trending now" },
-  { key: "netflix", title: "Popular on Netflix" },
-  { key: "prime", title: "Popular on Prime Video" },
+  { key: "all", title: "Trending now", density: "spacious" },
+  { key: "netflix", title: "Popular on Netflix", density: "compact" },
+  { key: "prime", title: "Popular on Prime Video", density: "compact" },
 ];
 
 /**
- * One trending shelf.
- *
- * Its own async component so each shelf streams in independently behind its
- * own Suspense boundary — a slow or failing platform never holds up the
- * others, which is what `useTrending`'s three parallel requests achieved on
- * the client in Phase 2.
- *
- * Unlike Phase 2 it distinguishes all three outcomes. A failure renders an
- * explicit error instead of a heading above empty space.
+ * One trending shelf streaming in behind its own Suspense boundary.
  */
 async function TrendingShelf({
   shelf,
   title,
   priority,
+  density = "compact",
 }: {
   shelf: ShelfSpec["key"];
   title: string;
   priority: boolean;
+  density?: "spacious" | "compact";
 }) {
   const result = await getTrending(shelf);
 
@@ -57,11 +53,8 @@ async function TrendingShelf({
   if (result.status === "empty") {
     return (
       <section className="space-y-3">
-        <div className="flex items-center gap-2 px-1">
-          <div className="h-5 w-1 rounded-full bg-neutral-700" />
-          <h2 className="text-lg font-bold text-gray-400">{title}</h2>
-        </div>
-        <p className="px-1 text-sm text-gray-600">
+        <h2 className="font-display font-medium text-lg text-muted">{title}</h2>
+        <p className="text-sm font-body text-muted">
           Nothing is trending here right now.
         </p>
       </section>
@@ -73,6 +66,7 @@ async function TrendingShelf({
       title={title}
       items={sanitizeMediaList(result.data)}
       priority={priority}
+      density={density}
     />
   );
 }
@@ -80,39 +74,36 @@ async function TrendingShelf({
 /**
  * Home / Discover.
  *
- * A Server Component. The hero and search box are static and reach the
- * browser immediately; the shelves are ISR-cached for six hours (matching the
- * backend's own TTL on `/trending/*`) and stream in behind Suspense.
+ * Screen opens on the search line in a smoked well with the mode selector,
+ * followed by mood chips and varied-density shelves streaming behind Suspense.
  */
 export default function DiscoverPage() {
   return (
-    <div className="animate-fade-in space-y-10 pb-24 md:pb-10">
-      <section className="relative overflow-hidden rounded-3xl border border-white/5 p-8 shadow-2xl md:p-12">
-        <div className="absolute inset-0 z-0 bg-linear-to-br from-red-900/80 via-orange-900/60 to-black" />
-        <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-orange-500/20 blur-3xl" />
-        <div className="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-red-600/20 blur-3xl" />
-
-        <div className="relative z-10 mx-auto max-w-4xl space-y-6 text-center">
-          <h1 className="text-3xl font-black tracking-tight text-white drop-shadow-lg md:text-5xl">
-            Ignite your next{" "}
-            <span className="bg-linear-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
-              obsession.
-            </span>
+    <div className="space-y-10 pb-20 md:pb-8">
+      {/* Search Stage */}
+      <Well className="p-6 md:p-8">
+        <div className="mx-auto max-w-3xl space-y-6 text-center">
+          <h1 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl text-balance">
+            Find a film by plot, scene, or title.
           </h1>
-          <p className="mx-auto max-w-xl text-sm font-medium text-gray-200 opacity-90 md:text-lg">
-            Describe the plot, the vibe, or the scene stuck in your head. Our AI
-            will handle the rest.
-          </p>
           <SearchBar />
-          <MoodChips />
+          <div className="border-t border-rule pt-4">
+            <MoodChips />
+          </div>
         </div>
-      </section>
+      </Well>
 
-      <div className="space-y-10">
+      {/* Shelves */}
+      <div className="space-y-12">
         <ForYouShelf />
-        {SHELVES.map(({ key, title }, index) => (
+        {SHELVES.map(({ key, title, density }, index) => (
           <Suspense key={key} fallback={<TrendingRowSkeleton />}>
-            <TrendingShelf shelf={key} title={title} priority={index === 0} />
+            <TrendingShelf
+              shelf={key}
+              title={title}
+              priority={index === 0}
+              density={density}
+            />
           </Suspense>
         ))}
       </div>

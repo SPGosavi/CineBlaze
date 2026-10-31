@@ -1,9 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import type { SanitizedMedia } from "@cineblaze/shared";
-import { displayRating, releaseYear } from "@/lib/sanitize";
-import Poster from "@/components/ui/Poster";
-import WatchlistButton from "./WatchlistButton";
+import { releaseYear } from "@/lib/sanitize";
 import { getLanguageName } from "@/lib/language";
+import Poster from "@/components/ui/Poster";
+import Frame from "@/components/ui/Frame";
+import Figure from "@/components/ui/Figure";
+import Label from "@/components/ui/Label";
+import Rating from "@/components/ui/Rating";
+import WatchlistButton from "@/components/media/WatchlistButton";
 import TrackedResultLink from "@/components/search/TrackedResultLink";
 
 export interface MediaCardProps {
@@ -14,16 +20,10 @@ export interface MediaCardProps {
 }
 
 /**
- * Grid card for a search result.
+ * Editorial Media Card in Kiln aesthetic.
  *
- * A Server Component. In Phase 2 this was `memo()`-wrapped and opened a modal
- * through a context callback; here it renders a real `<Link>` to the detail
- * route, which is both cheaper (no client JS for the card itself) and
- * crawlable — internal links to the SSR detail pages are what make them
- * discoverable.
- *
- * The link is a full-bleed overlay rather than a wrapper, because nesting the
- * watchlist `<button>` inside an `<a>` would be invalid HTML.
+ * Distinct typography (Boska display title, Geist metadata), Frame poster containment,
+ * Heat-ramp rating signature, and clean focus rings.
  */
 export default function MediaCard({
   item,
@@ -33,120 +33,139 @@ export default function MediaCard({
 }: MediaCardProps) {
   const year = releaseYear(item);
   const isTv = item.media_type === "tv";
-  const imdb = displayRating(item.imdb_rating);
-  const rt = displayRating(item.rotten_tomatoes);
   const language = getLanguageName(item.original_language);
+  const imdbNum = item.imdb_rating ? parseFloat(item.imdb_rating) : null;
+  const rtNum = item.rotten_tomatoes
+    ? parseFloat(item.rotten_tomatoes.replace("%", ""))
+    : null;
+  const ratingScore =
+    imdbNum ??
+    (rtNum !== null
+      ? rtNum / 10
+      : item.vote_average > 0
+        ? item.vote_average
+        : null);
+  const ratingSource =
+    imdbNum !== null
+      ? "IMDb"
+      : rtNum !== null
+        ? "RT"
+        : item.vote_average > 0
+          ? "TMDB"
+          : undefined;
+
+  const titleLinkContent = <span className="line-clamp-1">{item.title}</span>;
 
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-xl border border-neutral-700/50 bg-neutral-800 shadow-lg transition-all duration-200 hover:border-red-500/30 md:hover:scale-[1.02]">
-      <div className="relative aspect-2/3 overflow-hidden">
-        <Poster
-          path={item.poster_path}
-          alt={`${item.title} poster`}
-          priority={priority}
-          className="transition-transform duration-500 group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent opacity-60" />
-        <span
-          className={`absolute top-2 left-2 rounded px-2 py-0.5 text-[10px] font-extrabold tracking-wider text-white shadow-sm ${
-            isTv ? "bg-orange-600" : "bg-red-600"
-          }`}
-        >
-          {isTv ? "TV" : "MOVIE"}
+    <article className="group relative flex h-full flex-col overflow-hidden rounded-well border border-rule bg-paper-2 transition-colors duration-short hover:border-muted/50">
+      {/* Poster in Frame */}
+      <Frame aspectRatio="poster" hasScrim>
+        {searchQuery ? (
+          <TrackedResultLink
+            href={`/${item.media_type}/${item.id}`}
+            query={searchQuery}
+            selectedResultId={item.id}
+            srLabel={`View details for ${item.title} (${year})`}
+            className="block h-full w-full focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px]"
+          >
+            <Poster
+              path={item.poster_path}
+              alt={`${item.title} poster`}
+              priority={priority}
+              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 220px"
+              className="transition-opacity duration-short group-hover:opacity-90"
+            />
+          </TrackedResultLink>
+        ) : (
+          <Link
+            href={`/${item.media_type}/${item.id}`}
+            className="block h-full w-full focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px]"
+          >
+            <Poster
+              path={item.poster_path}
+              alt={`${item.title} poster`}
+              priority={priority}
+              sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 220px"
+              className="transition-opacity duration-short group-hover:opacity-90"
+            />
+          </Link>
+        )}
+        <span className="absolute top-2.5 left-2.5 z-10 rounded-full border border-rule bg-paper-2/90 px-2.5 py-0.5 font-body text-xs font-medium text-ink pointer-events-none">
+          {isTv ? "TV" : "Film"}
         </span>
-      </div>
+      </Frame>
 
-      <div className="relative z-10 flex flex-grow flex-col bg-neutral-800 p-3">
-        <h3
-          className="mb-1 line-clamp-1 leading-tight font-bold text-gray-100 transition-colors group-hover:text-red-400"
-          title={item.title}
-        >
-          {item.title}
-        </h3>
-
-        <div className="mb-2 flex items-center gap-1.5 text-xs text-gray-400">
-          <span className="font-mono text-gray-500">{year}</span>
-          {language && (
-            <>
-              <span aria-hidden className="text-neutral-600">
-                ·
-              </span>
-              <span className="text-gray-500">{language}</span>
-            </>
-          )}
-          {item.director !== "Unknown" && (
-            <span
-              className="ml-auto max-w-[70px] truncate text-gray-500 md:max-w-[100px]"
-              title={item.director}
-            >
-              {item.director}
-            </span>
-          )}
-        </div>
-
-        <div className="mb-2 flex min-h-[20px] flex-wrap gap-1">
-          {item.genres.slice(0, 2).map((genre) => (
-            <span
-              key={genre}
-              className="rounded-xs border border-neutral-600 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-gray-400 uppercase"
-            >
-              {genre}
-            </span>
-          ))}
-        </div>
-
-        {attributionTags.length > 0 ? (
-          <div className="mb-2 flex min-h-[20px] flex-wrap gap-1">
-            {attributionTags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-xs border border-orange-400/30 bg-orange-500/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-wider text-orange-300 uppercase"
+      {/* Card Body */}
+      <div className="flex flex-1 flex-col justify-between p-3.5 gap-2">
+        <div className="space-y-2">
+          {/* Title in Boska */}
+          <h3 className="font-display font-medium text-base text-ink group-hover:text-accent transition-colors">
+            {searchQuery ? (
+              <TrackedResultLink
+                href={`/${item.media_type}/${item.id}`}
+                query={searchQuery}
+                selectedResultId={item.id}
+                className="focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 rounded"
               >
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
+                {titleLinkContent}
+              </TrackedResultLink>
+            ) : (
+              <Link
+                href={`/${item.media_type}/${item.id}`}
+                className="focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 rounded"
+              >
+                {titleLinkContent}
+              </Link>
+            )}
+          </h3>
 
-        <div className="mt-auto flex gap-2 border-t border-neutral-700/50 pt-2">
-          {imdb ? (
-            <span className="rounded border border-yellow-500/20 bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-bold text-yellow-500">
-              IMDb {imdb}
-            </span>
-          ) : (
-            <span className="text-[10px] text-gray-600">No rating</span>
+          {/* Metadata byline (Geist) */}
+          <div className="flex flex-wrap items-center gap-2 text-xs font-body text-muted">
+            {year && <Figure value={year} size="sm" className="text-muted" />}
+            {language && (
+              <>
+                <span className="opacity-40" aria-hidden="true">
+                  /
+                </span>
+                <span>{language}</span>
+              </>
+            )}
+            {item.director && item.director !== "Unknown" && (
+              <>
+                <span className="opacity-40" aria-hidden="true">
+                  /
+                </span>
+                <span className="truncate max-w-[120px]">{item.director}</span>
+              </>
+            )}
+          </div>
+
+          {attributionTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs font-body text-accent">
+              {attributionTags.slice(0, 2).map((tag, idx) => (
+                <span key={tag}>
+                  {idx > 0 && <span className="mr-1.5 opacity-50">·</span>}
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
-          {rt && (
-            <span className="rounded border border-red-400/20 bg-red-400/10 px-1.5 py-0.5 text-[10px] font-bold text-red-400">
-              RT {rt}
-            </span>
+        </div>
+
+        {/* Rating Row (the signature) */}
+        <div className="border-t border-rule pt-2 flex items-center justify-between text-xs shrink-0">
+          {ratingScore != null ? (
+            <Rating score={ratingScore} source={ratingSource} size="sm" />
+          ) : (
+            <Label size="xs">Not rated</Label>
           )}
         </div>
       </div>
 
-      {searchQuery ? (
-        <TrackedResultLink
-          href={`/${item.media_type}/${item.id}`}
-          query={searchQuery}
-          selectedResultId={item.id}
-          className="absolute inset-0 z-10 rounded-xl focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
-          srLabel={`View details for ${item.title} (${year})`}
-        />
-      ) : (
-        <Link
-          href={`/${item.media_type}/${item.id}`}
-          className="absolute inset-0 z-10 rounded-xl focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
-        >
-          <span className="sr-only">
-            View details for {item.title} ({year})
-          </span>
-        </Link>
-      )}
-
-      <WatchlistButton
-        item={item}
-        className="absolute top-2 right-2 z-20 opacity-100 md:opacity-0 md:group-hover:opacity-100"
-      />
+      {/* Watchlist overlay button */}
+      <div className="absolute top-2.5 right-2.5 z-20">
+        <WatchlistButton item={item} />
+      </div>
     </article>
   );
 }

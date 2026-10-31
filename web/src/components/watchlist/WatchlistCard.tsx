@@ -5,6 +5,8 @@ import Link from "next/link";
 import { CircleCheck, RotateCcw } from "lucide-react";
 import type { WatchlistItem, WatchlistStatus } from "@cineblaze/shared";
 import Poster from "@/components/ui/Poster";
+import Frame from "@/components/ui/Frame";
+import Rating from "@/components/ui/Rating";
 import { useWatchlistDrag } from "@/contexts/WatchlistDragContext";
 
 export interface WatchlistCardProps {
@@ -17,10 +19,8 @@ export interface WatchlistCardProps {
 }
 
 /**
- * Draggable watchlist entry. Dropping one card onto another reorders.
- * Supports both desktop HTML5 drag-and-drop and mobile touch drag-and-drop.
- * Touch & hold reveals media title/genres and the move button, and continued
- * movement initiates touch drag.
+ * Draggable watchlist entry supporting HTML5 DnD and touch DnD.
+ * Follows Hallmark single-containment and focus guidelines.
  */
 function WatchlistCard({
   item,
@@ -75,7 +75,6 @@ function WatchlistCard({
     activeDragStartedRef.current = false;
 
     if (revealed) {
-      // If already revealed, touching and dragging can start immediately
       readyToDragRef.current = true;
     } else {
       readyToDragRef.current = false;
@@ -83,31 +82,26 @@ function WatchlistCard({
       longPressTimerRef.current = setTimeout(() => {
         setRevealed(true);
         readyToDragRef.current = true;
-        if (typeof navigator !== "undefined" && navigator.vibrate) {
-          navigator.vibrate(40);
-        }
-      }, 450);
+      }, 350);
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!touchStartRef.current || e.touches.length !== 1) return;
     const touch = e.touches[0];
-    const dx = touch.clientX - touchStartRef.current.x;
-    const dy = touch.clientY - touchStartRef.current.y;
-    const distance = Math.hypot(dx, dy);
+    const dx = Math.abs(touch.clientX - touchStartRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartRef.current.y);
 
-    // If hold hasn't triggered yet, cancel if moved > 10px (normal scroll gesture)
-    if (!readyToDragRef.current) {
-      if (distance > 10) {
-        clearLongPress();
-        touchStartRef.current = null;
-      }
+    if (!readyToDragRef.current && (dx > 8 || dy > 8)) {
+      clearLongPress();
       return;
     }
 
-    // Long press triggered (or already revealed): if moved > 8px, start mobile drag!
-    if (!activeDragStartedRef.current && distance > 8) {
+    if (
+      readyToDragRef.current &&
+      !activeDragStartedRef.current &&
+      (dx > 4 || dy > 4)
+    ) {
       activeDragStartedRef.current = true;
       startTouchDrag(item, { x: touch.clientX, y: touch.clientY });
     }
@@ -117,11 +111,39 @@ function WatchlistCard({
     clearLongPress();
     touchStartRef.current = null;
     readyToDragRef.current = false;
+    activeDragStartedRef.current = false;
   };
 
-  const isThisItemDragging = isTouchDragging && draggedItem?.id === item.id;
+  const isThisItemDragging =
+    isTouchDragging &&
+    draggedItem?.id === item.id &&
+    draggedItem?.media_type === item.media_type;
+
   const isThisItemDropTarget =
-    isTouchDragging && dragTarget?.type === "card" && dragTarget.id === item.id;
+    isTouchDragging &&
+    dragTarget?.type === "card" &&
+    dragTarget.id === item.id &&
+    !isThisItemDragging;
+
+  const imdbNum = item.imdb_rating ? parseFloat(item.imdb_rating) : null;
+  const rtNum = item.rotten_tomatoes
+    ? parseFloat(item.rotten_tomatoes.replace("%", ""))
+    : null;
+  const ratingScore =
+    imdbNum ??
+    (rtNum !== null
+      ? rtNum / 10
+      : item.vote_average > 0
+        ? item.vote_average
+        : null);
+  const ratingSource =
+    imdbNum !== null
+      ? "IMDb"
+      : rtNum !== null
+        ? "RT"
+        : item.vote_average > 0
+          ? "TMDB"
+          : undefined;
 
   return (
     <div
@@ -132,20 +154,14 @@ function WatchlistCard({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
-      onContextMenu={(e) => {
-        // Prevent default context menu on long-press in mobile browsers
-        e.preventDefault();
-      }}
-      style={{ WebkitTouchCallout: "none" }}
       onDragStart={(event) => {
-        event.dataTransfer.setData("text/plain", String(item.id));
-        event.dataTransfer.effectAllowed = "move";
         setIsDragging(true);
         onDragStart(event, item.id);
       }}
       onDragEnd={() => setIsDragging(false)}
       onDragOver={(event) => {
         event.preventDefault();
+        event.stopPropagation();
         setIsOver(true);
       }}
       onDragLeave={() => setIsOver(false)}
@@ -155,9 +171,9 @@ function WatchlistCard({
         setIsOver(false);
         onDropOnCard(item.id);
       }}
-      className={`group relative aspect-[2/3] overflow-hidden rounded-lg cursor-grab touch-manipulation active:cursor-grabbing select-none transition-transform duration-150 ${
+      className={`group relative aspect-[2/3] overflow-hidden rounded-well border border-rule cursor-grab touch-manipulation active:cursor-grabbing select-none transition-transform duration-short ${
         isOver || isThisItemDropTarget
-          ? "z-10 scale-[1.03] ring-2 ring-red-600/70 shadow-lg shadow-red-950/40"
+          ? "z-10 scale-[1.02] ring-2 ring-accent shadow-card"
           : ""
       } ${
         isDragging || isThisItemDragging ? "opacity-40 scale-95" : "opacity-100"
@@ -167,54 +183,29 @@ function WatchlistCard({
         path={item.poster_path}
         alt={`${item.title} poster`}
         sizes="(max-width: 768px) 30vw, 160px"
-        className="pointer-events-none select-none"
+        className="pointer-events-none select-none object-cover"
       />
 
+      {/* Scrim with Title and Rating */}
       <div
-        className={`pointer-events-none absolute inset-0 flex flex-col justify-end bg-linear-to-t from-black/90 via-black/40 to-transparent p-3 transition-opacity duration-200 ${
+        className={`pointer-events-none absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-paper via-paper/50 to-transparent p-2.5 transition-opacity duration-short ${
           revealed
             ? "opacity-100"
             : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
         }`}
       >
-        <div className="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,white_90%,transparent)]">
-          {/* Static truncated title when not hovered/revealed */}
-          <h4
-            className={`truncate font-bold text-sm text-white drop-shadow-md ${
-              revealed ? "hidden" : "group-hover:hidden"
-            }`}
-          >
-            {item.title}
-          </h4>
+        <h4 className="font-display font-medium text-xs text-ink truncate">
+          {item.title}
+        </h4>
 
-          {/* Sliding title when hovered/revealed, using the marquee animation */}
-          <div
-            className={`w-max gap-4 ${
-              revealed
-                ? "flex animate-marquee-title"
-                : "hidden group-hover:flex group-hover:animate-marquee-title"
-            }`}
-          >
-            <h4 className="font-bold text-sm text-white drop-shadow-md shrink-0">
-              {item.title}
-            </h4>
-            <h4 className="font-bold text-sm text-white drop-shadow-md shrink-0">
-              {item.title}
-            </h4>
+        {ratingScore != null && (
+          <div className="mt-1">
+            <Rating score={ratingScore} source={ratingSource} size="sm" />
           </div>
-        </div>
-        <div className="mt-1 flex flex-wrap gap-1">
-          {item.genres.slice(0, 2).map((genre) => (
-            <span
-              key={genre}
-              className="rounded bg-black/60 px-1.5 py-0.5 text-[9px] tracking-wide text-gray-300 uppercase backdrop-blur-sm"
-            >
-              {genre}
-            </span>
-          ))}
-        </div>
+        )}
       </div>
 
+      {/* Move Status Action Button */}
       <button
         type="button"
         onClick={(e) => {
@@ -230,40 +221,32 @@ function WatchlistCard({
             ? `Mark ${item.title} as watched`
             : `Move ${item.title} back to want to watch`
         }
-        className={`absolute top-2 right-2 z-20 flex h-8 w-8 items-center justify-center rounded-full shadow-lg transition-all ${
-          moveTo === "watched"
-            ? "bg-green-600/90 text-white hover:bg-green-500"
-            : "bg-neutral-700/90 text-white hover:bg-neutral-600"
-        } ${
+        className={`absolute top-2 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-rule bg-paper-2/95 text-ink hover:text-accent focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-1 active:translate-y-[1px] transition-colors ${
           revealed
-            ? "opacity-100 scale-100"
-            : "opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 group-focus-within:opacity-100 group-focus-within:scale-100"
+            ? "opacity-100"
+            : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
         }`}
       >
         {moveTo === "watched" ? (
-          <CircleCheck size={18} />
+          <CircleCheck size={15} aria-hidden="true" />
         ) : (
-          <RotateCcw size={18} />
+          <RotateCcw size={14} aria-hidden="true" />
         )}
       </button>
 
-      {/*
-        A link rather than a modal trigger, so a watchlist entry deep-links to
-        the same SSR detail page everything else points at. `draggable={false}`
-        stops the browser's native link drag from pre-empting the card's own
-        drag handler.
-      */}
+      {/* Detail Route Navigation Link */}
       <Link
         href={`/${item.media_type}/${item.id}`}
-        draggable={false}
+        tabIndex={0}
+        aria-label={`View ${item.title} details`}
+        className="absolute inset-0 z-10 rounded-well focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2"
         onClick={(e) => {
           if (activeDragStartedRef.current) {
             e.preventDefault();
           }
         }}
-        className="absolute inset-0 z-10 rounded-lg focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
       >
-        <span className="sr-only">View details for {item.title}</span>
+        <span className="sr-only">{item.title}</span>
       </Link>
     </div>
   );

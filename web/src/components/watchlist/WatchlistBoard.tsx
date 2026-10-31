@@ -18,6 +18,9 @@ import FacetFilter from "@/components/watchlist/FacetFilter";
 import KanbanColumn from "@/components/watchlist/KanbanColumn";
 import { getLanguageName } from "@/lib/language";
 import { releaseYear } from "@/lib/sanitize";
+import Button from "@/components/ui/Button";
+import Label from "@/components/ui/Label";
+import Figure from "@/components/ui/Figure";
 
 function useSessionState<T extends string>(
   key: string,
@@ -48,13 +51,6 @@ interface MobileStatusTabsProps {
   ) => void;
 }
 
-/**
- * Mobile status switcher tabs ("Want to watch" / "Watched").
- *
- * Acts as an interactive drop target for both mobile touch drag and desktop HTML5 drag,
- * letting users move media directly between sections by dragging and dropping posters
- * over either tab.
- */
 function MobileStatusTabs({
   mobileStatus,
   setMobileStatus,
@@ -67,7 +63,7 @@ function MobileStatusTabs({
     <div
       role="tablist"
       aria-label="Watchlist status"
-      className="flex w-full gap-1 rounded-xl border border-neutral-800 bg-black p-1.5 shadow-inner md:hidden"
+      className="flex w-full gap-1 rounded-full border border-rule bg-paper-2 p-1 md:hidden"
     >
       {(["want", "watched"] as const).map((status) => {
         const isDropTarget =
@@ -91,17 +87,17 @@ function MobileStatusTabs({
             onDrop={(e) => {
               onDropInColumn(e, status);
             }}
-            className={`relative flex-1 rounded-lg px-6 py-2.5 text-sm font-bold transition-all ${
+            className={`relative flex-1 rounded-full px-4 py-2 font-body text-xs sm:text-sm font-medium transition-colors duration-short focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-1 active:translate-y-[1px] ${
               isDropTarget
-                ? "ring-2 ring-red-600/70 bg-red-950/40 text-white scale-105 shadow-lg shadow-red-950/40"
+                ? "bg-accent/20 border border-accent text-accent"
                 : mobileStatus === status
-                  ? "bg-neutral-800 text-white shadow-lg"
-                  : "text-gray-500 hover:bg-white/5 hover:text-white"
+                  ? "bg-accent text-accent-ink shadow-sm"
+                  : "text-muted hover:text-ink hover:bg-paper-3/50"
             }`}
           >
             {status === "want" ? "Want to watch" : "Watched"}
             {isDropTarget && (
-              <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-red-700/90 px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase text-white shadow-md">
+              <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-accent px-2 py-0.5 text-[9px] font-medium text-accent-ink shadow">
                 Drop to move
               </span>
             )}
@@ -112,43 +108,42 @@ function MobileStatusTabs({
   );
 }
 
-/**
- * Kanban watchlist board.
- *
- * Fully client-side: it needs the signed-in user and a live Firestore
- * subscription, neither of which the server can see, and drag-and-drop is
- * inherently interactive. This is the one route in the app with nothing to
- * prerender.
- */
 export default function WatchlistBoard() {
   const {
     watchlist,
     ready,
     error,
+    setStatus,
+    reorder,
     onDragStart,
     onDragOver,
     onDropInColumn,
-    reorder,
-    setStatus,
   } = useWatchlistContext();
 
   const [mediaType, setMediaType] = useSessionState<MediaType>(
-    "watchlist_mediaType",
+    "cineblaze:watchlist:type",
     "movie"
   );
-  const [genre, setGenre] = useSessionState<string>("watchlist_genre", "All");
+  const [genre, setGenre] = useSessionState<string>(
+    "cineblaze:watchlist:genre",
+    "All"
+  );
   const [language, setLanguage] = useSessionState<string>(
-    "watchlist_language",
+    "cineblaze:watchlist:lang",
     "All"
   );
   const [decade, setDecade] = useSessionState<string>(
-    "watchlist_decade",
+    "cineblaze:watchlist:decade",
     "All"
   );
-  const [mobileStatus, setMobileStatus] = useSessionState<WatchlistStatus>(
-    "watchlist_mobileStatus",
-    "want"
-  );
+  const [mobileStatus, setMobileStatus] = useState<WatchlistStatus>("want");
+
+  const switchType = (type: MediaType) => {
+    setMediaType(type);
+    setGenre("All");
+    setLanguage("All");
+    setDecade("All");
+  };
 
   const byType = useMemo(
     () => watchlist.filter((item) => item.media_type === mediaType),
@@ -156,79 +151,60 @@ export default function WatchlistBoard() {
   );
 
   const genres = useMemo(() => {
-    const unique = new Set<string>();
-    byType.forEach((item) => item.genres.forEach((g) => unique.add(g)));
-    return ["All", ...Array.from(unique).sort()];
+    const set = new Set<string>();
+    byType.forEach((item) => item.genres.forEach((g) => set.add(g)));
+    return ["All", ...Array.from(set).sort()];
   }, [byType]);
 
   const languages = useMemo(() => {
-    const unique = new Set<string>();
+    const set = new Set<string>();
     byType.forEach((item) => {
       const name = getLanguageName(item.original_language);
-      unique.add(name || "Unknown");
+      if (name) set.add(name);
     });
-    return ["All", ...Array.from(unique).sort()];
+    return ["All", ...Array.from(set).sort()];
   }, [byType]);
-
-  const toDecade = (item: WatchlistItem): string | null => {
-    const year = Number(releaseYear(item));
-    if (!Number.isFinite(year) || year < 1900) return null;
-    return `${Math.floor(year / 10) * 10}s`;
-  };
 
   const decades = useMemo(() => {
-    const unique = new Set<string>();
+    const set = new Set<string>();
     byType.forEach((item) => {
-      const d = toDecade(item);
-      if (d) unique.add(d);
+      const year = releaseYear(item);
+      if (year && year !== "Unknown") {
+        set.add(`${year.slice(0, 3)}0s`);
+      }
     });
-    // Newest first — a watchlist skews recent, so 2020s should lead.
-    return ["All", ...Array.from(unique).sort().reverse()];
+    return ["All", ...Array.from(set).sort().reverse()];
   }, [byType]);
 
-  const filtered = useMemo(
-    () =>
-      byType.filter(
-        (item) =>
-          (genre === "All" || item.genres.includes(genre)) &&
-          (language === "All" ||
-            (getLanguageName(item.original_language) || "Unknown") ===
-              language) &&
-          (decade === "All" || toDecade(item) === decade)
-      ),
-    [byType, genre, language, decade]
-  );
+  const filtered = useMemo(() => {
+    return byType.filter((item) => {
+      if (genre !== "All" && !item.genres.includes(genre)) return false;
+      if (
+        language !== "All" &&
+        getLanguageName(item.original_language) !== language
+      ) {
+        return false;
+      }
+      if (decade !== "All") {
+        const year = releaseYear(item);
+        if (!year || `${year.slice(0, 3)}0s` !== decade) return false;
+      }
+      return true;
+    });
+  }, [byType, genre, language, decade]);
 
-  const byStatus = (status: WatchlistItem["status"]) =>
+  const byStatus = (status: WatchlistStatus) =>
     filtered.filter((item) => item.status === status);
-
-  const switchType = (next: MediaType) => {
-    setMediaType(next);
-    setGenre("All");
-    setLanguage("All");
-    setDecade("All");
-  };
-
-  if (!firebaseInitialized) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center p-8 text-center text-gray-400">
-        <AlertTriangle size={48} className="mb-4 text-orange-500" />
-        <h2 className="mb-2 text-xl font-bold text-white">
-          Feature unavailable
-        </h2>
-        <p>Add your Firebase config to use the watchlist.</p>
-      </div>
-    );
-  }
 
   return (
     <WatchlistDragProvider onReorder={reorder} onSetStatus={setStatus}>
-      <div className="animate-fade-in relative flex h-full flex-col pb-20 md:pb-0">
-        <header className="mb-8 flex flex-col items-start justify-between gap-6 rounded-2xl border border-neutral-800 bg-neutral-900/50 p-6 md:flex-row md:items-center">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-black tracking-tight text-white">
-              My watchlist
+      <div className="flex h-full flex-col font-body text-ink">
+        <header className="mb-6 flex flex-col gap-4 border-b border-rule pb-5 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-3">
+            <h1 className="font-display text-2xl font-medium tracking-tight text-ink md:text-3xl">
+              My Watchlist
             </h1>
+
             <div className="flex flex-wrap items-center gap-2">
               <FacetFilter
                 options={genres}
@@ -251,16 +227,22 @@ export default function WatchlistBoard() {
                 label="Decade"
                 icon={CalendarRange}
               />
-              <span className="text-xs font-medium tracking-wider text-gray-500 uppercase">
-                {filtered.length} titles
-              </span>
+              <Label size="xs" className="ml-2">
+                <Figure
+                  value={filtered.length}
+                  size="sm"
+                  className="font-medium"
+                />{" "}
+                titles
+              </Label>
             </div>
           </div>
 
-          <div className="flex w-full flex-col gap-4 md:w-auto md:flex-row">
+          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row">
+            {/* Movies vs TV series segmented control */}
             <div
               role="tablist"
-              className="flex w-full gap-1 rounded-xl border border-neutral-800 bg-black p-1.5 shadow-inner md:w-auto"
+              className="flex w-full gap-1 rounded-full border border-rule bg-paper-2 p-1 md:w-auto"
             >
               {(["movie", "tv"] as const).map((type) => (
                 <button
@@ -268,12 +250,10 @@ export default function WatchlistBoard() {
                   role="tab"
                   aria-selected={mediaType === type}
                   onClick={() => switchType(type)}
-                  className={`flex-1 rounded-lg px-6 py-2.5 text-sm font-bold transition-all md:flex-none ${
+                  className={`flex-1 rounded-full px-5 py-1.5 font-body text-xs sm:text-sm font-medium transition-colors duration-short focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-1 active:translate-y-[1px] md:flex-none ${
                     mediaType === type
-                      ? type === "movie"
-                        ? "bg-red-600 text-white shadow-lg shadow-red-900/30"
-                        : "bg-orange-600 text-white shadow-lg shadow-orange-900/30"
-                      : "text-gray-500 hover:bg-white/5 hover:text-white"
+                      ? "bg-accent text-accent-ink shadow-sm"
+                      : "text-muted hover:text-ink hover:bg-paper-3/50"
                   }`}
                 >
                   {type === "movie" ? "Movies" : "TV series"}
@@ -291,8 +271,8 @@ export default function WatchlistBoard() {
         </header>
 
         {error && (
-          <p className="mb-4 flex items-center gap-2 rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-            <AlertTriangle size={16} /> {error}
+          <p className="mb-4 flex items-center gap-2 rounded-lg border border-error/40 bg-error/10 px-4 py-3 font-body text-sm text-error">
+            <AlertTriangle size={16} aria-hidden="true" /> {error}
           </p>
         )}
 
@@ -301,25 +281,21 @@ export default function WatchlistBoard() {
             {Array.from({ length: 2 }).map((_, index) => (
               <div
                 key={index}
-                className="h-64 flex-1 animate-pulse rounded-xl bg-neutral-900/50"
+                className="h-64 flex-1 animate-pulse rounded-well border border-rule bg-paper-2/40"
               />
             ))}
           </div>
         ) : watchlist.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-neutral-800 bg-neutral-900/30 py-16 text-center">
-            <h2 className="text-lg font-bold text-gray-200">
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-well border border-rule bg-paper-2/40 py-16 text-center">
+            <h2 className="font-display font-medium text-lg text-ink">
               Your watchlist is empty
             </h2>
-            <p className="max-w-sm text-sm text-gray-500">
-              Find something on the discover page and hit the plus button to
-              save it here.
+            <p className="max-w-sm font-body text-sm text-muted">
+              Find something on the discover page and save it here.
             </p>
-            <Link
-              href="/"
-              className="mt-2 rounded-xl bg-linear-to-r from-red-600 to-orange-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:from-red-500 hover:to-orange-500"
-            >
+            <Button href="/" variant="ember" size="app" className="mt-2">
               Discover titles
-            </Link>
+            </Button>
           </div>
         ) : (
           <div className="flex flex-1 flex-col gap-6 overflow-hidden md:flex-row">
