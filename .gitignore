@@ -34,3 +34,11 @@ Prompt.txt
 private/
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Hallmark
+.hallmark/before/
+.hallmark/after/
+.hallmark/*.html
+.hallmark/*.json
+!.hallmark/log.json
+!.hallmark/preflight.json

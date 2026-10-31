@@ -1,25 +1,19 @@
 import Image from "next/image";
+import Frame from "./Frame";
 import { PLACEHOLDER_IMAGE, TMDB_IMAGE_BASE_URL } from "@/lib/constants";
 
 export interface PosterProps {
   path: string | null;
   alt: string;
   className?: string;
-  /**
-   * Set on the handful of posters above the fold. Everything else stays lazy,
-   * which matters on Discover where three shelves render ~36 images.
-   */
   priority?: boolean;
   sizes?: string;
+  hasScrim?: boolean;
+  standalone?: boolean;
 }
 
 /**
- * Media poster backed by `next/image`.
- *
- * A Server Component, so it costs no client JS. That rules out the `onError`
- * placeholder swap the Phase 2 version used; instead a missing `poster_path`
- * resolves to the placeholder up front, and TMDB paths are trusted because
- * they came from TMDB's own response.
+ * Media poster backed by `next/image` and integrated with Hallmark `Frame`.
  */
 export default function Poster({
   path,
@@ -27,8 +21,10 @@ export default function Poster({
   className = "",
   priority = false,
   sizes = "(max-width: 768px) 45vw, 200px",
+  hasScrim = false,
+  standalone = false,
 }: PosterProps) {
-  return (
+  const image = (
     <Image
       src={path ? `${TMDB_IMAGE_BASE_URL}${path}` : PLACEHOLDER_IMAGE}
       alt={alt}
@@ -38,4 +34,14 @@ export default function Poster({
       className={`object-cover ${className}`}
     />
   );
+
+  if (standalone) {
+    return (
+      <Frame aspectRatio="poster" hasScrim={hasScrim} className={className}>
+        {image}
+      </Frame>
+    );
+  }
+
+  return image;
 }

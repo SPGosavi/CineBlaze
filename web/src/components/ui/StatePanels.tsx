@@ -1,3 +1,4 @@
+import React from "react";
 import { AlertTriangle, SearchX, type LucideIcon } from "lucide-react";
 
 interface StatePanelProps {
@@ -8,24 +9,18 @@ interface StatePanelProps {
 }
 
 function StatePanel({ icon: Icon, title, children, tone }: StatePanelProps) {
-  const accent = tone === "warning" ? "text-orange-500" : "text-neutral-600";
+  const accent = tone === "warning" ? "text-accent" : "text-muted";
   return (
-    <div className="flex flex-col items-center justify-center text-center gap-3 rounded-2xl border border-dashed border-neutral-800 bg-neutral-900/30 px-6 py-14">
-      <Icon size={40} className={accent} />
-      <h3 className="text-lg font-bold text-gray-200">{title}</h3>
-      <div className="max-w-md text-sm text-gray-500">{children}</div>
+    <div className="flex flex-col items-center justify-center text-center gap-3 rounded-well border border-rule bg-paper-2 px-6 py-12">
+      <Icon size={36} className={accent} aria-hidden="true" />
+      <h3 className="font-display font-medium text-lg text-ink">{title}</h3>
+      <div className="max-w-md font-body text-sm text-muted">{children}</div>
     </div>
   );
 }
 
 /**
  * "The request succeeded and there is genuinely nothing here."
- *
- * Phase 2 had no such state: a search returning zero results fell straight
- * back to the trending shelves, so after a ~30s wait the page looked
- * unchanged and the user could not tell whether the search had run, failed,
- * or found nothing. Echoing the query back is what makes the difference
- * legible.
  */
 export function EmptyResults({ query }: { query?: string }) {
   return (
@@ -33,10 +28,8 @@ export function EmptyResults({ query }: { query?: string }) {
       {query ? (
         <>
           Nothing came back for{" "}
-          <span className="text-gray-300 font-medium">
-            &ldquo;{query}&rdquo;
-          </span>
-          . Try describing the plot differently, or search the exact title.
+          <span className="text-ink font-medium">&ldquo;{query}&rdquo;</span>.
+          Try describing the plot differently, or search the exact title.
         </>
       ) : (
         "Try describing the plot differently, or search the exact title."
@@ -47,10 +40,6 @@ export function EmptyResults({ query }: { query?: string }) {
 
 /**
  * "The request failed."
- *
- * Distinct from `EmptyResults` on purpose. `useTrending` in Phase 2 collapsed
- * every error into `[]`, which rendered as a section heading above empty
- * space — indistinguishable from a shelf that legitimately had no titles.
  */
 export function FailedToLoad({
   what,
@@ -67,7 +56,7 @@ export function FailedToLoad({
     >
       This is a problem on our side, not yours. Refresh to try again.
       {reason ? (
-        <span className="mt-2 block font-mono text-xs text-neutral-600">
+        <span className="mt-2 block font-outlier text-xs text-muted/80">
           {reason}
         </span>
       ) : null}
