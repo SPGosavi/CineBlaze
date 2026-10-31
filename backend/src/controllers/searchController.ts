@@ -510,7 +510,7 @@ export const findMovies = async (
         const genreIds = getGenreIds(moodAwareGenres);
         const preferredType = structuredParams.media_types[0] || "movie";
 
-        const discoverResults = await fetchRecommendPool(
+        let discoverResults = await fetchRecommendPool(
           languageCode,
           genreIds,
           preferredType,
@@ -518,40 +518,83 @@ export const findMovies = async (
           dateLte
         );
 
+        // A narrow genre/language/era combination (common for mood-driven
+        // queries, which often stack 3-5 mapped genre ids) can legitimately
+        // return zero TMDB results. Retry once with just the primary genre
+        // before giving up on a pool entirely — better than falling through
+        // to the identify-a-specific-title ladder below, which cannot answer
+        // a vibe query ("epic adventure with grand scale") that names no real
+        // plot to verify against.
+        if (discoverResults.length === 0 && genreIds.length > 1) {
+          discoverResults = await fetchRecommendPool(
+            languageCode,
+            [genreIds[0]],
+            preferredType,
+            dateGte,
+            dateLte
+          );
+        }
+
         if (discoverResults.length > 0) {
           log.debug(
             `[Search] Fetched ${discoverResults.length} candidates from TMDB discover.`
           );
-          const recommendedTitles = await callGroqRecommend(
-            description,
-            discoverResults
-          );
 
-          if (recommendedTitles && recommendedTitles.length > 0) {
-            log.debug(
-              `[Search] AI ranked ${recommendedTitles.length} titles from candidate pool.`
+          let foundMovies: EnrichedMedia[] = [];
+
+          try {
+            const recommendedTitles = await callGroqRecommend(
+              description,
+              discoverResults
             );
-            // Resolve against TMDB again
-            const results = await Promise.all(
-              recommendedTitles.map((item) =>
-                fetchEnrichedData(
-                  item.title,
-                  item.year?.toString() || "",
-                  item.media_type || preferredType
+
+            if (recommendedTitles && recommendedTitles.length > 0) {
+              log.debug(
+                `[Search] AI ranked ${recommendedTitles.length} titles from candidate pool.`
+              );
+              // Resolve against TMDB again
+              const results = await Promise.all(
+                recommendedTitles.map((item) =>
+                  fetchEnrichedData(
+                    item.title,
+                    item.year?.toString() || "",
+                    item.media_type || preferredType
+                  )
                 )
-              )
-            );
-            const foundMovies = results.filter(Boolean) as EnrichedMedia[];
-            if (foundMovies.length > 0) {
-              await respond(foundMovies, "recommend", 86400);
-              return;
+              );
+              foundMovies = results.filter(Boolean) as EnrichedMedia[];
             }
+          } catch (e) {
+            log.warn(
+              { err: String(e) },
+              "[Search] AI ranking of candidate pool failed."
+            );
+          }
+
+          // The AI ranking/resolution step is a refinement on top of a pool
+          // that is already mood/genre-filtered and real (it came straight
+          // from TMDB) — if ranking fails or every ranked title fails to
+          // re-resolve, the pool itself is still a perfectly good answer.
+          // Falling through to the generic identify-a-title ladder instead
+          // (as this used to) reliably produced "No Matches Found" for
+          // vague mood/vibe queries, which have no single specific title to
+          // identify from a plain description.
+          if (foundMovies.length === 0) {
+            log.debug(
+              "[Search] AI ranking unavailable or empty; using discover pool directly."
+            );
+            foundMovies = await enrichWithDeepData(discoverResults, 10);
+          }
+
+          if (foundMovies.length > 0) {
+            await respond(foundMovies, "recommend", 86400);
+            return;
           }
         }
       }
 
       log.debug(
-        "[Search] Recommend mode yielded nothing. Falling back to AI ladder."
+        "[Search] Recommend mode yielded nothing from TMDB discover. Falling back to AI ladder."
       );
     }
 

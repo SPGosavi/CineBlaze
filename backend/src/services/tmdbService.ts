@@ -310,8 +310,17 @@ export async function fetchRecommendPool(
   dateLte: string
 ): Promise<BasicTmdbResult[]> {
   try {
+    // Pipe = OR in TMDB's discover API; comma = AND (requires every listed
+    // genre on the same title at once). Callers here pass several
+    // mood-expanded/related genres meaning "match any of these" — with a
+    // comma join, TMDB was instead asked for titles carrying *all* of them
+    // simultaneously, which is often an empty intersection (e.g. the
+    // "epic adventure" mood expands to Adventure+Action+Fantasy+War, and
+    // very few movies carry all four). This is what made several mood chips
+    // reliably return "No Matches Found" while others, whose genre sets
+    // happened to co-occur more often, appeared to work.
     const genreParam =
-      genreIds.length > 0 ? `&with_genres=${genreIds.join(",")}` : "";
+      genreIds.length > 0 ? `&with_genres=${genreIds.join("|")}` : "";
     const langParam = languageCode
       ? `&with_original_language=${languageCode}`
       : "";
@@ -321,10 +330,11 @@ export async function fetchRecommendPool(
     const url = `https://api.themoviedb.org/3/discover/${mediaType}?api_key=${TMDB_API_KEY}${langParam}${genreParam}${gteParam}${lteParam}&sort_by=popularity.desc&page=1`;
     log.debug(`[TMDB] Fetching recommend pool: ${url}`);
 
-    const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
-    if (!res.ok) return [];
-
-    const data = (await res.json()) as TmdbPaginatedResponse;
+    // `fetchTmdb` retries transient failures (connection resets, 5xx, 429
+    // with backoff) — a single dropped connection here used to kill the
+    // entire recommend-mode request with no second chance, which is exactly
+    // the kind of flake observed hitting TMDB from this environment.
+    const data = await fetchTmdb(url);
     if (!data.results) return [];
 
     return data.results
