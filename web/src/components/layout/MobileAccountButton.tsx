@@ -8,19 +8,17 @@ export default function MobileAccountButton() {
   const { user, loading } = useAuthContext();
 
   if (loading) {
-    return (
-      <div className="h-8 w-8 animate-pulse rounded-full bg-neutral-800" />
-    );
+    return <div className="h-8 w-8 animate-pulse rounded-full bg-paper-3/40" />;
   }
 
   if (!user) {
     return (
       <Link
         href="/login"
-        className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-800 bg-neutral-900 text-gray-400 transition-colors hover:border-red-600/40 hover:text-white"
+        className="flex h-8 w-8 items-center justify-center rounded-full border border-rule bg-paper-3/40 text-muted transition-colors hover:text-ink hover:bg-paper-3 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2"
         aria-label="Sign in"
       >
-        <LogIn size={15} />
+        <LogIn size={15} aria-hidden="true" />
       </Link>
     );
   }
@@ -30,10 +28,10 @@ export default function MobileAccountButton() {
   return (
     <Link
       href="/settings"
-      className="flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-br from-neutral-700 to-neutral-800 text-xs font-bold text-white shadow transition-transform active:scale-95"
+      className="flex h-8 w-8 items-center justify-center rounded-full border border-rule bg-paper-3/40 text-xs font-body font-medium text-ink transition-colors hover:bg-paper-3 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2"
       aria-label="Account Settings"
     >
-      {user.isAnonymous ? <UserIcon size={15} /> : initial}
+      {user.isAnonymous ? <UserIcon size={15} aria-hidden="true" /> : initial}
     </Link>
   );
 }

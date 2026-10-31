@@ -1,73 +1,87 @@
 import Link from "next/link";
 import type { SanitizedMedia } from "@cineblaze/shared";
-import { displayRating, releaseYear } from "@/lib/sanitize";
+import { releaseYear } from "@/lib/sanitize";
 import Poster from "@/components/ui/Poster";
+import Frame from "@/components/ui/Frame";
+import Rating from "@/components/ui/Rating";
+import Figure from "@/components/ui/Figure";
+import Label from "@/components/ui/Label";
 import WatchlistButton from "./WatchlistButton";
 
 export interface PosterTileProps {
   item: SanitizedMedia;
   priority?: boolean;
+  density?: "spacious" | "compact";
 }
 
 /**
- * Compact poster tile used inside horizontal shelves — the trending rows and
- * the "you might also like" row on a detail page.
- *
- * Phase 2 had two near-identical components for these two cases
- * (`TrendingRow`'s inline tile and `SimilarCard`); they differed only in
- * size and are one component here.
+ * Compact poster tile with signature heat-ramp rating and clean focus styling.
  */
 export default function PosterTile({
   item,
   priority = false,
+  density = "compact",
 }: PosterTileProps) {
   const year = releaseYear(item);
-  const imdb = displayRating(item.imdb_rating);
-  const rt = displayRating(item.rotten_tomatoes);
+  const imdbNum = item.imdb_rating ? parseFloat(item.imdb_rating) : null;
+  const rtNum = item.rotten_tomatoes
+    ? parseFloat(item.rotten_tomatoes.replace("%", ""))
+    : null;
+  const ratingScore =
+    imdbNum ??
+    (rtNum !== null
+      ? rtNum / 10
+      : item.vote_average > 0
+        ? item.vote_average
+        : null);
+  const ratingSource =
+    imdbNum !== null
+      ? "IMDb"
+      : rtNum !== null
+        ? "RT"
+        : item.vote_average > 0
+          ? "TMDB"
+          : undefined;
+
+  const widthClass =
+    density === "spacious"
+      ? "w-[160px] min-w-[160px] md:w-[190px] md:min-w-[190px]"
+      : "w-[130px] min-w-[130px] md:w-[150px] md:min-w-[150px]";
 
   return (
-    <div className="group relative w-[140px] min-w-[140px] flex-shrink-0 md:w-[160px] md:min-w-[160px]">
-      <div className="relative mb-2 aspect-2/3 overflow-hidden rounded-lg shadow-lg">
+    <div className={`group relative flex-shrink-0 space-y-2 ${widthClass}`}>
+      <Frame aspectRatio="poster" hasScrim>
         <Poster
           path={item.poster_path}
           alt={`${item.title} poster`}
           priority={priority}
-          sizes="160px"
-          className="transition-transform duration-500 group-hover:scale-110"
+          sizes={density === "spacious" ? "190px" : "150px"}
+          className="transition-opacity duration-short group-hover:opacity-90"
         />
-        <div className="absolute inset-0 bg-linear-to-t from-black/80 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+        <div className="absolute top-2 right-2 z-20">
+          <WatchlistButton item={item} />
+        </div>
+      </Frame>
+
+      <div className="space-y-1">
+        <Link
+          href={`/${item.media_type}/${item.id}`}
+          className="block font-display font-medium text-sm text-ink truncate hover:text-accent focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-1 rounded transition-colors"
+        >
+          {item.title}
+        </Link>
+
+        <div className="flex items-center justify-between text-xs font-body text-muted">
+          {year ? (
+            <Figure value={year} size="sm" className="text-muted" />
+          ) : (
+            <span />
+          )}
+          {ratingScore != null && (
+            <Rating score={ratingScore} source={ratingSource} size="sm" />
+          )}
+        </div>
       </div>
-
-      <p className="truncate text-sm font-bold text-gray-300 transition-colors group-hover:text-red-500">
-        {item.title}
-      </p>
-      <div className="mt-1 flex h-4 gap-2">
-        <span className="text-[9px] font-medium text-orange-500">{year}</span>
-        {imdb && (
-          <span className="rounded border border-yellow-500/20 bg-yellow-500/5 px-1 text-[9px] font-bold text-yellow-500">
-            IMDb {imdb}
-          </span>
-        )}
-        {rt && (
-          <span className="rounded border border-red-400/20 bg-red-400/5 px-1 text-[9px] font-bold text-red-400">
-            RT {rt}
-          </span>
-        )}
-      </div>
-
-      <Link
-        href={`/${item.media_type}/${item.id}`}
-        className="absolute inset-0 z-10 rounded-lg focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-hidden"
-      >
-        <span className="sr-only">
-          View details for {item.title} ({year})
-        </span>
-      </Link>
-
-      <WatchlistButton
-        item={item}
-        className="absolute top-2 right-2 z-20 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-      />
     </div>
   );
 }

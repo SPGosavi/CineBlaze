@@ -216,7 +216,7 @@ export function WatchlistDragProvider({
     >
       {children}
 
-      {/* Floating touch drag preview with reduced brightness red ring */}
+      {/* Floating touch drag preview with clean Kiln styling */}
       {isTouchDragging && draggedItem && touchPos && (
         <div
           className="pointer-events-none fixed z-50 select-none transition-transform duration-75 ease-out"
@@ -228,15 +228,15 @@ export function WatchlistDragProvider({
             height: "155px",
           }}
         >
-          <div className="relative h-full w-full overflow-hidden rounded-xl bg-neutral-900 shadow-2xl shadow-black ring-2 ring-red-600/70">
+          <div className="relative h-full w-full overflow-hidden rounded-well bg-paper-2 border border-accent shadow-card">
             <Poster
               path={draggedItem.poster_path}
               alt={`${draggedItem.title} poster preview`}
               sizes="105px"
               className="pointer-events-none select-none"
             />
-            <div className="absolute inset-x-0 bottom-0 bg-black/85 p-1 text-center backdrop-blur-xs">
-              <p className="truncate text-[10px] font-bold text-white">
+            <div className="absolute inset-x-0 bottom-0 bg-paper-2 border-t border-rule p-1 text-center">
+              <p className="truncate text-[10px] font-medium text-ink">
                 {draggedItem.title}
               </p>
             </div>

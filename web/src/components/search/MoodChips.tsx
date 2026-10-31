@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Label from "@/components/ui/Label";
 
 interface MoodChip {
   label: string;
@@ -7,15 +8,15 @@ interface MoodChip {
 
 const MOOD_CHIPS: MoodChip[] = [
   {
-    label: "Dark & Mysterious",
+    label: "Dark & mysterious",
     query: "dark mysterious thriller in a rainy city",
   },
   {
-    label: "Feel Good",
+    label: "Feel good",
     query: "feel good uplifting movie to relax",
   },
   {
-    label: "Mind-Bending",
+    label: "Mind-bending",
     query: "mind bending psychological sci-fi",
   },
   {
@@ -23,11 +24,11 @@ const MOOD_CHIPS: MoodChip[] = [
     query: "heartwarming family drama",
   },
   {
-    label: "Intense Thriller",
+    label: "Intense thriller",
     query: "intense gripping thriller",
   },
   {
-    label: "Epic Adventure",
+    label: "Epic adventure",
     query: "epic adventure with grand scale",
   },
 ];
@@ -35,9 +36,9 @@ const MOOD_CHIPS: MoodChip[] = [
 export default function MoodChips() {
   return (
     <div className="space-y-2">
-      <p className="text-xs font-semibold tracking-wide text-gray-300/90 uppercase">
+      <Label size="xs" className="block text-center text-muted">
         Pick a mood
-      </p>
+      </Label>
       <div className="flex flex-wrap justify-center gap-2">
         {MOOD_CHIPS.map((chip) => (
           <Link
@@ -46,7 +47,7 @@ export default function MoodChips() {
               pathname: "/search",
               query: { mode: "recommend", q: chip.query },
             }}
-            className="rounded-full border border-white/20 bg-black/30 px-3 py-1.5 text-xs font-medium text-gray-200 transition hover:border-orange-400/60 hover:text-orange-200"
+            className="rounded-full border border-rule bg-paper-2 px-3 py-1 font-body text-xs font-medium text-ink transition-colors hover:border-muted/50 hover:bg-paper-3 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px]"
           >
             {chip.label}
           </Link>

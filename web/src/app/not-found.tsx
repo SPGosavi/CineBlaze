@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { FileQuestion } from "lucide-react";
 import AppShell from "@/components/layout/AppShell";
+import Button from "@/components/ui/Button";
 
 /**
  * The app's only 404.
@@ -23,25 +23,26 @@ export default function NotFound() {
   return (
     <AppShell>
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <FileQuestion size={48} className="text-neutral-600" />
-        <h1 className="text-2xl font-bold text-white">Not found</h1>
-        <p className="max-w-md text-sm text-gray-500">
+        <FileQuestion size={48} className="text-muted" aria-hidden="true" />
+        <h1 className="text-3xl font-display font-medium text-ink">
+          Not found
+        </h1>
+        <p className="max-w-md text-sm text-muted">
           We couldn&apos;t find that page. Titles live at addresses like{" "}
-          <code className="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-xs text-gray-400">
+          <code className="rounded border border-rule bg-paper-3 px-1.5 py-0.5 font-mono text-xs text-ink">
             /movie/550
           </code>{" "}
           or{" "}
-          <code className="rounded bg-neutral-800 px-1.5 py-0.5 font-mono text-xs text-gray-400">
+          <code className="rounded border border-rule bg-paper-3 px-1.5 py-0.5 font-mono text-xs text-ink">
             /tv/1396
           </code>
           .
         </p>
-        <Link
-          href="/"
-          className="mt-2 rounded-xl bg-linear-to-r from-red-600 to-orange-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:from-red-500 hover:to-orange-500"
-        >
-          Back to discover
-        </Link>
+        <div className="mt-2">
+          <Button href="/" variant="ember">
+            Back to discover
+          </Button>
+        </div>
       </div>
     </AppShell>
   );

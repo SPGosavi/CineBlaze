@@ -6,6 +6,7 @@ import { Check, Loader2, Plus } from "lucide-react";
 import type { SanitizedMedia } from "@cineblaze/shared";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useWatchlistContext } from "@/contexts/WatchlistContext";
+import Button from "@/components/ui/Button";
 
 export interface WatchlistButtonProps {
   item: SanitizedMedia;
@@ -15,14 +16,7 @@ export interface WatchlistButtonProps {
 }
 
 /**
- * Add-to-watchlist control.
- *
- * The only interactive island on an otherwise server-rendered card, which is
- * why it is split out rather than making the whole card a Client Component.
- *
- * Signing in is no longer a precondition for browsing, so a signed-out click
- * routes to /login with a return path instead of the action silently doing
- * nothing.
+ * Add-to-watchlist control with Hallmark token states and focus rings.
  */
 export default function WatchlistButton({
   item,
@@ -37,8 +31,6 @@ export default function WatchlistButton({
   const saved = isInWatchlist(item.id);
 
   const handleClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    // Cards wrap themselves in a full-bleed link overlay; without this the
-    // click would navigate to the detail page instead of saving.
     event.preventDefault();
     event.stopPropagation();
 
@@ -61,26 +53,25 @@ export default function WatchlistButton({
 
   if (variant === "full") {
     return (
-      <button
+      <Button
         type="button"
+        variant={saved ? "ghost" : "ember"}
+        size="page"
         onClick={handleClick}
         disabled={pending}
+        isLoading={pending}
         aria-label={label}
-        className={`flex-1 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-60 ${
-          saved
-            ? "bg-red-900/20 border border-red-500/50 text-red-500 hover:bg-red-600 hover:text-white"
-            : "bg-white text-black hover:bg-gray-200 shadow-lg shadow-white/10"
-        } ${className}`}
+        leftIcon={
+          saved ? (
+            <Check size={18} aria-hidden="true" />
+          ) : (
+            <Plus size={18} aria-hidden="true" />
+          )
+        }
+        className={className}
       >
-        {pending ? (
-          <Loader2 size={20} className="animate-spin" />
-        ) : saved ? (
-          <Check size={20} />
-        ) : (
-          <Plus size={20} />
-        )}
         {saved ? "In your watchlist" : "Add to watchlist"}
-      </button>
+      </Button>
     );
   }
 
@@ -91,18 +82,22 @@ export default function WatchlistButton({
       disabled={pending}
       aria-label={label}
       title={label}
-      className={`p-2 rounded-full text-white transition-all shadow-lg active:scale-90 disabled:opacity-60 ${
+      className={`min-h-[32px] min-w-[32px] p-2 rounded-full border transition-colors transition-opacity transition-transform duration-short ease-out focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px] disabled:opacity-55 disabled:cursor-not-allowed ${
         saved
-          ? "bg-green-600 hover:bg-green-500 shadow-green-900/20"
-          : "bg-red-600 hover:bg-red-500 shadow-red-900/20"
+          ? "bg-paper-2 text-success border-success/40 hover:bg-paper-3"
+          : "bg-paper-2/90 text-ink border-rule hover:text-accent hover:border-muted/50 hover:bg-paper-3"
       } ${className}`}
     >
       {pending ? (
-        <Loader2 size={16} className="animate-spin" />
+        <Loader2
+          size={15}
+          className="motion-safe:animate-spin"
+          aria-hidden="true"
+        />
       ) : saved ? (
-        <Check size={16} strokeWidth={3} />
+        <Check size={15} strokeWidth={2.5} aria-hidden="true" />
       ) : (
-        <Plus size={16} strokeWidth={3} />
+        <Plus size={15} strokeWidth={2.5} aria-hidden="true" />
       )}
     </button>
   );

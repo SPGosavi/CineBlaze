@@ -9,11 +9,12 @@ export interface TrackedResultLinkProps {
   className?: string;
   query?: string;
   selectedResultId: number;
-  srLabel: string;
+  srLabel?: string;
+  children?: React.ReactNode;
 }
 
 /**
- * Overlay link for search results that records which title was chosen.
+ * Link for search results that records which title was chosen.
  *
  * Uses Link's `onNavigate` so we only fire on same-origin SPA navigations,
  * not on prefetch, right-click or new-tab modifier clicks.
@@ -24,6 +25,7 @@ export default function TrackedResultLink({
   query,
   selectedResultId,
   srLabel,
+  children,
 }: TrackedResultLinkProps) {
   const normalizedQuery = (query ?? "").trim();
 
@@ -44,7 +46,7 @@ export default function TrackedResultLink({
         void api.post("/search-selection", payload).catch(() => {});
       }}
     >
-      <span className="sr-only">{srLabel}</span>
+      {children || (srLabel && <span className="sr-only">{srLabel}</span>)}
     </Link>
   );
 }

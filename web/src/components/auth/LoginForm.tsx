@@ -6,11 +6,13 @@ import Link from "next/link";
 import { AlertTriangle, Flame, Lock, Mail, User } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import PosterMarquee from "./PosterMarquee";
+import Button from "@/components/ui/Button";
+import Label from "@/components/ui/Label";
 
 /**
  * Authentication form (Sign in / Sign up).
  *
- * Redirects to `?next=` after a successful authentication.
+ * Hero Posture: Stage (Form on columns 1-5, poster wall on columns 6-12).
  */
 export default function LoginForm() {
   const {
@@ -71,53 +73,47 @@ export default function LoginForm() {
   const displayError = validationError || loginError;
 
   return (
-    <div className="relative grid min-h-screen grid-cols-1 overflow-hidden bg-black md:grid-cols-2">
-      <div className="relative z-10 flex items-center justify-center p-4">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-red-900/20 via-black to-black" />
-        <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl">
-          <div className="absolute top-0 left-0 h-1 w-full bg-linear-to-r from-red-600 to-orange-600" />
-
-          <div className="p-8 pb-0 text-center">
+    <div className="relative grid min-h-screen grid-cols-1 overflow-hidden bg-paper text-ink md:grid-cols-2">
+      <div className="relative z-10 flex items-center justify-center p-6 md:p-12">
+        <div className="w-full max-w-md rounded-well border border-rule bg-paper-2 p-8 shadow-card">
+          <div className="text-center pb-2">
             <Link
               href="/"
-              className="mx-auto mb-4 flex h-16 w-16 -rotate-3 items-center justify-center rounded-2xl bg-linear-to-tr from-red-600 to-orange-600 shadow-lg shadow-orange-900/20"
+              className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-paper-3 border border-rule text-ink focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px]"
             >
-              <Flame size={32} fill="white" className="text-white" />
+              <Flame size={28} className="text-ink" aria-hidden="true" />
             </Link>
-            <h1 className="text-2xl font-black tracking-tight text-white">
+            <h1 className="font-display text-2xl font-medium tracking-tight text-ink">
               CineBlaze
             </h1>
-            <p className="mt-2 text-sm font-medium text-gray-400">
+            <p className="mt-2 text-sm font-body text-muted">
               {mode === "signin"
                 ? "Sign in to save titles to your watchlist."
                 : "Create an account to save titles to your watchlist."}
             </p>
           </div>
 
-          <div className="space-y-6 p-8">
+          <div className="space-y-6 pt-4">
             {displayError && (
               <p
                 role="alert"
-                className="flex items-center justify-center gap-2 rounded-lg border border-red-500/50 bg-red-900/30 p-3 text-center text-sm text-red-200"
+                className="flex items-center justify-center gap-2 rounded-lg border border-error/40 bg-error/10 p-3 text-center text-sm font-body text-error"
               >
-                <AlertTriangle size={16} />
+                <AlertTriangle size={16} aria-hidden="true" />
                 {displayError}
               </p>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label
-                  htmlFor="email"
-                  className="text-xs font-bold tracking-wider text-gray-500 uppercase"
-                >
+              <div className="space-y-1.5">
+                <Label as="label" htmlFor="email" size="xs">
                   Email
-                </label>
+                </Label>
                 <div className="relative">
                   <Mail
-                    aria-hidden
-                    size={18}
-                    className="absolute top-3.5 left-3 text-gray-500"
+                    aria-hidden="true"
+                    size={16}
+                    className="absolute top-4 left-3.5 text-muted pointer-events-none"
                   />
                   <input
                     id="email"
@@ -127,23 +123,20 @@ export default function LoginForm() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="name@example.com"
-                    className="w-full rounded-xl border border-neutral-700 bg-black/50 p-3 pl-10 text-white transition-all outline-hidden placeholder:text-gray-600 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                    className="w-full min-h-[48px] rounded-full border border-muted bg-paper px-4 pl-10 font-body text-sm text-ink placeholder:text-muted/60 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px] active:border-muted disabled:opacity-55 disabled:cursor-not-allowed transition-colors"
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label
-                  htmlFor="password"
-                  className="text-xs font-bold tracking-wider text-gray-500 uppercase"
-                >
+              <div className="space-y-1.5">
+                <Label as="label" htmlFor="password" size="xs">
                   Password
-                </label>
+                </Label>
                 <div className="relative">
                   <Lock
-                    aria-hidden
-                    size={18}
-                    className="absolute top-3.5 left-3 text-gray-500"
+                    aria-hidden="true"
+                    size={16}
+                    className="absolute top-4 left-3.5 text-muted pointer-events-none"
                   />
                   <input
                     id="password"
@@ -155,24 +148,21 @@ export default function LoginForm() {
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-xl border border-neutral-700 bg-black/50 p-3 pl-10 text-white transition-all outline-hidden placeholder:text-gray-600 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                    className="w-full min-h-[48px] rounded-full border border-muted bg-paper px-4 pl-10 font-body text-sm text-ink placeholder:text-muted/60 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px] active:border-muted disabled:opacity-55 disabled:cursor-not-allowed transition-colors"
                   />
                 </div>
               </div>
 
               {mode === "signup" && (
-                <div className="space-y-2">
-                  <label
-                    htmlFor="confirmPassword"
-                    className="text-xs font-bold tracking-wider text-gray-500 uppercase"
-                  >
-                    Confirm Password
-                  </label>
+                <div className="space-y-1.5">
+                  <Label as="label" htmlFor="confirmPassword" size="xs">
+                    Confirm password
+                  </Label>
                   <div className="relative">
                     <Lock
-                      aria-hidden
-                      size={18}
-                      className="absolute top-3.5 left-3 text-gray-500"
+                      aria-hidden="true"
+                      size={16}
+                      className="absolute top-4 left-3.5 text-muted pointer-events-none"
                     />
                     <input
                       id="confirmPassword"
@@ -184,44 +174,43 @@ export default function LoginForm() {
                         setConfirmPassword(event.target.value)
                       }
                       placeholder="••••••••"
-                      className="w-full rounded-xl border border-neutral-700 bg-black/50 p-3 pl-10 text-white transition-all outline-hidden placeholder:text-gray-600 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                      className="w-full min-h-[48px] rounded-full border border-muted bg-paper px-4 pl-10 font-body text-sm text-ink placeholder:text-muted/60 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px] active:border-muted disabled:opacity-55 disabled:cursor-not-allowed transition-colors"
                     />
                   </div>
                 </div>
               )}
 
-              <button
+              <Button
                 type="submit"
+                variant="ember"
+                size="page"
+                isLoading={busy}
                 disabled={busy}
-                className="w-full rounded-xl bg-linear-to-r from-red-600 to-orange-600 py-3.5 font-bold text-white shadow-lg shadow-orange-900/20 transition-all hover:from-red-500 hover:to-orange-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full mt-2"
               >
-                {busy
-                  ? "Authenticating…"
-                  : mode === "signin"
-                    ? "Sign in"
-                    : "Create account"}
-              </button>
+                {mode === "signin" ? "Sign in" : "Create account"}
+              </Button>
             </form>
 
-            <div className="text-center text-sm">
+            <div className="text-center text-sm font-body">
               {mode === "signin" ? (
-                <p className="text-gray-400">
-                  Don&apos;t have an account?{" "}
+                <p className="text-muted inline-flex items-center gap-1.5 justify-center">
+                  <span>Don&apos;t have an account?</span>
                   <button
                     type="button"
                     onClick={() => switchMode("signup")}
-                    className="font-semibold text-red-500 transition-colors hover:text-red-400 hover:underline"
+                    className="inline-flex min-h-[32px] items-center px-1 font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px] rounded whitespace-nowrap"
                   >
                     Sign up
                   </button>
                 </p>
               ) : (
-                <p className="text-gray-400">
-                  Already have an account?{" "}
+                <p className="text-muted inline-flex items-center gap-1.5 justify-center">
+                  <span>Already have an account?</span>
                   <button
                     type="button"
                     onClick={() => switchMode("signin")}
-                    className="font-semibold text-red-500 transition-colors hover:text-red-400 hover:underline"
+                    className="inline-flex min-h-[32px] items-center px-1 font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px] rounded whitespace-nowrap"
                   >
                     Sign in
                   </button>
@@ -231,24 +220,30 @@ export default function LoginForm() {
 
             <div className="relative flex items-center justify-center">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-neutral-800" />
+                <div className="w-full border-t border-rule" />
               </div>
-              <span className="relative bg-neutral-900 px-4 text-xs font-semibold text-gray-500 uppercase">
-                Or
+              <span className="relative bg-paper-2 px-3 text-xs font-body text-muted">
+                or
               </span>
             </div>
 
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="page"
               onClick={() => void continueAsGuest()}
               disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-700 bg-neutral-800 py-3.5 font-bold text-gray-300 transition-all hover:bg-neutral-700 hover:text-white disabled:opacity-50"
+              leftIcon={<User size={16} aria-hidden="true" />}
+              className="w-full"
             >
-              <User size={18} /> Continue as guest
-            </button>
+              Continue as guest
+            </Button>
 
-            <p className="text-center text-sm">
-              <Link href="/" className="text-gray-500 hover:text-gray-300">
+            <p className="text-center text-xs font-body text-muted">
+              <Link
+                href="/"
+                className="hover:text-ink focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px] rounded"
+              >
                 Browse without signing in
               </Link>
             </p>

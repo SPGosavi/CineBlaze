@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { AlertTriangle, RotateCw } from "lucide-react";
+import Button from "@/components/ui/Button";
 
 /**
  * Route-level error boundary.
@@ -23,20 +24,24 @@ export default function Error({
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-      <AlertTriangle size={48} className="text-orange-500" />
-      <h1 className="text-2xl font-bold text-white">Something went wrong</h1>
-      <p className="max-w-md text-sm text-gray-500">
+      <AlertTriangle size={48} className="text-accent" aria-hidden="true" />
+      <h1 className="text-3xl font-display font-medium text-ink">
+        Something went wrong
+      </h1>
+      <p className="max-w-md text-sm text-muted">
         {error.message || "We couldn't load this page."}
       </p>
-      <button
-        type="button"
-        onClick={reset}
-        className="mt-2 flex items-center gap-2 rounded-xl bg-linear-to-r from-red-600 to-orange-600 px-5 py-2.5 text-sm font-bold text-white transition-all hover:from-red-500 hover:to-orange-500"
-      >
-        <RotateCw size={16} /> Try again
-      </button>
+      <div className="mt-2">
+        <Button
+          variant="ember"
+          onClick={reset}
+          leftIcon={<RotateCw size={16} />}
+        >
+          Try again
+        </Button>
+      </div>
       {error.digest && (
-        <p className="font-mono text-xs text-neutral-700">
+        <p className="font-mono text-xs text-muted">
           Reference: {error.digest}
         </p>
       )}

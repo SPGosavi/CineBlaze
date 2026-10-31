@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { X, Plus } from "lucide-react";
 import type { SearchMode } from "@cineblaze/shared";
+import Label from "@/components/ui/Label";
 
 const REFINEMENT_SUGGESTIONS: Record<SearchMode, string[]> = {
   ai: [
@@ -55,13 +57,13 @@ export default function SearchRefinements({
   );
 
   return (
-    <section className="space-y-2">
-      <p className="px-1 text-xs font-semibold tracking-wide text-gray-400 uppercase">
+    <section className="space-y-3">
+      <Label size="xs" className="block text-muted">
         Refine this search
-      </p>
+      </Label>
 
       {refinements.length > 0 ? (
-        <div className="flex flex-wrap gap-2 px-1">
+        <div className="flex flex-wrap gap-2">
           {refinements.map((refinement) => (
             <Link
               key={refinement}
@@ -70,22 +72,24 @@ export default function SearchRefinements({
                 mode,
                 refinements.filter((value) => value !== refinement)
               )}
-              className="rounded-full border border-orange-400/40 bg-orange-500/10 px-3 py-1 text-xs font-medium text-orange-200 transition hover:border-orange-300"
+              aria-label={`Remove refinement: ${refinement}`}
+              className="inline-flex items-center gap-1.5 rounded-full border border-accent bg-accent text-accent-ink px-3 py-1 font-body text-xs font-medium transition-colors hover:opacity-95 focus-visible:outline-2 focus-visible:outline-ink focus-visible:outline-offset-2 active:translate-y-[1px]"
             >
-              {refinement} ✕
+              <span>{refinement}</span>
+              <X size={13} aria-hidden="true" />
             </Link>
           ))}
 
           <Link
             href={buildHref(query, mode, [])}
-            className="rounded-full border border-white/20 px-3 py-1 text-xs font-medium text-gray-300 transition hover:border-white/40"
+            className="rounded-full border border-rule bg-paper-2 px-3 py-1 font-body text-xs text-muted transition-colors hover:text-ink hover:bg-paper-3 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px]"
           >
             Clear all
           </Link>
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 px-1">
+      <div className="flex flex-wrap gap-2">
         {candidates.slice(0, 6).map((candidate) => (
           <Link
             key={candidate}
@@ -94,9 +98,10 @@ export default function SearchRefinements({
               mode,
               Array.from(new Set([...refinements, candidate])).slice(0, 4)
             )}
-            className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs font-medium text-gray-200 transition hover:border-orange-400/60 hover:text-orange-200"
+            className="inline-flex items-center gap-1 rounded-full border border-rule bg-paper-2 px-3 py-1 font-body text-xs text-ink transition-colors hover:border-muted/50 hover:bg-paper-3 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px]"
           >
-            + {candidate}
+            <Plus size={12} className="text-muted" aria-hidden="true" />
+            <span>{candidate}</span>
           </Link>
         ))}
       </div>
