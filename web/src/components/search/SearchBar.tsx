@@ -41,7 +41,7 @@ function SubmitButton({ label }: { label: string }) {
       size="app"
       isLoading={pending}
       disabled={pending}
-      className="absolute top-1.5 right-1.5 bottom-1.5"
+      className="h-9 px-4 text-xs sm:text-sm font-medium whitespace-nowrap shadow-sm"
     >
       {label}
     </Button>
@@ -110,14 +110,14 @@ export default function SearchBar({
       </div>
 
       {/* Search Input Line */}
-      <div className="relative flex items-center">
+      <div className="relative w-full">
         <label htmlFor="q" className="sr-only">
           {currentMeta.hint}
         </label>
         <Search
           aria-hidden="true"
           size={18}
-          className="absolute left-4 text-muted pointer-events-none"
+          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted"
         />
         <input
           id="q"
@@ -127,17 +127,19 @@ export default function SearchBar({
           defaultValue={defaultQuery}
           autoFocus={autoFocus}
           placeholder={currentMeta.placeholder}
-          className="w-full min-h-[46px] rounded-full border border-muted bg-paper py-2.5 pr-28 sm:pr-32 pl-11 font-body text-sm text-ink placeholder:text-muted/60 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px] transition-colors"
+          className="block w-full h-12 rounded-full border border-muted bg-paper pl-11 pr-28 sm:pr-32 font-body text-sm text-ink placeholder:text-muted/60 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px] transition-colors"
         />
-        <SubmitButton
-          label={
-            currentMeta.mode === "recommend"
-              ? "Recommend"
-              : currentMeta.mode === "direct"
-                ? "Search"
-                : "Find"
-          }
-        />
+        <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+          <SubmitButton
+            label={
+              currentMeta.mode === "recommend"
+                ? "Recommend"
+                : currentMeta.mode === "direct"
+                  ? "Search"
+                  : "Find"
+            }
+          />
+        </div>
       </div>
 
       <p className="mt-2 text-center font-body text-xs text-muted">

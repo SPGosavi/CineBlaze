@@ -51,13 +51,19 @@ export default function PosterTile({
   return (
     <div className={`group relative flex-shrink-0 space-y-2 ${widthClass}`}>
       <Frame aspectRatio="poster" hasScrim>
-        <Poster
-          path={item.poster_path}
-          alt={`${item.title} poster`}
-          priority={priority}
-          sizes={density === "spacious" ? "190px" : "150px"}
-          className="transition-opacity duration-short group-hover:opacity-90"
-        />
+        <Link
+          href={`/${item.media_type}/${item.id}`}
+          className="block h-full w-full cursor-pointer focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-[-2px]"
+          aria-label={item.title}
+        >
+          <Poster
+            path={item.poster_path}
+            alt={`${item.title} poster`}
+            priority={priority}
+            sizes={density === "spacious" ? "190px" : "150px"}
+            className="transition-opacity duration-short group-hover:opacity-90"
+          />
+        </Link>
         <div className="absolute top-2 right-2 z-20">
           <WatchlistButton item={item} />
         </div>
