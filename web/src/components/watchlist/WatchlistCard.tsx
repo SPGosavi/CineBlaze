@@ -213,7 +213,7 @@ function WatchlistCard({
           text={item.title}
           as="h4"
           isRevealed={revealed}
-          className="font-medium text-xs text-ink"
+          className="font-body font-medium text-xs text-ink"
         />
 
         {ratingScore != null && (

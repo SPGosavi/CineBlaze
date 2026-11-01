@@ -116,7 +116,7 @@ function ForYouCard({ item }: { item: EnrichedMedia }) {
       <SlidingTitle
         text={item.title}
         as="p"
-        className="text-xs font-medium text-ink group-hover:text-accent transition-colors"
+        className="font-body text-xs font-medium text-ink group-hover:text-accent transition-colors"
       />
     </Link>
   );
