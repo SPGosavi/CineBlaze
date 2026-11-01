@@ -22,7 +22,7 @@ export const Frame: React.FC<FrameProps> = ({
 }) => {
   return (
     <div
-      className={`relative overflow-hidden rounded-[min(2vw,28px)] bg-paper-2 ring-1 ring-inset ring-ink/10 ${aspectStyles[aspectRatio]} ${className}`}
+      className={`relative overflow-hidden rounded-lg bg-paper-2 ring-1 ring-inset ring-ink/10 ${aspectStyles[aspectRatio]} ${className}`}
       {...props}
     >
       {children}

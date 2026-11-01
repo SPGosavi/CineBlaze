@@ -228,7 +228,7 @@ export function WatchlistDragProvider({
             height: "155px",
           }}
         >
-          <div className="relative h-full w-full overflow-hidden rounded-well bg-paper-2 border border-accent shadow-card">
+          <div className="relative h-full w-full overflow-hidden rounded-lg bg-paper-2 border border-accent shadow-card">
             <Poster
               path={draggedItem.poster_path}
               alt={`${draggedItem.title} poster preview`}

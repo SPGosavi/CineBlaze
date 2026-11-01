@@ -151,7 +151,7 @@ export default function PreviewPage() {
       {/* Frame & Poster */}
       <section className="space-y-4">
         <h2 className="font-display text-xl font-medium border-b border-rule pb-2">
-          4. Frame (28px radius, 1px cream inset ring)
+          4. Frame (8px radius, 1px cream inset ring)
         </h2>
         <div className="flex gap-6">
           <div className="w-36">
