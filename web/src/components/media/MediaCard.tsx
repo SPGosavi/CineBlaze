@@ -54,7 +54,18 @@ export default function MediaCard({
           ? "TMDB"
           : undefined;
 
-  const titleLinkContent = <span className="line-clamp-1">{item.title}</span>;
+  const titleLinkContent = (
+    <div className="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,black_90%,transparent)]">
+      <span className="block truncate group-hover:hidden">{item.title}</span>
+      <div
+        className="hidden w-max group-hover:flex group-hover:animate-marquee-title"
+        aria-hidden="true"
+      >
+        <span className="shrink-0 pr-8">{item.title}</span>
+        <span className="shrink-0 pr-8">{item.title}</span>
+      </div>
+    </div>
+  );
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-lg border border-rule bg-paper-2 transition-colors duration-short hover:border-muted/50">
@@ -99,7 +110,7 @@ export default function MediaCard({
       <div className="flex flex-1 flex-col justify-between p-3.5 gap-2">
         <div className="space-y-2">
           {/* Title in Boska */}
-          <h3 className="font-display font-medium text-base text-ink group-hover:text-accent transition-colors">
+          <h3 className="font-medium text-base text-ink group-hover:text-accent transition-colors">
             {searchQuery ? (
               <TrackedResultLink
                 href={`/${item.media_type}/${item.id}`}

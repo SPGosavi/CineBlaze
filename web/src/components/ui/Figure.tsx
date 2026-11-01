@@ -22,7 +22,7 @@ export const Figure: React.FC<FigureProps> = ({
 }) => {
   return (
     <span
-      className={`font-display font-medium tabular-nums lining-nums tracking-[-0.03em] ${sizeClasses[size]} ${className}`}
+      className={`font-body font-semibold tabular-nums lining-nums ${sizeClasses[size]} ${className}`}
       {...props}
     >
       <span>{value}</span>
