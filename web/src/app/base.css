@@ -24,13 +24,11 @@ body {
 ::selection {
   background: color-mix(in oklab, var(--color-accent) 35%, transparent);
 }
-:where(a, button, input, select, textarea, [tabindex]):focus-visible,
-:focus-visible {
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
-:where(a, button, [role="button"]):active,
-:active {
+:where(a, button, [role="button"]):active {
   transform: translateY(1px);
 }
 button:disabled,
@@ -60,7 +58,6 @@ h3 {
   text-wrap: balance;
 }
 h1 {
-  max-width: 20ch;
   font-size: var(--text-display);
 }
 h2 {

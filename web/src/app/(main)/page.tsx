@@ -83,7 +83,7 @@ export default function DiscoverPage() {
       {/* Search Stage */}
       <Well className="p-6 md:p-8">
         <div className="mx-auto max-w-3xl space-y-6 text-center">
-          <h1 className="font-display text-2xl font-medium tracking-tight text-ink md:text-4xl text-balance">
+          <h1 className="mx-auto w-full text-center font-display text-2xl font-medium tracking-tight text-ink md:text-4xl text-balance">
             Find a film by plot, scene, or title.
           </h1>
           <SearchBar />
