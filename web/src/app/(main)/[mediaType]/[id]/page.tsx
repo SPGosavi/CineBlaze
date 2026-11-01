@@ -222,7 +222,7 @@ export default async function MediaDetailPage(
             fill
             priority={false}
             sizes="100vw"
-            className="scale-125 object-cover opacity-60 blur-3xl"
+            className="scale-125 object-cover opacity-80 blur-3xl"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-paper/30 via-paper/60 to-paper" />
         </div>
