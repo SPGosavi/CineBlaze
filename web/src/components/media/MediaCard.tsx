@@ -101,7 +101,7 @@ export default function MediaCard({
       <div className="flex flex-1 flex-col justify-between p-3.5 gap-2">
         <div className="space-y-2">
           {/* Title in Boska */}
-          <h3 className="font-medium text-base text-ink group-hover:text-accent transition-colors">
+          <h3 className="font-body font-medium text-base text-ink group-hover:text-accent transition-colors">
             {searchQuery ? (
               <TrackedResultLink
                 href={`/${item.media_type}/${item.id}`}

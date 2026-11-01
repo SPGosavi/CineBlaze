@@ -78,7 +78,7 @@ function SlidingTitle({
             ref={(node: HTMLElement | null) => {
               textRef.current = node;
             }}
-            className={`block truncate ${hiddenClass} ${className}`}
+            className={`block truncate ${hiddenClass} font-body ${className}`}
             title={text}
           >
             {text}
@@ -109,12 +109,12 @@ function SlidingTitle({
           {href ? (
             <>
               <Link href={href} tabIndex={-1}>
-                <Component className={`shrink-0 pr-8 ${className}`}>
+                <Component className={`shrink-0 pr-8 font-body ${className}`}>
                   {text}
                 </Component>
               </Link>
               <Link href={href} tabIndex={-1}>
-                <Component className={`shrink-0 pr-8 ${className}`}>
+                <Component className={`shrink-0 pr-8 font-body ${className}`}>
                   {text}
                 </Component>
               </Link>

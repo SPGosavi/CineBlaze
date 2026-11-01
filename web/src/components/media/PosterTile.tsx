@@ -73,7 +73,7 @@ export default function PosterTile({
         <SlidingTitle
           text={item.title}
           href={`/${item.media_type}/${item.id}`}
-          className="font-medium text-sm text-ink hover:text-accent transition-colors"
+          className="font-body font-medium text-sm text-ink hover:text-accent transition-colors"
         />
 
         <div className="flex items-center justify-between text-xs font-body text-muted">
