@@ -90,8 +90,10 @@ export default function SearchBar({
                 type="button"
                 role="tab"
                 aria-selected={isActive}
+                aria-label={meta.label}
+                title={meta.label}
                 onClick={() => setMode(meta.mode)}
-                className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 font-body text-xs sm:text-sm font-medium transition-colors duration-short focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px] ${
+                className={`flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 sm:px-3.5 sm:py-1.5 font-body text-xs sm:text-sm font-medium transition-colors duration-short focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px] ${
                   isActive
                     ? "bg-accent text-accent-ink shadow-sm"
                     : "text-muted hover:text-ink hover:bg-paper-3/50"
@@ -102,7 +104,7 @@ export default function SearchBar({
                   aria-hidden="true"
                   className={isActive ? "text-accent-ink" : "text-muted"}
                 />
-                <span>{meta.label}</span>
+                <span className="hidden sm:inline">{meta.label}</span>
               </button>
             );
           })}

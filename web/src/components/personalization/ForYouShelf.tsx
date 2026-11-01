@@ -1,5 +1,7 @@
 "use client";
 
+import SlidingTitle from "@/components/ui/SlidingTitle";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -111,22 +113,11 @@ function ForYouCard({ item }: { item: EnrichedMedia }) {
           className="object-cover transition-opacity duration-short group-hover:opacity-90"
         />
       </Frame>
-      <div className="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,black_90%,transparent)]">
-        <p className="truncate text-xs font-medium text-ink group-hover:hidden transition-colors">
-          {item.title}
-        </p>
-        <div
-          className="hidden w-max group-hover:flex group-hover:animate-marquee-title"
-          aria-hidden="true"
-        >
-          <span className="shrink-0 pr-6 text-xs font-medium text-ink group-hover:text-accent transition-colors">
-            {item.title}
-          </span>
-          <span className="shrink-0 pr-6 text-xs font-medium text-ink group-hover:text-accent transition-colors">
-            {item.title}
-          </span>
-        </div>
-      </div>
+      <SlidingTitle
+        text={item.title}
+        as="p"
+        className="text-xs font-medium text-ink group-hover:text-accent transition-colors"
+      />
     </Link>
   );
 }
