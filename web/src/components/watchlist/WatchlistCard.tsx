@@ -161,7 +161,16 @@ function WatchlistCard({
       onDragStart={(event) => {
         event.dataTransfer.setData("text/plain", String(item.id));
         event.dataTransfer.effectAllowed = "move";
-        setIsDragging(true);
+        if (cardRef.current && event.dataTransfer.setDragImage) {
+          event.dataTransfer.setDragImage(
+            cardRef.current,
+            event.nativeEvent.offsetX || 40,
+            event.nativeEvent.offsetY || 60
+          );
+        }
+        requestAnimationFrame(() => {
+          setIsDragging(true);
+        });
         onDragStart(event, item.id);
       }}
       onDragEnd={() => setIsDragging(false)}
@@ -176,7 +185,7 @@ function WatchlistCard({
         setIsOver(false);
         onDropOnCard(item.id);
       }}
-      className={`group relative aspect-[2/3] overflow-hidden rounded-well border border-rule cursor-grab touch-manipulation active:cursor-grabbing select-none transition-transform duration-short ${
+      className={`group relative aspect-[2/3] overflow-hidden rounded-lg border border-rule cursor-grab touch-manipulation active:cursor-grabbing select-none transition-transform duration-short ${
         isOver || isThisItemDropTarget
           ? "z-10 scale-[1.02] ring-2 ring-accent shadow-card"
           : ""
@@ -242,11 +251,12 @@ function WatchlistCard({
       {/* Detail Route Navigation Link */}
       <Link
         href={`/${item.media_type}/${item.id}`}
+        draggable={false}
         tabIndex={0}
         aria-label={`View ${item.title} details`}
-        className="absolute inset-0 z-10 rounded-well focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2"
+        className="absolute inset-0 z-10 rounded-lg focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2"
         onClick={(e) => {
-          if (activeDragStartedRef.current) {
+          if (activeDragStartedRef.current || isDragging) {
             e.preventDefault();
           }
         }}

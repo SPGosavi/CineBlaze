@@ -57,7 +57,7 @@ export default function MediaCard({
   const titleLinkContent = <span className="line-clamp-1">{item.title}</span>;
 
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-well border border-rule bg-paper-2 transition-colors duration-short hover:border-muted/50">
+    <article className="group relative flex h-full flex-col overflow-hidden rounded-lg border border-rule bg-paper-2 transition-colors duration-short hover:border-muted/50">
       {/* Poster in Frame */}
       <Frame aspectRatio="poster" hasScrim>
         {searchQuery ? (
