@@ -12,7 +12,6 @@ import type {
 import { isMediaType } from "@cineblaze/shared";
 import { getMediaDetails, getSimilar } from "@/lib/server-api";
 import {
-  displayRating,
   releaseYear,
   sanitizeMedia,
   sanitizeMediaList,
@@ -211,7 +210,23 @@ export default async function MediaDetailPage(
   });
 
   return (
-    <article className="space-y-12 pb-20 md:pb-10 font-body text-ink">
+    <article className="relative isolate space-y-12 pb-20 md:pb-10 font-body text-ink">
+      {item.poster_path && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-4 -inset-x-4 -z-10 h-[380px] sm:h-[480px] overflow-hidden md:hidden [mask-image:linear-gradient(to_bottom,black_60%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,black_60%,transparent_100%)]"
+        >
+          <Image
+            src={`${TMDB_IMAGE_BASE_URL}${item.poster_path}`}
+            alt=""
+            fill
+            priority={false}
+            sizes="100vw"
+            className="scale-125 object-cover opacity-60 blur-3xl"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-paper/30 via-paper/60 to-paper" />
+        </div>
+      )}
       <StructuredData item={item} />
 
       {/* Editorial Top Presentation: Poster in Frame beside Header */}
