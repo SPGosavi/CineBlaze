@@ -1,3 +1,4 @@
+import SlidingTitle from "@/components/ui/SlidingTitle";
 import Link from "next/link";
 import type { SanitizedMedia } from "@cineblaze/shared";
 import { releaseYear } from "@/lib/sanitize";
@@ -5,7 +6,6 @@ import Poster from "@/components/ui/Poster";
 import Frame from "@/components/ui/Frame";
 import Rating from "@/components/ui/Rating";
 import Figure from "@/components/ui/Figure";
-import Label from "@/components/ui/Label";
 import WatchlistButton from "./WatchlistButton";
 
 export interface PosterTileProps {
@@ -70,37 +70,11 @@ export default function PosterTile({
       </Frame>
 
       <div className="space-y-1">
-        <div className="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,black_90%,transparent)]">
-          {/* Static truncated title when not hovered */}
-          <Link
-            href={`/${item.media_type}/${item.id}`}
-            className="block font-medium text-sm text-ink truncate hover:text-accent focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-1 rounded transition-colors group-hover:hidden"
-            title={item.title}
-          >
-            {item.title}
-          </Link>
-
-          {/* Sliding title when hovered, using marquee animation */}
-          <div
-            className="hidden w-max group-hover:flex group-hover:animate-marquee-title"
-            aria-hidden="true"
-          >
-            <Link
-              href={`/${item.media_type}/${item.id}`}
-              tabIndex={-1}
-              className="shrink-0 pr-8 font-medium text-sm text-ink hover:text-accent transition-colors"
-            >
-              {item.title}
-            </Link>
-            <Link
-              href={`/${item.media_type}/${item.id}`}
-              tabIndex={-1}
-              className="shrink-0 pr-8 font-medium text-sm text-ink hover:text-accent transition-colors"
-            >
-              {item.title}
-            </Link>
-          </div>
-        </div>
+        <SlidingTitle
+          text={item.title}
+          href={`/${item.media_type}/${item.id}`}
+          className="font-medium text-sm text-ink hover:text-accent transition-colors"
+        />
 
         <div className="flex items-center justify-between text-xs font-body text-muted">
           {year ? (

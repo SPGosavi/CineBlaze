@@ -1,5 +1,7 @@
 "use client";
 
+import SlidingTitle from "@/components/ui/SlidingTitle";
+
 import Link from "next/link";
 import type { SanitizedMedia } from "@cineblaze/shared";
 import { releaseYear } from "@/lib/sanitize";
@@ -54,18 +56,7 @@ export default function MediaCard({
           ? "TMDB"
           : undefined;
 
-  const titleLinkContent = (
-    <div className="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,black_90%,transparent)]">
-      <span className="block truncate group-hover:hidden">{item.title}</span>
-      <div
-        className="hidden w-max group-hover:flex group-hover:animate-marquee-title"
-        aria-hidden="true"
-      >
-        <span className="shrink-0 pr-8">{item.title}</span>
-        <span className="shrink-0 pr-8">{item.title}</span>
-      </div>
-    </div>
-  );
+  const titleLinkContent = <SlidingTitle text={item.title} />;
 
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-lg border border-rule bg-paper-2 transition-colors duration-short hover:border-muted/50">
