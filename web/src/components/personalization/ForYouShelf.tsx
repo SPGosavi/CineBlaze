@@ -111,9 +111,22 @@ function ForYouCard({ item }: { item: EnrichedMedia }) {
           className="object-cover transition-opacity duration-short group-hover:opacity-90"
         />
       </Frame>
-      <p className="line-clamp-2 text-xs font-display font-medium text-ink group-hover:text-accent transition-colors">
-        {item.title}
-      </p>
+      <div className="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,black_90%,transparent)]">
+        <p className="truncate text-xs font-medium text-ink group-hover:hidden transition-colors">
+          {item.title}
+        </p>
+        <div
+          className="hidden w-max group-hover:flex group-hover:animate-marquee-title"
+          aria-hidden="true"
+        >
+          <span className="shrink-0 pr-6 text-xs font-medium text-ink group-hover:text-accent transition-colors">
+            {item.title}
+          </span>
+          <span className="shrink-0 pr-6 text-xs font-medium text-ink group-hover:text-accent transition-colors">
+            {item.title}
+          </span>
+        </div>
+      </div>
     </Link>
   );
 }

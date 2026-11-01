@@ -33,7 +33,7 @@
 
   --animate-marquee-left: marquee-left 60s linear infinite;
   --animate-marquee-right: marquee-right 60s linear infinite;
-  --animate-marquee-title: marquee-left 15s linear infinite;
+  --animate-marquee-title: marquee-left 12s linear infinite;
 
   @keyframes marquee-left {
     from {
@@ -52,6 +52,10 @@
       transform: translate3d(0, 0, 0);
     }
   }
+}
+
+@utility animate-marquee-title {
+  animation: marquee-left 12s linear infinite;
 }
 
 /* Decorative motion only; respect the OS setting. */

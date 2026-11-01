@@ -208,9 +208,35 @@ function WatchlistCard({
             : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
         }`}
       >
-        <h4 className="font-display font-medium text-xs text-ink truncate">
-          {item.title}
-        </h4>
+        <div className="relative w-full overflow-hidden [mask-image:linear-gradient(to_right,white_90%,transparent)]">
+          {/* Static truncated title when not hovered/revealed */}
+          <h4
+            className={`truncate font-medium text-xs text-ink ${
+              revealed
+                ? "hidden"
+                : "group-hover:hidden group-focus-within:hidden"
+            }`}
+          >
+            {item.title}
+          </h4>
+
+          {/* Sliding title when hovered/revealed, using marquee animation */}
+          <div
+            className={`w-max ${
+              revealed
+                ? "flex animate-marquee-title"
+                : "hidden group-hover:flex group-hover:animate-marquee-title group-focus-within:flex group-focus-within:animate-marquee-title"
+            }`}
+            aria-hidden="true"
+          >
+            <h4 className="shrink-0 pr-6 font-medium text-xs text-ink">
+              {item.title}
+            </h4>
+            <h4 className="shrink-0 pr-6 font-medium text-xs text-ink">
+              {item.title}
+            </h4>
+          </div>
+        </div>
 
         {ratingScore != null && (
           <div className="mt-1">
