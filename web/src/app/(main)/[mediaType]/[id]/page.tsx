@@ -321,18 +321,15 @@ export default async function MediaDetailPage(
               id="watch-now"
               className="space-y-3 pt-3 border-t border-rule"
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MonitorPlay
-                    size={16}
-                    className="text-accent"
-                    aria-hidden="true"
-                  />
-                  <h2 className="font-display font-medium text-base text-ink">
-                    Watch now
-                  </h2>
-                </div>
-                <Label size="xs">Streaming via JustWatch</Label>
+              <div className="flex items-center gap-2">
+                <MonitorPlay
+                  size={16}
+                  className="text-accent"
+                  aria-hidden="true"
+                />
+                <h2 className="font-display font-medium text-base text-ink">
+                  Watch now
+                </h2>
               </div>
 
               {inTheatres ? (
