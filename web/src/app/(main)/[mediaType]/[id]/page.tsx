@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Film, MonitorPlay, Ticket, ExternalLink } from "lucide-react";
+import { Film, MonitorPlay, Ticket, ExternalLink, Play } from "lucide-react";
 import Image from "next/image";
 import type {
   EnrichedMedia,
@@ -240,6 +240,17 @@ export default async function MediaDetailPage(
               sizes="(max-width: 768px) 256px, 320px"
             />
           </Frame>
+          {item.trailer_key && (
+            <a
+              href={`https://www.youtube.com/watch?v=${item.trailer_key}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 mx-auto flex w-fit items-center gap-2 rounded-full border border-rule bg-paper-2 px-4 py-2 font-body text-sm font-medium text-ink transition-colors hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px]"
+            >
+              <Play size={16} className="fill-current" aria-hidden="true" />
+              Watch Trailer
+            </a>
+          )}
         </div>
 
         <div className="flex flex-col space-y-5">

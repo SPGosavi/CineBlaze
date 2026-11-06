@@ -787,6 +787,37 @@ function parseTmdbDetails(
   return { genres, director, cast };
 }
 
+/**
+ * Picks the best YouTube trailer key from a TMDB videos response.
+ * Returns null when no suitable video exists.
+ */
+function pickTrailerKey(videos: TmdbDetailResponse["videos"]): string | null {
+  const results = videos?.results;
+  if (!results || results.length === 0) return null;
+
+  const ytVideos = results.filter((v) => v.site === "YouTube");
+  if (ytVideos.length === 0) return null;
+
+  // 1. Official Trailer
+  const officialTrailer = ytVideos.find(
+    (v) => v.type === "Trailer" && v.official
+  );
+  if (officialTrailer) return officialTrailer.key;
+
+  // 2. Any Trailer
+  const anyTrailer = ytVideos.find((v) => v.type === "Trailer");
+  if (anyTrailer) return anyTrailer.key;
+
+  // 3. Official Teaser
+  const officialTeaser = ytVideos.find(
+    (v) => v.type === "Teaser" && v.official
+  );
+  if (officialTeaser) return officialTeaser.key;
+
+  // 4. Fallback: first YouTube video
+  return ytVideos[0].key;
+}
+
 async function fetchTmdbDetails(
   id: number,
   mediaType: MediaType
@@ -823,8 +854,7 @@ export async function fetchFullDetailsById(
 ): Promise<EnrichedMedia | null> {
   if (!id || !mediaType) return null;
 
-  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
-
+  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,videos`;
   let data: TmdbDetailResponse;
   try {
     const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
@@ -876,6 +906,7 @@ export async function fetchFullDetailsById(
     providers,
     imdb_rating: ratings.imdb,
     rotten_tomatoes: ratings.rt,
+    trailer_key: pickTrailerKey(data.videos),
   };
 }
 

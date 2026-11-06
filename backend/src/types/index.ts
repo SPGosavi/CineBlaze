@@ -111,6 +111,14 @@ export interface TmdbDetailResponse {
     cast?: { name: string; order?: number }[];
     crew?: { name: string; job: string }[];
   };
+  videos?: {
+    results?: {
+      key: string;
+      site: string;
+      type: string;
+      official: boolean;
+    }[];
+  };
 }
 
 /** Raw TMDB collection response (`/collection/{id}`) */

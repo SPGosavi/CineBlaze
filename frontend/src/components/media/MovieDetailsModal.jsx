@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Trash2, Plus, Zap, Film, MonitorPlay } from "lucide-react";
+import { X, Trash2, Plus, Zap, Film, MonitorPlay, Play } from "lucide-react";
 import api from "../../services/api";
 import { TMDB_LOGO_BASE_URL, AI_REQUEST_TIMEOUT } from "../../constants";
 import { sanitizeItem } from "../../utils/sanitize";
@@ -145,6 +145,17 @@ const MovieDetailsModal = ({
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-neutral-900"></div>
+          {safeItem.trailer_key && (
+            <a
+              href={`https://www.youtube.com/watch?v=${safeItem.trailer_key}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs md:text-sm px-3 md:px-4 py-2 rounded-full shadow-lg shadow-red-900/40 transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+            >
+              <Play size={16} fill="currentColor" /> Watch Trailer
+            </a>
+          )}
         </div>
 
         <div className="flex-1 flex flex-col overflow-y-auto p-6 md:p-8 custom-scrollbar">
