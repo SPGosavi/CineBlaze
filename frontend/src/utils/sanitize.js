@@ -24,5 +24,6 @@ export const sanitizeItem = (item) => {
     imdb_rating: item.imdb_rating || null,
     rotten_tomatoes: item.rotten_tomatoes || null,
     addedAt: item.addedAt || 0,
+    trailer_key: item.trailer_key || null,
   };
 };
