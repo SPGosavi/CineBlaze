@@ -83,6 +83,7 @@ export function sanitizeMedia(input: unknown): SanitizedMedia | null {
     rotten_tomatoes: asString(item.rotten_tomatoes) || null,
     status: asStatus(item.status),
     addedAt: typeof item.addedAt === "number" ? item.addedAt : 0,
+    trailer_key: asString(item.trailer_key) || null,
   };
 }
 
