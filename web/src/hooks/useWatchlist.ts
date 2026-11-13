@@ -103,6 +103,14 @@ export function useWatchlist(user: User | null): WatchlistState {
   const watchlist = synced ? store.items : EMPTY;
   const ready = !canSubscribe || synced;
 
+  // A Set of media IDs derived from the current watchlist during render.
+  // `isInWatchlist` reads this so the UI reflects the very latest snapshot
+  // without waiting for an effect to mirror data into a ref.
+  const watchlistIdSet = useMemo(
+    () => new Set(watchlist.map((item) => item.id)),
+    [watchlist]
+  );
+
   // Mutations need the current list to compute the next one, but taking it as
   // a dependency would give every handler a new identity on each snapshot and
   // defeat the memoised cards. Mirrored into a ref after commit rather than
@@ -139,8 +147,8 @@ export function useWatchlist(user: User | null): WatchlistState {
   }, [uid]);
 
   const isInWatchlist = useCallback(
-    (id: number) => watchlistRef.current.some((item) => item.id === id),
-    []
+    (id: number) => watchlistIdSet.has(id),
+    [watchlistIdSet]
   );
 
   const add = useCallback(

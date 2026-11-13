@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Search, AlertTriangle, Zap } from "lucide-react";
 import { useTrending } from "../hooks/useTrending";
 import { useSearchContext } from "../contexts/SearchContext";
@@ -28,7 +28,8 @@ const DiscoverPage = () => {
     loadingPrime,
   } = useTrending();
 
-  const { addToWatchlist } = useWatchlistContext();
+  const { addToWatchlist, removeFromWatchlist, watchlist } =
+    useWatchlistContext();
   const { openMedia } = useModalContext();
 
   // Stable identity, otherwise the memoised cards re-render on every
@@ -36,6 +37,17 @@ const DiscoverPage = () => {
   const onAddToWatchlist = useCallback(
     (item) => addToWatchlist(item, "want"),
     [addToWatchlist]
+  );
+
+  const onRemoveFromWatchlist = useCallback(
+    (id) => removeFromWatchlist(id),
+    [removeFromWatchlist]
+  );
+
+  // Set of watchlist IDs for O(1) lookup in each card.
+  const watchlistIdSet = useMemo(
+    () => new Set(watchlist.map((item) => item.id)),
+    [watchlist]
   );
 
   return (
@@ -130,6 +142,8 @@ const DiscoverPage = () => {
                   key={m.id}
                   item={m}
                   onAddToWatchlist={onAddToWatchlist}
+                  onRemoveFromWatchlist={onRemoveFromWatchlist}
+                  isInWatchlist={watchlistIdSet.has(m.id)}
                   onExpand={openMedia}
                 />
               ))}
@@ -147,6 +161,8 @@ const DiscoverPage = () => {
               title="Trending Now"
               items={trendingAll}
               onAdd={onAddToWatchlist}
+              onRemove={onRemoveFromWatchlist}
+              watchlistIdSet={watchlistIdSet}
               onExpand={openMedia}
             />
           )}
@@ -158,6 +174,8 @@ const DiscoverPage = () => {
               title="Popular on Netflix"
               items={trendingNetflix}
               onAdd={onAddToWatchlist}
+              onRemove={onRemoveFromWatchlist}
+              watchlistIdSet={watchlistIdSet}
               onExpand={openMedia}
             />
           )}
@@ -169,6 +187,8 @@ const DiscoverPage = () => {
               title="Popular on Prime Video"
               items={trendingPrime}
               onAdd={onAddToWatchlist}
+              onRemove={onRemoveFromWatchlist}
+              watchlistIdSet={watchlistIdSet}
               onExpand={openMedia}
             />
           )}

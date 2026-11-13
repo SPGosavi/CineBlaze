@@ -1,11 +1,18 @@
 import { memo } from "react";
-import { Plus } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import Poster from "../ui/Poster";
 import HorizontalScrollContainer from "../ui/HorizontalScroll";
 import { sanitizeItem } from "../../utils/sanitize";
 
 /** A titled, horizontally scrollable shelf of trending titles. */
-const TrendingRow = ({ title, items, onAdd, onExpand }) => (
+const TrendingRow = ({
+  title,
+  items,
+  onAdd,
+  onRemove,
+  watchlistIdSet,
+  onExpand,
+}) => (
   <div className="space-y-3">
     <div className="flex items-center gap-2 px-1">
       <div className="w-1 h-5 bg-red-600 rounded-full"></div>
@@ -14,6 +21,7 @@ const TrendingRow = ({ title, items, onAdd, onExpand }) => (
     <HorizontalScrollContainer>
       {items.map((item) => {
         const safeItem = sanitizeItem(item);
+        const saved = watchlistIdSet && watchlistIdSet.has(safeItem.id);
         const imdbRating =
           safeItem.imdb_rating && safeItem.imdb_rating !== "N/A"
             ? safeItem.imdb_rating
@@ -38,11 +46,20 @@ const TrendingRow = ({ title, items, onAdd, onExpand }) => (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onAdd(safeItem);
+                    if (saved) {
+                      onRemove?.(safeItem.id);
+                    } else {
+                      onAdd(safeItem);
+                    }
                   }}
-                  className="bg-red-600 p-2 rounded-full text-white hover:bg-red-500 transform hover:scale-110 transition-all shadow-xl"
+                  className={`p-2 rounded-full text-white transform hover:scale-110 transition-all shadow-xl ${
+                    saved
+                      ? "bg-green-600 hover:bg-red-600"
+                      : "bg-red-600 hover:bg-red-500"
+                  }`}
+                  title={saved ? "Remove from Watchlist" : "Add to Watchlist"}
                 >
-                  <Plus size={20} />
+                  {saved ? <Check size={20} /> : <Plus size={20} />}
                 </button>
               </div>
             </div>

@@ -308,7 +308,7 @@ const MovieDetailsModal = ({
                   size={20}
                   className="group-hover:scale-110 transition-transform"
                 />{" "}
-                Remove from List
+                Remove from Watchlist
               </button>
             ) : (
               <button
