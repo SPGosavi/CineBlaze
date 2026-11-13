@@ -1,10 +1,16 @@
 import { memo } from "react";
-import { Plus } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import Poster from "../ui/Poster";
 import { sanitizeItem } from "../../utils/sanitize";
 
-/** Grid card for a search result, with quick add-to-watchlist. */
-const MediaCard = ({ item, onAddToWatchlist, onExpand }) => {
+/** Grid card for a search result, with quick add-to/remove-from watchlist. */
+const MediaCard = ({
+  item,
+  onAddToWatchlist,
+  onRemoveFromWatchlist,
+  isInWatchlist,
+  onExpand,
+}) => {
   if (!item) return null;
   const safeItem = sanitizeItem(item);
   const year = safeItem.release_date.split("-")[0] || "N/A";
@@ -41,12 +47,24 @@ const MediaCard = ({ item, onAddToWatchlist, onExpand }) => {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onAddToWatchlist(safeItem);
+            if (isInWatchlist) {
+              onRemoveFromWatchlist(safeItem.id);
+            } else {
+              onAddToWatchlist(safeItem);
+            }
           }}
-          className="absolute top-2 right-2 p-2 bg-red-600 hover:bg-red-500 rounded-full text-white transition-all shadow-lg shadow-red-900/20 md:opacity-0 group-hover:opacity-100 opacity-100 transform translate-y-0 group-hover:translate-y-0"
-          title="Add to Watchlist"
+          className={`absolute top-2 right-2 p-2 rounded-full text-white transition-all shadow-lg md:opacity-0 group-hover:opacity-100 opacity-100 transform translate-y-0 group-hover:translate-y-0 ${
+            isInWatchlist
+              ? "bg-green-600 hover:bg-red-600 shadow-green-900/20"
+              : "bg-red-600 hover:bg-red-500 shadow-red-900/20"
+          }`}
+          title={isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
         >
-          <Plus size={16} strokeWidth={3} />
+          {isInWatchlist ? (
+            <Check size={16} strokeWidth={3} />
+          ) : (
+            <Plus size={16} strokeWidth={3} />
+          )}
         </button>
       </div>
       <div className="p-3 flex flex-col flex-grow bg-neutral-800 relative z-10">

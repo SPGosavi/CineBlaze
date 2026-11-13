@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Plus } from "lucide-react";
+import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import type { SanitizedMedia } from "@cineblaze/shared";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useWatchlistContext } from "@/contexts/WatchlistContext";
@@ -63,14 +63,14 @@ export default function WatchlistButton({
         aria-label={label}
         leftIcon={
           saved ? (
-            <Check size={18} aria-hidden="true" />
+            <Trash2 size={18} aria-hidden="true" />
           ) : (
             <Plus size={18} aria-hidden="true" />
           )
         }
         className={className}
       >
-        {saved ? "In your watchlist" : "Add to watchlist"}
+        {saved ? "Remove from watchlist" : "Add to watchlist"}
       </Button>
     );
   }
