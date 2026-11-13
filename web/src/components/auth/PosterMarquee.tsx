@@ -16,7 +16,7 @@ function sliceRows(posters: readonly string[], rows: number): string[][] {
 /**
  * Decorative poster wall for the login page.
  *
- * Includes hover/focus pause affordance and visible pause control (Gate 18).
+ * Continuous sliding poster marquee with visible pause control (Gate 18).
  * Uses CSS mask-image rather than decorative gradient overlays (Gate 81).
  */
 export default function PosterMarquee() {
@@ -26,7 +26,7 @@ export default function PosterMarquee() {
   return (
     <div
       aria-label="Movie poster gallery"
-      className="group/marquee relative hidden select-none overflow-hidden md:flex md:flex-col md:justify-center md:gap-4 bg-paper [mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)] [-webkit-mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)]"
+      className="relative hidden select-none overflow-hidden md:flex md:flex-col md:justify-center md:gap-4 bg-paper [mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)] [-webkit-mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)]"
     >
       {/* Visible pause control button (Gate 18 requirement for animations > 5s) */}
       <button
@@ -56,11 +56,7 @@ export default function PosterMarquee() {
             index % 2 === 0
               ? "motion-safe:animate-marquee-left"
               : "motion-safe:animate-marquee-right"
-          } ${
-            isPaused
-              ? "[animation-play-state:paused]"
-              : "group-hover/marquee:[animation-play-state:paused] group-focus-within/marquee:[animation-play-state:paused]"
-          }`}
+          } ${isPaused ? "[animation-play-state:paused]" : ""}`}
           style={{ animationDuration: `${55 + index * 10}s` }}
         >
           {[...row, ...row].map((path, position) => (
