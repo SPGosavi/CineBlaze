@@ -1,12 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import {
-  doc,
-  setDoc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
-  onSnapshot,
-} from "firebase/firestore";
+import { doc, setDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db, firebaseInitialized } from "../services/firebase";
 
 /**
@@ -53,8 +46,9 @@ export const useWatchlist = (user) => {
   const addToWatchlist = useCallback(
     async (item, status = "want") => {
       if (!firebaseInitialized || !user) return;
+      const targetId = Number(item.id);
       const newItem = {
-        id: item.id,
+        id: targetId,
         title: item.title || item.name,
         poster_path: item.poster_path,
         release_date: item.release_date || item.first_air_date,
@@ -70,12 +64,15 @@ export const useWatchlist = (user) => {
         providers: item.providers || [],
         addedAt: Date.now(),
       };
-      if (watchlist.some((i) => i.id === newItem.id)) return;
+      if (watchlist.some((i) => Number(i.id) === targetId)) return;
+      const updated = [...watchlist, newItem];
+      setWatchlist(updated);
       const userRef = watchlistDocRef(user.uid);
       try {
-        await setDoc(userRef, { items: arrayUnion(newItem) }, { merge: true });
+        await setDoc(userRef, { items: updated }, { merge: true });
       } catch (e) {
         console.error(e);
+        setWatchlist(watchlist);
       }
     },
     [user, watchlist]
@@ -84,10 +81,17 @@ export const useWatchlist = (user) => {
   const removeFromWatchlist = useCallback(
     async (itemId) => {
       if (!firebaseInitialized || !user) return;
-      const item = watchlist.find((i) => i.id === itemId);
-      if (!item) return;
+      const targetId = Number(itemId);
+      if (!watchlist.some((i) => Number(i.id) === targetId)) return;
+      const updated = watchlist.filter((i) => Number(i.id) !== targetId);
+      setWatchlist(updated);
       const userRef = watchlistDocRef(user.uid);
-      await updateDoc(userRef, { items: arrayRemove(item) });
+      try {
+        await setDoc(userRef, { items: updated }, { merge: true });
+      } catch (e) {
+        console.error(e);
+        setWatchlist(watchlist);
+      }
     },
     [user, watchlist]
   );

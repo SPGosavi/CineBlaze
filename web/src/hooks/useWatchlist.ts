@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import {
-  doc,
-  setDoc,
-  updateDoc,
-  arrayUnion,
-  arrayRemove,
-  onSnapshot,
-} from "firebase/firestore";
+import { doc, setDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import type { User } from "firebase/auth";
 import type {
   SanitizedMedia,
@@ -107,7 +100,7 @@ export function useWatchlist(user: User | null): WatchlistState {
   // `isInWatchlist` reads this so the UI reflects the very latest snapshot
   // without waiting for an effect to mirror data into a ref.
   const watchlistIdSet = useMemo(
-    () => new Set(watchlist.map((item) => item.id)),
+    () => new Set(watchlist.map((item) => Number(item.id))),
     [watchlist]
   );
 
@@ -147,42 +140,48 @@ export function useWatchlist(user: User | null): WatchlistState {
   }, [uid]);
 
   const isInWatchlist = useCallback(
-    (id: number) => watchlistIdSet.has(id),
+    (id: number) => watchlistIdSet.has(Number(id)),
     [watchlistIdSet]
   );
 
   const add = useCallback(
     async (item: SanitizedMedia, status: WatchlistStatus = "want") => {
       if (!firebaseInitialized || uid === null) return;
-      if (watchlistRef.current.some((existing) => existing.id === item.id)) {
+      const targetId = Number(item.id);
+      if (
+        watchlistRef.current.some(
+          (existing) => Number(existing.id) === targetId
+        )
+      ) {
         return;
       }
 
       const entry: WatchlistItem = {
-        id: item.id,
+        id: targetId,
         title: item.title,
         poster_path: item.poster_path,
         release_date: item.release_date,
         media_type: item.media_type,
-        genres: item.genres,
-        director: item.director,
-        cast: item.cast,
+        genres: item.genres ?? [],
+        director: item.director || "Unknown",
+        cast: item.cast ?? [],
         overview: item.overview ?? "",
         vote_average: item.vote_average ?? 0,
-        imdb_rating: item.imdb_rating,
-        rotten_tomatoes: item.rotten_tomatoes,
-        providers: item.providers,
-        original_language: item.original_language,
+        imdb_rating: item.imdb_rating ?? null,
+        rotten_tomatoes: item.rotten_tomatoes ?? null,
+        providers: item.providers ?? [],
+        original_language: item.original_language || "",
         status,
         addedAt: Date.now(),
+        trailer_key: item.trailer_key ?? null,
       };
 
+      const previous = watchlistRef.current;
+      const next = [...previous, entry];
+      setStore({ uid, items: next });
+
       try {
-        await setDoc(
-          watchlistDocRef(uid),
-          { items: arrayUnion(entry) },
-          { merge: true }
-        );
+        await setDoc(watchlistDocRef(uid), { items: next }, { merge: true });
 
         const eventAction: UserEventRequest["action"] =
           status === "watched" ? "watched" : "watchlisted";
@@ -202,6 +201,7 @@ export function useWatchlist(user: User | null): WatchlistState {
         void api.post("/events", payload).catch(() => {});
       } catch (writeError) {
         console.error(writeError);
+        setStore({ uid, items: previous });
         setError("Could not add that title.");
       }
     },
@@ -211,12 +211,18 @@ export function useWatchlist(user: User | null): WatchlistState {
   const remove = useCallback(
     async (id: number) => {
       if (!firebaseInitialized || uid === null) return;
-      const item = watchlistRef.current.find((entry) => entry.id === id);
-      if (!item) return;
+      const targetId = Number(id);
+      const previous = watchlistRef.current;
+      if (!previous.some((entry) => Number(entry.id) === targetId)) return;
+
+      const next = previous.filter((entry) => Number(entry.id) !== targetId);
+      setStore({ uid, items: next });
+
       try {
-        await updateDoc(watchlistDocRef(uid), { items: arrayRemove(item) });
+        await setDoc(watchlistDocRef(uid), { items: next }, { merge: true });
       } catch (writeError) {
         console.error(writeError);
+        setStore({ uid, items: previous });
         setError("Could not remove that title.");
       }
     },
