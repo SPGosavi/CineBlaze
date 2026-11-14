@@ -61,15 +61,24 @@ export default function PosterTile({
           className="font-body font-medium text-sm text-ink hover:text-accent transition-colors"
         />
 
-        <div className="flex items-center justify-between text-xs font-body text-muted">
-          {year ? (
+        {year && (
+          <div className="text-xs font-body text-muted">
             <Figure value={year} size="sm" className="text-muted" />
-          ) : (
-            <span />
-          )}
-          <div className="flex items-center gap-1.5">
+          </div>
+        )}
+
+        {(imdbNum != null || rtNum != null || item.vote_average > 0) && (
+          <div className="flex items-center gap-2 text-xs font-body">
             {imdbNum != null && (
               <Rating score={imdbNum} maxScore={10} source="IMDb" size="sm" />
+            )}
+            {imdbNum != null && rtNum != null && (
+              <span
+                className="text-muted/40 text-[10px] select-none"
+                aria-hidden="true"
+              >
+                ·
+              </span>
             )}
             {rtNum != null && (
               <Rating score={rtNum} maxScore={100} source="RT" size="sm" />
@@ -83,7 +92,7 @@ export default function PosterTile({
               />
             )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
