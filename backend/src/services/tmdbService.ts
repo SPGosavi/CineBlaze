@@ -1,4 +1,3 @@
-import fetch from "node-fetch";
 import * as cache from "../cache/index.js";
 import { CacheKeys } from "../cache/index.js";
 import {
@@ -109,14 +108,15 @@ export async function fetchFastDetailsById(
 
 export async function fetchRatings(
   title: string,
-  year: string | undefined
+  year: string | undefined,
+  imdbId?: string | null
 ): Promise<Ratings> {
-  const cacheKey = CacheKeys.ratings(title, year);
+  const cacheKey = CacheKeys.ratings(title, year, imdbId);
   const cached = await cache.get<Ratings>(cacheKey);
   if (cached) return cached;
 
   try {
-    const ratings = await fetchOmdbRatings(title, year);
+    const ratings = await fetchOmdbRatings(title, year, imdbId);
     await cache.set(cacheKey, ratings, 86_400); // 24 hours
     return ratings;
   } catch {
@@ -854,7 +854,7 @@ export async function fetchFullDetailsById(
 ): Promise<EnrichedMedia | null> {
   if (!id || !mediaType) return null;
 
-  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,videos`;
+  const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,videos,external_ids`;
   let data: TmdbDetailResponse;
   try {
     const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
@@ -873,6 +873,8 @@ export async function fetchFullDetailsById(
 
   const releaseDate = data.release_date || data.first_air_date || "";
   const details = parseTmdbDetails(data, mediaType, 10);
+  const imdbId =
+    (data as any).imdb_id || (data as any).external_ids?.imdb_id || null;
 
   // Both are independently cached and neither blocks the other.
   const [providers, ratings] = await Promise.all([
@@ -888,7 +890,7 @@ export async function fetchFullDetailsById(
         )
       )
     ),
-    fetchRatings(title, releaseDate.split("-")[0] || undefined),
+    fetchRatings(title, releaseDate.split("-")[0] || undefined, imdbId),
   ]);
 
   return {
@@ -969,27 +971,77 @@ export async function fetchWatchProviders(
 
 export async function fetchOmdbRatings(
   title: string,
-  year: string | undefined
+  year: string | undefined,
+  imdbId?: string | null
 ): Promise<Ratings> {
-  const url = `https://www.omdbapi.com/?t=${encodeURIComponent(title)}&y=${year}&apikey=${OMDB_API_KEY}`;
-  const res = await fetch(url);
-  const data = (await res.json()) as OmdbResponse;
+  const parseRatings = (data: OmdbResponse): Ratings => {
+    let imdb: string | null = null;
+    let rt: string | null = null;
 
-  let imdb: string | null = null;
-  let rt: string | null = null;
+    if (data.imdbRating && data.imdbRating !== "N/A") {
+      imdb = data.imdbRating;
+    }
 
-  if (Array.isArray(data.Ratings)) {
-    for (const r of data.Ratings) {
-      if (r.Source === "Internet Movie Database") {
-        imdb = r.Value?.split("/")[0] || null;
+    if (Array.isArray(data.Ratings)) {
+      for (const r of data.Ratings) {
+        if (r.Source === "Internet Movie Database" && r.Value) {
+          imdb = r.Value.split("/")[0] || imdb;
+        }
+        if (r.Source === "Rotten Tomatoes" && r.Value) {
+          rt = r.Value.replace("%", "").trim() || null;
+        }
       }
-      if (r.Source === "Rotten Tomatoes") {
-        rt = r.Value?.replace("%", "") || null;
-      }
+    }
+
+    return { imdb, rt };
+  };
+
+  const executeOmdbQuery = async (
+    queryUrl: string
+  ): Promise<OmdbResponse | null> => {
+    try {
+      const res = await fetchWithTimeout(queryUrl, 5000);
+      if (!res.ok) return null;
+      return (await res.json()) as OmdbResponse;
+    } catch {
+      return null;
+    }
+  };
+
+  // 1. Try exact IMDb ID lookup first if available
+  if (imdbId && /^tt\d+$/i.test(imdbId.trim())) {
+    const idUrl = `https://www.omdbapi.com/?i=${encodeURIComponent(imdbId.trim())}&apikey=${OMDB_API_KEY}`;
+    const idData = await executeOmdbQuery(idUrl);
+    if (idData && idData.Response !== "False") {
+      return parseRatings(idData);
     }
   }
 
-  return { imdb, rt } as unknown as Ratings;
+  // 2. Try title + year lookup
+  const cleanYear =
+    year && year !== "undefined" && year.trim() ? year.trim() : undefined;
+  const buildTitleUrl = (y?: string) => {
+    const params = new URLSearchParams();
+    params.set("t", title);
+    if (y) params.set("y", y);
+    params.set("apikey", OMDB_API_KEY);
+    return `https://www.omdbapi.com/?${params.toString()}`;
+  };
+
+  const titleData = await executeOmdbQuery(buildTitleUrl(cleanYear));
+  if (titleData && titleData.Response !== "False") {
+    return parseRatings(titleData);
+  }
+
+  // 3. Fallback: retry title without year if year search failed
+  if (cleanYear) {
+    const titleOnlyData = await executeOmdbQuery(buildTitleUrl(undefined));
+    if (titleOnlyData && titleOnlyData.Response !== "False") {
+      return parseRatings(titleOnlyData);
+    }
+  }
+
+  return { imdb: null, rt: null };
 }
 
 function formatTmdbResult(

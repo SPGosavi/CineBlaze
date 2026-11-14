@@ -42,8 +42,8 @@ export const CacheKeys = {
     mediaType: string
   ) => `details:title:${title}:${year ?? ""}:${mediaType}`,
   detailsPrefix: "details:",
-  ratings: (title: string, year: string | undefined) =>
-    `ratings:${title}:${year ?? ""}`,
+  ratings: (title: string, year: string | undefined, imdbId?: string | null) =>
+    imdbId ? `ratings:id:${imdbId}` : `ratings:${title}:${year ?? ""}`,
   forYou: (userId: string, count: number) => `forYou:${userId}:${count}`,
   forYouPrefix: "forYou:",
 } as const;

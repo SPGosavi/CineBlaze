@@ -74,7 +74,7 @@ const TrendingRow = ({
               )}
               {rtRating && (
                 <span className="text-[9px] font-bold text-red-400 border border-red-400/20 px-1 rounded bg-red-400/5">
-                  RT {rtRating}
+                  RT {rtRating.includes("%") ? rtRating : `${rtRating}%`}
                 </span>
               )}
             </div>

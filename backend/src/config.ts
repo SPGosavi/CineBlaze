@@ -13,7 +13,7 @@ function requireEnv(name: string): string {
   if (!value) {
     throw new Error(`Environment variable ${name} is missing.`);
   }
-  return value;
+  return value.trim();
 }
 
 export const GROQ_API_KEY = requireEnv("GROQ_API_KEY");
