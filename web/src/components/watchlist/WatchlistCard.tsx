@@ -1,6 +1,7 @@
 "use client";
 
 import SlidingTitle from "@/components/ui/SlidingTitle";
+import SlidingRatings from "@/components/ui/SlidingRatings";
 
 import { memo, useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
@@ -201,9 +202,17 @@ function WatchlistCard({
           className="font-body font-medium text-xs text-ink"
         />
 
-        <div className="mt-1 flex items-center gap-1.5">
+        <SlidingRatings isRevealed={revealed} className="mt-1">
           {imdbNum != null && (
             <Rating score={imdbNum} maxScore={10} source="IMDb" size="sm" />
+          )}
+          {imdbNum != null && rtNum != null && (
+            <span
+              className="text-muted/40 text-[10px] select-none"
+              aria-hidden="true"
+            >
+              ·
+            </span>
           )}
           {rtNum != null && (
             <Rating score={rtNum} maxScore={100} source="RT" size="sm" />
@@ -216,7 +225,7 @@ function WatchlistCard({
               size="sm"
             />
           )}
-        </div>
+        </SlidingRatings>
       </div>
 
       {/* Move Status Action Button */}

@@ -1,4 +1,5 @@
 import SlidingTitle from "@/components/ui/SlidingTitle";
+import SlidingRatings from "@/components/ui/SlidingRatings";
 import Link from "next/link";
 import type { SanitizedMedia } from "@cineblaze/shared";
 import { releaseYear } from "@/lib/sanitize";
@@ -68,7 +69,7 @@ export default function PosterTile({
         )}
 
         {(imdbNum != null || rtNum != null || item.vote_average > 0) && (
-          <div className="flex items-center gap-2 text-xs font-body">
+          <SlidingRatings className="text-xs font-body">
             {imdbNum != null && (
               <Rating score={imdbNum} maxScore={10} source="IMDb" size="sm" />
             )}
@@ -91,7 +92,7 @@ export default function PosterTile({
                 size="sm"
               />
             )}
-          </div>
+          </SlidingRatings>
         )}
       </div>
     </div>
