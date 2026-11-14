@@ -40,21 +40,6 @@ export default function MediaCard({
   const rtNum = item.rotten_tomatoes
     ? parseFloat(item.rotten_tomatoes.replace("%", ""))
     : null;
-  const ratingScore =
-    imdbNum ??
-    (rtNum !== null
-      ? rtNum / 10
-      : item.vote_average > 0
-        ? item.vote_average
-        : null);
-  const ratingSource =
-    imdbNum !== null
-      ? "IMDb"
-      : rtNum !== null
-        ? "RT"
-        : item.vote_average > 0
-          ? "TMDB"
-          : undefined;
 
   const titleLinkContent = <SlidingTitle text={item.title} />;
 
@@ -155,12 +140,26 @@ export default function MediaCard({
         </div>
 
         {/* Rating Row (the signature) */}
-        <div className="border-t border-rule pt-2 flex items-center justify-between text-xs shrink-0">
-          {ratingScore != null ? (
-            <Rating score={ratingScore} source={ratingSource} size="sm" />
-          ) : (
-            <Label size="xs">Not rated</Label>
+        <div className="border-t border-rule pt-2 flex flex-wrap items-center gap-2.5 text-xs shrink-0">
+          {imdbNum != null && (
+            <Rating score={imdbNum} maxScore={10} source="IMDb" size="sm" />
           )}
+          {rtNum != null && (
+            <Rating score={rtNum} maxScore={100} source="RT" size="sm" />
+          )}
+          {imdbNum == null && rtNum == null && item.vote_average > 0 && (
+            <Rating
+              score={item.vote_average}
+              maxScore={10}
+              source="TMDB"
+              size="sm"
+            />
+          )}
+          {imdbNum == null &&
+            rtNum == null &&
+            (!item.vote_average || item.vote_average === 0) && (
+              <Label size="xs">Not rated</Label>
+            )}
         </div>
       </div>
 

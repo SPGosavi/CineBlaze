@@ -27,21 +27,6 @@ export default function PosterTile({
   const rtNum = item.rotten_tomatoes
     ? parseFloat(item.rotten_tomatoes.replace("%", ""))
     : null;
-  const ratingScore =
-    imdbNum ??
-    (rtNum !== null
-      ? rtNum / 10
-      : item.vote_average > 0
-        ? item.vote_average
-        : null);
-  const ratingSource =
-    imdbNum !== null
-      ? "IMDb"
-      : rtNum !== null
-        ? "RT"
-        : item.vote_average > 0
-          ? "TMDB"
-          : undefined;
 
   const widthClass =
     density === "spacious"
@@ -82,9 +67,22 @@ export default function PosterTile({
           ) : (
             <span />
           )}
-          {ratingScore != null && (
-            <Rating score={ratingScore} source={ratingSource} size="sm" />
-          )}
+          <div className="flex items-center gap-1.5">
+            {imdbNum != null && (
+              <Rating score={imdbNum} maxScore={10} source="IMDb" size="sm" />
+            )}
+            {rtNum != null && (
+              <Rating score={rtNum} maxScore={100} source="RT" size="sm" />
+            )}
+            {imdbNum == null && rtNum == null && item.vote_average > 0 && (
+              <Rating
+                score={item.vote_average}
+                maxScore={10}
+                source="TMDB"
+                size="sm"
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -179,21 +179,6 @@ export default async function MediaDetailPage(
   const rtNum = item.rotten_tomatoes
     ? parseFloat(item.rotten_tomatoes.replace("%", ""))
     : null;
-  const ratingScore =
-    imdbNum ??
-    (rtNum !== null
-      ? rtNum / 10
-      : item.vote_average > 0
-        ? item.vote_average
-        : null);
-  const ratingSource =
-    imdbNum !== null
-      ? "IMDb"
-      : rtNum !== null
-        ? "RT"
-        : item.vote_average > 0
-          ? "TMDB"
-          : undefined;
 
   const inTheatres = isInTheatres(item);
   const flatrateProviders = item.providers.filter(
@@ -266,8 +251,19 @@ export default async function MediaDetailPage(
 
             {year && <Figure value={year} size="sm" className="text-muted" />}
 
-            {ratingScore != null && (
-              <Rating score={ratingScore} source={ratingSource} size="md" />
+            {imdbNum != null && (
+              <Rating score={imdbNum} maxScore={10} source="IMDb" size="md" />
+            )}
+            {rtNum != null && (
+              <Rating score={rtNum} maxScore={100} source="RT" size="md" />
+            )}
+            {imdbNum == null && rtNum == null && item.vote_average > 0 && (
+              <Rating
+                score={item.vote_average}
+                maxScore={10}
+                source="TMDB"
+                size="md"
+              />
             )}
           </div>
 

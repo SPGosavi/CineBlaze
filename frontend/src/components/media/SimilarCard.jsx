@@ -41,7 +41,10 @@ const SimilarCard = ({ item, onClick }) => {
           )}
           {item.rotten_tomatoes && (
             <span className="text-[9px] font-bold text-red-400">
-              RT {item.rotten_tomatoes}
+              RT{" "}
+              {String(item.rotten_tomatoes).includes("%")
+                ? item.rotten_tomatoes
+                : `${item.rotten_tomatoes}%`}
             </span>
           )}
         </div>
