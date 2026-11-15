@@ -108,6 +108,16 @@ const MediaCard = ({
               />
               {imdbRating}
             </span>
+          ) : !rtRating && safeItem.vote_average > 0 ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-400 bg-teal-400/10 px-1.5 py-0.5 rounded border border-teal-400/20">
+              <img
+                src="/icons/tmdb.svg"
+                alt="TMDB"
+                className="h-3"
+                draggable={false}
+              />
+              {safeItem.vote_average.toFixed(1)}
+            </span>
           ) : (
             <span className="text-[10px] text-gray-600">No Rating</span>
           )}

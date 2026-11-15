@@ -34,7 +34,7 @@ const SimilarCard = ({ item, onClick }) => {
         <p className="text-[10px] text-orange-500 font-medium">{year}</p>
 
         <div className="flex gap-2">
-          {item.imdb_rating && (
+          {item.imdb_rating ? (
             <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-yellow-500">
               <img
                 src="/icons/imdb.svg"
@@ -44,7 +44,17 @@ const SimilarCard = ({ item, onClick }) => {
               />
               {item.imdb_rating}
             </span>
-          )}
+          ) : !item.rotten_tomatoes && item.vote_average > 0 ? (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-teal-400">
+              <img
+                src="/icons/tmdb.svg"
+                alt="TMDB"
+                className="h-2.5"
+                draggable={false}
+              />
+              {Number(item.vote_average).toFixed(1)}
+            </span>
+          ) : null}
           {item.rotten_tomatoes &&
             (() => {
               const score = parseFloat(

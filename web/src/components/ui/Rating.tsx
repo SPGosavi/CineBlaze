@@ -71,7 +71,18 @@ function SourceLogo({
     );
   }
 
-  // Fallback for TMDB or other sources — keep text
+  if (source === "TMDB") {
+    return (
+      <img
+        src="/icons/tmdb.svg"
+        alt="TMDB"
+        className={`inline-block ${h} opacity-80`}
+        draggable={false}
+      />
+    );
+  }
+
+  // Fallback for other sources — keep text
   return (
     <Label size="xs" className="opacity-80">
       {source}

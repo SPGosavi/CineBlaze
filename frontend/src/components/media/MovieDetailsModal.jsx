@@ -202,6 +202,17 @@ const MovieDetailsModal = ({
                     </span>
                   );
                 })()}
+              {!imdbRating && !rtRating && safeItem.vote_average > 0 && (
+                <span className="inline-flex items-center gap-1.5 text-teal-400 font-bold bg-teal-400/10 px-2 py-0.5 rounded border border-teal-400/20">
+                  <img
+                    src="/icons/tmdb.svg"
+                    alt="TMDB"
+                    className="h-3.5"
+                    draggable={false}
+                  />
+                  {safeItem.vote_average.toFixed(1)}
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
               <h2 className="text-2xl md:text-4xl font-black text-white leading-tight tracking-tight">
