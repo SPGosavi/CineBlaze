@@ -34,7 +34,9 @@ const WatchlistCard = ({ item, onDragStart, onDropItem, onExpand }) => {
     e.preventDefault();
     e.stopPropagation();
     setIsOver(false);
-    onDropItem(safeItem.id);
+    const dataId = Number(e.dataTransfer.getData("text/plain"));
+    const fromId = Number.isInteger(dataId) && dataId > 0 ? dataId : undefined;
+    onDropItem(safeItem.id, fromId);
   };
 
   const year = safeItem.release_date.split("-")[0] || "N/A";

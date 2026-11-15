@@ -277,17 +277,46 @@ export function useWatchlist(user: User | null): WatchlistState {
       if (sourceId === null || sourceId === targetId) return;
 
       const previous = watchlistRef.current;
-      const sourceIndex = previous.findIndex((item) => item.id === sourceId);
-      const targetIndex = previous.findIndex((item) => item.id === targetId);
-      if (sourceIndex === -1 || targetIndex === -1) return;
+      const sourceItem = previous.find((item) => item.id === sourceId);
+      const targetItem = previous.find((item) => item.id === targetId);
+      if (!sourceItem || !targetItem) return;
 
-      const next = [...previous];
-      const [moved] = next.splice(sourceIndex, 1);
-      next.splice(targetIndex, 0, moved);
+      const statusChanged = sourceItem.status !== targetItem.status;
+      const movedItem: WatchlistItem = statusChanged
+        ? { ...sourceItem, status: targetItem.status }
+        : sourceItem;
+
+      // Filter out source item first to calculate precise target index
+      const listWithoutSource = previous.filter((item) => item.id !== sourceId);
+      const insertIndex = listWithoutSource.findIndex(
+        (item) => item.id === targetId
+      );
+      if (insertIndex === -1) return;
+
+      const next = [...listWithoutSource];
+      next.splice(insertIndex, 0, movedItem);
 
       setStore({ uid, items: next });
       try {
         await updateDoc(watchlistDocRef(uid), { items: next });
+
+        if (statusChanged && movedItem.status === "watched") {
+          const payload: UserEventRequest = {
+            action: "watched",
+            tmdbId: movedItem.id,
+            mediaType: movedItem.media_type,
+            title: movedItem.title,
+            genres: movedItem.genres,
+            languageCode: movedItem.original_language || undefined,
+            releaseYear:
+              Number(movedItem.release_date?.slice(0, 4)) || undefined,
+            voteAverage:
+              typeof movedItem.vote_average === "number"
+                ? movedItem.vote_average
+                : undefined,
+          };
+          void api.post("/events", payload).catch(() => {});
+        }
       } catch (writeError) {
         console.error(writeError);
         setStore({ uid, items: previous });

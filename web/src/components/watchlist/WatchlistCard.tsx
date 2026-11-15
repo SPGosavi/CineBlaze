@@ -17,7 +17,7 @@ export interface WatchlistCardProps {
   moveTo: WatchlistStatus;
   onMove: (id: number, status: WatchlistStatus) => void;
   onDragStart: (event: React.DragEvent<HTMLElement>, id: number) => void;
-  onDropOnCard: (targetId: number) => void;
+  onDropOnCard: (targetId: number, fromId?: number) => void;
 }
 
 /**
@@ -170,7 +170,10 @@ function WatchlistCard({
         event.preventDefault();
         event.stopPropagation();
         setIsOver(false);
-        onDropOnCard(item.id);
+        const dataId = Number(event.dataTransfer.getData("text/plain"));
+        const fromId =
+          Number.isInteger(dataId) && dataId > 0 ? dataId : undefined;
+        onDropOnCard(item.id, fromId);
       }}
       className={`group relative aspect-[2/3] overflow-hidden rounded-lg border border-rule cursor-grab touch-manipulation active:cursor-grabbing select-none transition-transform duration-short ${
         isOver || isThisItemDropTarget
