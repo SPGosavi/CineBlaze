@@ -31,6 +31,12 @@
   --color-heat-5: var(--heat-5);
   --color-heat-6: var(--heat-6);
 
+  /* Rotten Tomatoes Tomatometer palette */
+  --rt-rotten: oklch(55% 0.12 145);
+  --rt-fresh: oklch(62% 0.22 30);
+  --color-rt-rotten: var(--rt-rotten);
+  --color-rt-fresh: var(--rt-fresh);
+
   --font-display: var(--font-boska), "Boska", "Iowan Old Style", Georgia, serif;
   --font-body: var(--font-geist), "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-outlier: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;

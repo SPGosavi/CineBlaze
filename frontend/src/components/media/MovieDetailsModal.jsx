@@ -170,15 +170,38 @@ const MovieDetailsModal = ({
                 {year}
               </span>
               {imdbRating && (
-                <span className="text-yellow-400 font-bold bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-400/20">
-                  IMDb {imdbRating}
+                <span className="inline-flex items-center gap-1.5 text-yellow-400 font-bold bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-400/20">
+                  <img
+                    src="/icons/imdb.svg"
+                    alt="IMDb"
+                    className="h-3.5"
+                    draggable={false}
+                  />
+                  {imdbRating}
                 </span>
               )}
-              {rtRating && (
-                <span className="text-red-400 font-bold bg-red-400/10 px-2 py-0.5 rounded border border-red-400/20">
-                  RT {rtRating.includes("%") ? rtRating : `${rtRating}%`}
-                </span>
-              )}
+              {rtRating &&
+                (() => {
+                  const score = parseFloat(String(rtRating).replace("%", ""));
+                  const isFresh = !isNaN(score) && score >= 60;
+                  return (
+                    <span
+                      className={`inline-flex items-center gap-1.5 font-bold px-2 py-0.5 rounded border ${isFresh ? "text-red-500 bg-red-500/10 border-red-500/20" : "text-green-500 bg-green-500/10 border-green-500/20"}`}
+                    >
+                      <img
+                        src={
+                          isFresh
+                            ? "/icons/rt-fresh.svg"
+                            : "/icons/rt-rotten.svg"
+                        }
+                        alt={isFresh ? "Fresh" : "Rotten"}
+                        className="h-3.5"
+                        draggable={false}
+                      />
+                      {rtRating.includes("%") ? rtRating : `${rtRating}%`}
+                    </span>
+                  );
+                })()}
             </div>
             <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
               <h2 className="text-2xl md:text-4xl font-black text-white leading-tight tracking-tight">
