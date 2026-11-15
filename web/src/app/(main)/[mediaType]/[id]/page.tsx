@@ -32,6 +32,7 @@ import Label from "@/components/ui/Label";
 import HorizontalScroll from "@/components/ui/HorizontalScroll";
 import PosterTile from "@/components/media/PosterTile";
 import WatchlistButton from "@/components/media/WatchlistButton";
+import StremioButton from "@/components/media/StremioButton";
 import Button from "@/components/ui/Button";
 import { TrendingRowSkeleton } from "@/components/ui/Skeleton";
 
@@ -327,60 +328,65 @@ export default async function MediaDetailPage(
           </section>
 
           {/* Watch Now — single containment layer (Gate 4) */}
-          {(item.providers.length > 0 || inTheatres) && (
-            <section
-              id="watch-now"
-              className="space-y-3 pt-3 border-t border-rule"
-            >
-              <div className="flex items-center gap-2">
-                <MonitorPlay
-                  size={16}
-                  className="text-accent"
-                  aria-hidden="true"
-                />
-                <h2 className="font-display font-medium text-base text-ink">
-                  Watch now
-                </h2>
+          <section
+            id="watch-now"
+            className="space-y-3 pt-3 border-t border-rule"
+          >
+            <div className="flex items-center gap-2">
+              <MonitorPlay
+                size={16}
+                className="text-accent"
+                aria-hidden="true"
+              />
+              <h2 className="font-display font-medium text-base text-ink">
+                Watch now
+              </h2>
+            </div>
+
+            {inTheatres && (
+              <div className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3.5 py-1.5 text-xs font-medium text-accent">
+                <Ticket size={14} aria-hidden="true" />
+                <span>In theatres now</span>
               </div>
+            )}
 
-              {inTheatres ? (
-                <div className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3.5 py-1.5 text-xs font-medium text-accent">
-                  <Ticket size={14} aria-hidden="true" />
-                  <span>In theatres now</span>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {flatrateProviders.length > 0 && (
-                    <div className="space-y-2">
-                      <Label size="xs">Stream</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {flatrateProviders.map((provider) => (
-                          <ProviderLinkItem
-                            key={`stream-${provider.name}`}
-                            provider={provider}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {rentBuyProviders.length > 0 && (
-                    <div className="space-y-2">
-                      <Label size="xs">Rent / Buy</Label>
-                      <div className="flex flex-wrap gap-2">
-                        {rentBuyProviders.map((provider) => (
-                          <ProviderLinkItem
-                            key={`rentbuy-${provider.name}`}
-                            provider={provider}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
+            <div className="space-y-3">
+              {flatrateProviders.length > 0 && (
+                <div className="space-y-2">
+                  <Label size="xs">Stream</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {flatrateProviders.map((provider) => (
+                      <ProviderLinkItem
+                        key={`stream-${provider.name}`}
+                        provider={provider}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
-            </section>
-          )}
+
+              {rentBuyProviders.length > 0 && (
+                <div className="space-y-2">
+                  <Label size="xs">Rent / Buy</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {rentBuyProviders.map((provider) => (
+                      <ProviderLinkItem
+                        key={`rentbuy-${provider.name}`}
+                        provider={provider}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label size="xs">Stremio</Label>
+                <div className="flex flex-wrap gap-2">
+                  <StremioButton item={item} />
+                </div>
+              </div>
+            </div>
+          </section>
 
           {/* Primary Action Button */}
           <div className="pt-4 max-w-xs">

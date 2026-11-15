@@ -286,48 +286,86 @@ const MovieDetailsModal = ({
             </p>
           </div>
 
-          {safeItem.providers.length > 0 ? (
-            <div className="mb-6 border-t border-neutral-800 pt-4">
-              <h3 className="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest flex items-center gap-2">
-                <MonitorPlay size={14} /> Streaming On
-              </h3>
-              <div className="flex flex-wrap gap-3">
-                {safeItem.providers.map((provider, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 bg-neutral-800 p-2 rounded-lg border border-neutral-700 hover:border-neutral-500 transition-colors"
-                    title={provider.name}
-                  >
-                    <img
-                      src={`${TMDB_LOGO_BASE_URL}${provider.logo}`}
-                      alt={provider.name}
-                      loading="lazy"
-                      className="w-6 h-6 rounded-md"
-                    />
-                    <span className="text-xs text-gray-300 font-medium">
-                      {provider.name}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            loadingDetails && (
-              <div className="mb-6 border-t border-neutral-800 pt-4">
-                <h3 className="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest flex items-center gap-2">
-                  <MonitorPlay size={14} /> Streaming On
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  {[...Array(2)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-10 w-32 bg-white/5 rounded-lg animate-pulse"
-                    />
-                  ))}
+          <div className="mb-6 border-t border-neutral-800 pt-4">
+            <h3 className="text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest flex items-center gap-2">
+              <MonitorPlay size={14} /> Watch Options
+            </h3>
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href={
+                  safeItem.imdb_id
+                    ? `https://web.stremio.com/#/detail/${safeItem.media_type === "tv" ? "series" : "movie"}/${safeItem.imdb_id}/${safeItem.imdb_id}`
+                    : `https://web.stremio.com/#/search?search=${encodeURIComponent(safeItem.title)}`
+                }
+                onClick={(e) => {
+                  e.preventDefault();
+                  const type =
+                    safeItem.media_type === "tv" ? "series" : "movie";
+                  const imdbId = safeItem.imdb_id?.trim();
+                  const appUrl =
+                    imdbId && /^tt\d+$/i.test(imdbId)
+                      ? `stremio:///detail/${type}/${imdbId}/${imdbId}`
+                      : `stremio:///search?search=${encodeURIComponent(safeItem.title)}`;
+                  const webUrl =
+                    imdbId && /^tt\d+$/i.test(imdbId)
+                      ? `https://web.stremio.com/#/detail/${type}/${imdbId}/${imdbId}`
+                      : `https://web.stremio.com/#/search?search=${encodeURIComponent(safeItem.title)}`;
+
+                  let appOpened = false;
+                  const onVisibility = () => {
+                    if (document.hidden) appOpened = true;
+                  };
+                  const onBlur = () => {
+                    appOpened = true;
+                  };
+                  document.addEventListener("visibilitychange", onVisibility);
+                  window.addEventListener("blur", onBlur);
+                  window.location.href = appUrl;
+                  setTimeout(() => {
+                    document.removeEventListener(
+                      "visibilitychange",
+                      onVisibility
+                    );
+                    window.removeEventListener("blur", onBlur);
+                    if (!appOpened) {
+                      window.open(webUrl, "_blank", "noopener,noreferrer");
+                    }
+                  }, 1500);
+                }}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 bg-neutral-800 p-2 rounded-lg border border-neutral-700 hover:border-purple-500/50 hover:bg-neutral-750 transition-colors cursor-pointer group"
+                title={`Watch ${safeItem.title} on Stremio`}
+              >
+                <img
+                  src="/icons/stremio.svg"
+                  alt="Stremio"
+                  className="w-6 h-6 rounded-md"
+                />
+                <span className="text-xs text-gray-300 font-medium group-hover:text-purple-300">
+                  Stremio
+                </span>
+              </a>
+
+              {safeItem.providers.map((provider, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 bg-neutral-800 p-2 rounded-lg border border-neutral-700 hover:border-neutral-500 transition-colors"
+                  title={provider.name}
+                >
+                  <img
+                    src={`${TMDB_LOGO_BASE_URL}${provider.logo}`}
+                    alt={provider.name}
+                    loading="lazy"
+                    className="w-6 h-6 rounded-md"
+                  />
+                  <span className="text-xs text-gray-300 font-medium">
+                    {provider.name}
+                  </span>
                 </div>
-              </div>
-            )
-          )}
+              ))}
+            </div>
+          </div>
 
           <div className="flex flex-col sm:flex-row gap-3 mt-auto pt-6 border-t border-neutral-800">
             {isInWatchlist ? (

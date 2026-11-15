@@ -81,6 +81,7 @@ export function sanitizeMedia(input: unknown): SanitizedMedia | null {
     original_language: asString(item.original_language),
     imdb_rating: asString(item.imdb_rating) || null,
     rotten_tomatoes: asString(item.rotten_tomatoes) || null,
+    imdb_id: asString(item.imdb_id) || null,
     status: asStatus(item.status),
     addedAt: typeof item.addedAt === "number" ? item.addedAt : 0,
     trailer_key: asString(item.trailer_key) || null,

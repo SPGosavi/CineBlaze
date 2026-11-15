@@ -75,6 +75,7 @@ export interface EnrichedMedia extends BasicTmdbResult {
   cast?: string[];
   imdb_rating: string | null;
   rotten_tomatoes: string | null;
+  imdb_id?: string | null;
   providers?: WatchProvider[];
   /** YouTube video key for the official trailer, if available */
   trailer_key?: string | null;
