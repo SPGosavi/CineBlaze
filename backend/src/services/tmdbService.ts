@@ -908,6 +908,7 @@ export async function fetchFullDetailsById(
     providers,
     imdb_rating: ratings.imdb,
     rotten_tomatoes: ratings.rt,
+    imdb_id: imdbId,
     trailer_key: pickTrailerKey(data.videos),
   };
 }

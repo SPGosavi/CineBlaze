@@ -23,6 +23,7 @@ export const sanitizeItem = (item) => {
     vote_average: typeof item.vote_average === "number" ? item.vote_average : 0,
     imdb_rating: item.imdb_rating || null,
     rotten_tomatoes: item.rotten_tomatoes || null,
+    imdb_id: item.imdb_id || null,
     addedAt: item.addedAt || 0,
     trailer_key: item.trailer_key || null,
   };
