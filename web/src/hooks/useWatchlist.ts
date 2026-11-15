@@ -277,9 +277,12 @@ export function useWatchlist(user: User | null): WatchlistState {
       if (sourceId === null || sourceId === targetId) return;
 
       const previous = watchlistRef.current;
-      const sourceItem = previous.find((item) => item.id === sourceId);
-      const targetItem = previous.find((item) => item.id === targetId);
-      if (!sourceItem || !targetItem) return;
+      const sourceIndex = previous.findIndex((item) => item.id === sourceId);
+      const targetIndex = previous.findIndex((item) => item.id === targetId);
+      if (sourceIndex === -1 || targetIndex === -1) return;
+
+      const sourceItem = previous[sourceIndex];
+      const targetItem = previous[targetIndex];
 
       const statusChanged = sourceItem.status !== targetItem.status;
       const movedItem: WatchlistItem = statusChanged
@@ -288,10 +291,18 @@ export function useWatchlist(user: User | null): WatchlistState {
 
       // Filter out source item first to calculate precise target index
       const listWithoutSource = previous.filter((item) => item.id !== sourceId);
-      const insertIndex = listWithoutSource.findIndex(
+      const targetIndexInList = listWithoutSource.findIndex(
         (item) => item.id === targetId
       );
-      if (insertIndex === -1) return;
+      if (targetIndexInList === -1) return;
+
+      // When reordering within the same category to the right (source before target),
+      // insert after the target card so it moves forward. When moving left or
+      // across categories, insert at the target card's position to take its place.
+      const insertIndex =
+        !statusChanged && sourceIndex < targetIndex
+          ? targetIndexInList + 1
+          : targetIndexInList;
 
       const next = [...listWithoutSource];
       next.splice(insertIndex, 0, movedItem);
