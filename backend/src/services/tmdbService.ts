@@ -432,6 +432,7 @@ export async function enrichWithDeepData(
       // every search result and every "find similar" card silently rendered
       // without its Rotten Tomatoes score. The `as any` is what hid it.
       rotten_tomatoes: ratings.rt,
+      imdb_id: (item as any).imdb_id || ratings.imdbId || null,
       director: details.director,
       cast: details.cast,
       genres: details.genres,
@@ -451,6 +452,55 @@ export async function enrichWithDeepData(
   );
 
   return [...enriched, ...remaining] as EnrichedMedia[];
+}
+
+/**
+ * Resolves an IMDb / Cinemeta ID (tt...) directly via Stremio's official Cinemeta catalog.
+ * Acts as a resilient fallback for titles or series where TMDB/OMDb do not provide an IMDb ID.
+ */
+export async function fetchCinemetaId(
+  title: string,
+  mediaType: MediaType,
+  year?: string
+): Promise<string | null> {
+  if (!title) return null;
+  const stremioType = mediaType === "movie" ? "movie" : "series";
+  const url = `https://v3-cinemeta.strem.io/catalog/${stremioType}/top/search=${encodeURIComponent(
+    title
+  )}.json`;
+
+  try {
+    const res = await fetchWithTimeout(url, 4000);
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      metas?: Array<{ id: string; name: string; year?: string | number }>;
+    };
+    if (!data?.metas || data.metas.length === 0) return null;
+
+    const cleanTitle = title.trim().toLowerCase();
+    const cleanYear = year ? String(year).trim() : null;
+
+    if (cleanYear) {
+      const exact = data.metas.find(
+        (m) =>
+          m.id?.startsWith("tt") &&
+          m.name?.trim().toLowerCase() === cleanTitle &&
+          String(m.year).includes(cleanYear)
+      );
+      if (exact) return exact.id;
+    }
+
+    const exactTitle = data.metas.find(
+      (m) =>
+        m.id?.startsWith("tt") && m.name?.trim().toLowerCase() === cleanTitle
+    );
+    if (exactTitle) return exactTitle.id;
+
+    const firstValid = data.metas.find((m) => m.id?.startsWith("tt"));
+    return firstValid?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchEnrichedData(
@@ -483,6 +533,15 @@ export async function fetchEnrichedData(
     ),
   ]);
 
+  let imdbId = omdbData.imdbId || null;
+  if (!imdbId) {
+    imdbId = await fetchCinemetaId(
+      searchResult.title,
+      searchResult.media_type as MediaType,
+      searchResult.release_date?.split("-")[0] || year
+    );
+  }
+
   return {
     ...searchResult,
     genres: details.genres,
@@ -490,6 +549,7 @@ export async function fetchEnrichedData(
     cast: details.cast,
     imdb_rating: omdbData.imdb,
     rotten_tomatoes: omdbData.rt,
+    imdb_id: imdbId,
     providers: providers,
   } as EnrichedMedia;
 }
@@ -873,7 +933,7 @@ export async function fetchFullDetailsById(
 
   const releaseDate = data.release_date || data.first_air_date || "";
   const details = parseTmdbDetails(data, mediaType, 10);
-  const imdbId =
+  let imdbId =
     (data as any).imdb_id || (data as any).external_ids?.imdb_id || null;
 
   // Both are independently cached and neither blocks the other.
@@ -892,6 +952,17 @@ export async function fetchFullDetailsById(
     ),
     fetchRatings(title, releaseDate.split("-")[0] || undefined, imdbId),
   ]);
+
+  if (!imdbId && ratings.imdbId) {
+    imdbId = ratings.imdbId;
+  }
+  if (!imdbId) {
+    imdbId = await fetchCinemetaId(
+      title,
+      mediaType,
+      releaseDate.split("-")[0] || undefined
+    );
+  }
 
   return {
     id,
@@ -994,7 +1065,12 @@ export async function fetchOmdbRatings(
       }
     }
 
-    return { imdb, rt };
+    const foundId =
+      data.imdbID && /^tt\d+$/i.test(data.imdbID.trim())
+        ? data.imdbID.trim()
+        : null;
+
+    return { imdb, rt, imdbId: foundId };
   };
 
   const executeOmdbQuery = async (

@@ -157,6 +157,7 @@ export interface TmdbWatchProvidersResponse {
 export interface OmdbResponse {
   Response?: string;
   imdbRating?: string;
+  imdbID?: string;
   Ratings?: { Source: string; Value: string }[];
 }
 
