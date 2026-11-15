@@ -1,8 +1,4 @@
-"use client";
-
-import { useState } from "react";
 import Image from "next/image";
-import { Pause, Play } from "lucide-react";
 import { LOGIN_POSTERS, TMDB_IMAGE_BASE_URL } from "@/lib/constants";
 import Frame from "@/components/ui/Frame";
 
@@ -16,11 +12,10 @@ function sliceRows(posters: readonly string[], rows: number): string[][] {
 /**
  * Decorative poster wall for the login page.
  *
- * Continuous sliding poster marquee with visible pause control (Gate 18).
- * Uses CSS mask-image rather than decorative gradient overlays (Gate 81).
+ * Continuous sliding poster marquee.
+ * Uses CSS mask-image rather than decorative gradient overlays.
  */
 export default function PosterMarquee() {
-  const [isPaused, setIsPaused] = useState(false);
   const rows = sliceRows(LOGIN_POSTERS, 3);
 
   return (
@@ -28,27 +23,6 @@ export default function PosterMarquee() {
       aria-label="Movie poster gallery"
       className="relative hidden select-none overflow-hidden md:flex md:flex-col md:justify-center md:gap-4 bg-paper [mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)] [-webkit-mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)]"
     >
-      {/* Visible pause control button (Gate 18 requirement for animations > 5s) */}
-      <button
-        type="button"
-        onClick={() => setIsPaused((prev) => !prev)}
-        aria-label={isPaused ? "Resume poster marquee" : "Pause poster marquee"}
-        aria-pressed={isPaused}
-        className="absolute top-4 right-4 z-20 flex items-center gap-1.5 rounded-full border border-rule bg-paper-2/90 px-3 py-1.5 font-body text-xs text-muted hover:text-ink hover:bg-paper-3 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px] disabled:opacity-55 disabled:cursor-not-allowed transition-colors"
-      >
-        {isPaused ? (
-          <>
-            <Play size={12} aria-hidden="true" />
-            <span>Play</span>
-          </>
-        ) : (
-          <>
-            <Pause size={12} aria-hidden="true" />
-            <span>Pause</span>
-          </>
-        )}
-      </button>
-
       {rows.map((row, index) => (
         <div
           key={index}
@@ -56,7 +30,7 @@ export default function PosterMarquee() {
             index % 2 === 0
               ? "motion-safe:animate-marquee-left"
               : "motion-safe:animate-marquee-right"
-          } ${isPaused ? "[animation-play-state:paused]" : ""}`}
+          }`}
           style={{ animationDuration: `${55 + index * 10}s` }}
         >
           {[...row, ...row].map((path, position) => (
