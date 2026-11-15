@@ -18,7 +18,7 @@ export interface KanbanColumnProps {
     event: React.DragEvent<HTMLElement>,
     status: WatchlistStatus
   ) => void;
-  onDropOnCard: (targetId: number) => void;
+  onDropOnCard: (targetId: number, fromId?: number) => void;
 }
 
 /** One status column ("Want to watch", "Watched") of the watchlist board. */

@@ -110,24 +110,38 @@ export const useWatchlist = (user) => {
   );
 
   const handleReorder = useCallback(
-    async (targetId) => {
+    async (targetId, fromId) => {
       if (!firebaseInitialized || !user) return;
-      const sourceId = dragItem.current;
+      const sourceId = fromId || dragItem.current;
       if (!sourceId || sourceId === targetId) return;
 
-      const sourceIndex = watchlist.findIndex((i) => i.id === sourceId);
-      const targetIndex = watchlist.findIndex((i) => i.id === targetId);
+      const sourceItem = watchlist.find((i) => i.id === sourceId);
+      const targetItem = watchlist.find((i) => i.id === targetId);
+      if (!sourceItem || !targetItem) return;
 
-      if (sourceIndex === -1 || targetIndex === -1) return;
+      const statusChanged = sourceItem.status !== targetItem.status;
+      const movedItem = statusChanged
+        ? { ...sourceItem, status: targetItem.status }
+        : sourceItem;
 
-      const newList = [...watchlist];
-      const [movedItem] = newList.splice(sourceIndex, 1);
-      newList.splice(targetIndex, 0, movedItem);
+      const listWithoutSource = watchlist.filter((i) => i.id !== sourceId);
+      const insertIndex = listWithoutSource.findIndex((i) => i.id === targetId);
+      if (insertIndex === -1) return;
+
+      const newList = [...listWithoutSource];
+      newList.splice(insertIndex, 0, movedItem);
 
       setWatchlist(newList);
 
       const userRef = watchlistDocRef(user.uid);
-      await updateDoc(userRef, { items: newList });
+      try {
+        await updateDoc(userRef, { items: newList });
+      } catch (e) {
+        console.error(e);
+        setWatchlist(watchlist);
+      } finally {
+        dragItem.current = null;
+      }
     },
     [user, watchlist]
   );
