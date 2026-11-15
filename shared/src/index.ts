@@ -60,6 +60,7 @@ export interface WatchProvider {
 export interface Ratings {
   imdb: string | null;
   rt: string | null;
+  imdbId?: string | null;
 }
 
 /** TMDB detail extras (genres, director, cast) from /movie|tv/{id}?append_to_response=credits */

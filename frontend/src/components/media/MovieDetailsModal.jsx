@@ -8,6 +8,48 @@ import HorizontalScrollContainer from "../ui/HorizontalScroll";
 import SimilarCard from "./SimilarCard";
 
 /**
+ * Resolves an IMDb / Cinemeta identifier directly from Stremio's public Cinemeta catalog.
+ */
+async function resolveCinemetaId(title, mediaType, year) {
+  if (!title) return null;
+  const stremioType = mediaType === "tv" ? "series" : "movie";
+  const url = `https://v3-cinemeta.strem.io/catalog/${stremioType}/top/search=${encodeURIComponent(
+    title
+  )}.json`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data?.metas || data.metas.length === 0) return null;
+
+    const cleanTitle = title.trim().toLowerCase();
+    const cleanYear = year ? String(year).trim() : null;
+
+    if (cleanYear) {
+      const exact = data.metas.find(
+        (m) =>
+          m.id?.startsWith("tt") &&
+          m.name?.trim().toLowerCase() === cleanTitle &&
+          String(m.year).includes(cleanYear)
+      );
+      if (exact) return exact.id;
+    }
+
+    const exactTitle = data.metas.find(
+      (m) =>
+        m.id?.startsWith("tt") && m.name?.trim().toLowerCase() === cleanTitle
+    );
+    if (exactTitle) return exactTitle.id;
+
+    const firstValid = data.metas.find((m) => m.id?.startsWith("tt"));
+    return firstValid?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Full-screen details view for a movie or series.
  *
  * Opens with whatever data the caller already has, then backfills cast and
@@ -26,6 +68,40 @@ const MovieDetailsModal = ({
   const [loadingSimilar, setLoadingSimilar] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [stremioId, setStremioId] = useState(
+    item.imdb_id && /^tt\d+$/i.test(item.imdb_id.trim())
+      ? item.imdb_id.trim()
+      : null
+  );
+
+  useEffect(() => {
+    const currentImdb = detailedItem?.imdb_id || item?.imdb_id;
+    if (currentImdb && /^tt\d+$/i.test(currentImdb.trim())) {
+      setStremioId(currentImdb.trim());
+      return;
+    }
+
+    let isCancelled = false;
+    const title =
+      detailedItem?.title || detailedItem?.name || item?.title || item?.name;
+    const mediaType = detailedItem?.media_type || item?.media_type || "movie";
+    const year = (
+      detailedItem?.release_date ||
+      detailedItem?.first_air_date ||
+      item?.release_date ||
+      item?.first_air_date
+    )?.split("-")[0];
+
+    resolveCinemetaId(title, mediaType, year).then((id) => {
+      if (!isCancelled && id) {
+        setStremioId(id);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [detailedItem, item]);
 
   // Initialize
   useEffect(() => {
@@ -291,61 +367,87 @@ const MovieDetailsModal = ({
               <MonitorPlay size={14} /> Watch Options
             </h3>
             <div className="flex flex-wrap items-center gap-3">
-              <a
-                href={
-                  safeItem.imdb_id
-                    ? `https://web.stremio.com/#/detail/${safeItem.media_type === "tv" ? "series" : "movie"}/${safeItem.imdb_id}/${safeItem.imdb_id}`
-                    : `https://web.stremio.com/#/search?search=${encodeURIComponent(safeItem.title)}`
-                }
-                onClick={(e) => {
-                  e.preventDefault();
-                  const type =
-                    safeItem.media_type === "tv" ? "series" : "movie";
-                  const imdbId = safeItem.imdb_id?.trim();
-                  const appUrl =
-                    imdbId && /^tt\d+$/i.test(imdbId)
-                      ? `stremio:///detail/${type}/${imdbId}/${imdbId}`
-                      : `stremio:///search?search=${encodeURIComponent(safeItem.title)}`;
-                  const webUrl =
-                    imdbId && /^tt\d+$/i.test(imdbId)
-                      ? `https://web.stremio.com/#/detail/${type}/${imdbId}/${imdbId}`
-                      : `https://web.stremio.com/#/search?search=${encodeURIComponent(safeItem.title)}`;
+              {(() => {
+                const isSeries = safeItem.media_type === "tv";
+                const type = isSeries ? "series" : "movie";
+                const effectiveId = stremioId || safeItem.imdb_id?.trim();
+                const hasValidId = effectiveId && /^tt\d+$/i.test(effectiveId);
+                const pathSuffix = isSeries
+                  ? effectiveId
+                  : `${effectiveId}/${effectiveId}`;
+                const webHref = hasValidId
+                  ? `https://web.stremio.com/#/detail/${type}/${pathSuffix}`
+                  : `https://web.stremio.com/#/search?search=${encodeURIComponent(safeItem.title)}`;
 
-                  let appOpened = false;
-                  const onVisibility = () => {
-                    if (document.hidden) appOpened = true;
-                  };
-                  const onBlur = () => {
-                    appOpened = true;
-                  };
-                  document.addEventListener("visibilitychange", onVisibility);
-                  window.addEventListener("blur", onBlur);
-                  window.location.href = appUrl;
-                  setTimeout(() => {
-                    document.removeEventListener(
-                      "visibilitychange",
-                      onVisibility
-                    );
-                    window.removeEventListener("blur", onBlur);
-                    if (!appOpened) {
-                      window.open(webUrl, "_blank", "noopener,noreferrer");
-                    }
-                  }, 1500);
-                }}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 bg-neutral-800 p-2 rounded-lg border border-neutral-700 hover:border-purple-500/50 hover:bg-neutral-750 transition-colors cursor-pointer group"
-                title={`Watch ${safeItem.title} on Stremio`}
-              >
-                <img
-                  src="/icons/stremio.svg"
-                  alt="Stremio"
-                  className="w-6 h-6 rounded-md"
-                />
-                <span className="text-xs text-gray-300 font-medium group-hover:text-purple-300">
-                  Stremio
-                </span>
-              </a>
+                return (
+                  <a
+                    href={webHref}
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      let targetId = effectiveId;
+                      if (!targetId || !/^tt\d+$/i.test(targetId)) {
+                        const year = (
+                          safeItem.release_date || safeItem.first_air_date
+                        )?.split("-")[0];
+                        targetId = await resolveCinemetaId(
+                          safeItem.title,
+                          safeItem.media_type,
+                          year
+                        );
+                        if (targetId) setStremioId(targetId);
+                      }
+
+                      const valid = targetId && /^tt\d+$/i.test(targetId);
+                      const suffix = isSeries
+                        ? targetId
+                        : `${targetId}/${targetId}`;
+                      const appUrl = valid
+                        ? `stremio:///detail/${type}/${suffix}`
+                        : `stremio:///search?search=${encodeURIComponent(safeItem.title)}`;
+                      const webUrl = valid
+                        ? `https://web.stremio.com/#/detail/${type}/${suffix}`
+                        : `https://web.stremio.com/#/search?search=${encodeURIComponent(safeItem.title)}`;
+
+                      let appOpened = false;
+                      const onVisibility = () => {
+                        if (document.hidden) appOpened = true;
+                      };
+                      const onBlur = () => {
+                        appOpened = true;
+                      };
+                      document.addEventListener(
+                        "visibilitychange",
+                        onVisibility
+                      );
+                      window.addEventListener("blur", onBlur);
+                      window.location.href = appUrl;
+                      setTimeout(() => {
+                        document.removeEventListener(
+                          "visibilitychange",
+                          onVisibility
+                        );
+                        window.removeEventListener("blur", onBlur);
+                        if (!appOpened) {
+                          window.open(webUrl, "_blank", "noopener,noreferrer");
+                        }
+                      }, 1500);
+                    }}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-neutral-800 p-2 rounded-lg border border-neutral-700 hover:border-purple-500/50 hover:bg-neutral-750 transition-colors cursor-pointer group"
+                    title={`Watch ${safeItem.title} on Stremio`}
+                  >
+                    <img
+                      src="/icons/stremio.svg"
+                      alt="Stremio"
+                      className="w-6 h-6 rounded-md"
+                    />
+                    <span className="text-xs text-gray-300 font-medium group-hover:text-purple-300">
+                      Stremio
+                    </span>
+                  </a>
+                );
+              })()}
 
               {safeItem.providers.map((provider, idx) => (
                 <div
