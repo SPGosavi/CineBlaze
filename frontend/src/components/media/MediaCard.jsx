@@ -99,18 +99,39 @@ const MediaCard = ({
 
         <div className="mt-auto pt-2 flex gap-2 border-t border-neutral-700/50">
           {imdbRating ? (
-            <span className="text-[10px] font-bold text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">
-              IMDb {imdbRating}
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">
+              <img
+                src="/icons/imdb.svg"
+                alt="IMDb"
+                className="h-3"
+                draggable={false}
+              />
+              {imdbRating}
             </span>
           ) : (
             <span className="text-[10px] text-gray-600">No Rating</span>
           )}
 
-          {rtRating && (
-            <span className="text-[10px] font-bold text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded border border-red-400/20">
-              RT {rtRating.includes("%") ? rtRating : `${rtRating}%`}
-            </span>
-          )}
+          {rtRating &&
+            (() => {
+              const score = parseFloat(String(rtRating).replace("%", ""));
+              const isFresh = !isNaN(score) && score >= 60;
+              return (
+                <span
+                  className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${isFresh ? "text-red-500 bg-red-500/10 border-red-500/20" : "text-green-500 bg-green-500/10 border-green-500/20"}`}
+                >
+                  <img
+                    src={
+                      isFresh ? "/icons/rt-fresh.svg" : "/icons/rt-rotten.svg"
+                    }
+                    alt={isFresh ? "Fresh" : "Rotten"}
+                    className="h-3"
+                    draggable={false}
+                  />
+                  {rtRating.includes("%") ? rtRating : `${rtRating}%`}
+                </span>
+              );
+            })()}
         </div>
       </div>
     </div>

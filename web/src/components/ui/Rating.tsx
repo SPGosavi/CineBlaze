@@ -24,6 +24,61 @@ export function getHeatColorClass(
   return "text-heat-5";
 }
 
+/** Rotten Tomatoes Tomatometer color: binary Fresh / Rotten at 60% */
+export function getRTColorClass(score?: number | null): string {
+  if (score == null || isNaN(score)) return "text-muted";
+  if (score < 60) return "text-rt-rotten";
+  return "text-rt-fresh";
+}
+
+const logoSizeClasses = {
+  sm: "h-3.5",
+  md: "h-4",
+  lg: "h-5",
+};
+
+function SourceLogo({
+  source,
+  score,
+  size = "md",
+}: {
+  source: string;
+  score?: number | null;
+  size?: "sm" | "md" | "lg";
+}) {
+  const h = logoSizeClasses[size];
+
+  if (source === "IMDb") {
+    return (
+      <img
+        src="/icons/imdb.svg"
+        alt="IMDb"
+        className={`inline-block ${h} opacity-80`}
+        draggable={false}
+      />
+    );
+  }
+
+  if (source === "RT") {
+    const isFresh = score != null && !isNaN(score) && score >= 60;
+    return (
+      <img
+        src={isFresh ? "/icons/rt-fresh.svg" : "/icons/rt-rotten.svg"}
+        alt={isFresh ? "Fresh" : "Rotten"}
+        className={`inline-block ${h} opacity-90`}
+        draggable={false}
+      />
+    );
+  }
+
+  // Fallback for TMDB or other sources — keep text
+  return (
+    <Label size="xs" className="opacity-80">
+      {source}
+    </Label>
+  );
+}
+
 export const Rating: React.FC<RatingProps> = ({
   score,
   maxScore = 10,
@@ -32,7 +87,11 @@ export const Rating: React.FC<RatingProps> = ({
   className = "",
   ...props
 }) => {
-  const heatClass = getHeatColorClass(score, maxScore);
+  const heatClass =
+    source === "RT"
+      ? getRTColorClass(score)
+      : getHeatColorClass(score, maxScore);
+
   const displayScore =
     score == null || isNaN(score)
       ? "—"
@@ -42,15 +101,11 @@ export const Rating: React.FC<RatingProps> = ({
 
   return (
     <div
-      className={`inline-flex items-baseline gap-1.5 select-none ${className}`}
+      className={`inline-flex items-center gap-1.5 select-none ${className}`}
       {...props}
     >
+      {source && <SourceLogo source={source} score={score} size={size} />}
       <Figure value={displayScore} size={size} className={heatClass} />
-      {source && (
-        <Label size="xs" className="opacity-80">
-          {source}
-        </Label>
-      )}
     </div>
   );
 };

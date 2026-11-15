@@ -35,18 +35,40 @@ const SimilarCard = ({ item, onClick }) => {
 
         <div className="flex gap-2">
           {item.imdb_rating && (
-            <span className="text-[9px] font-bold text-yellow-500">
-              IMDb {item.imdb_rating}
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-yellow-500">
+              <img
+                src="/icons/imdb.svg"
+                alt="IMDb"
+                className="h-2.5"
+                draggable={false}
+              />
+              {item.imdb_rating}
             </span>
           )}
-          {item.rotten_tomatoes && (
-            <span className="text-[9px] font-bold text-red-400">
-              RT{" "}
-              {String(item.rotten_tomatoes).includes("%")
-                ? item.rotten_tomatoes
-                : `${item.rotten_tomatoes}%`}
-            </span>
-          )}
+          {item.rotten_tomatoes &&
+            (() => {
+              const score = parseFloat(
+                String(item.rotten_tomatoes).replace("%", "")
+              );
+              const isFresh = !isNaN(score) && score >= 60;
+              return (
+                <span
+                  className={`inline-flex items-center gap-0.5 text-[9px] font-bold ${isFresh ? "text-red-500" : "text-green-500"}`}
+                >
+                  <img
+                    src={
+                      isFresh ? "/icons/rt-fresh.svg" : "/icons/rt-rotten.svg"
+                    }
+                    alt={isFresh ? "Fresh" : "Rotten"}
+                    className="h-2.5"
+                    draggable={false}
+                  />
+                  {String(item.rotten_tomatoes).includes("%")
+                    ? item.rotten_tomatoes
+                    : `${item.rotten_tomatoes}%`}
+                </span>
+              );
+            })()}
         </div>
       </div>
     </div>
