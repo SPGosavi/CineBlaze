@@ -115,9 +115,12 @@ export const useWatchlist = (user) => {
       const sourceId = fromId || dragItem.current;
       if (!sourceId || sourceId === targetId) return;
 
-      const sourceItem = watchlist.find((i) => i.id === sourceId);
-      const targetItem = watchlist.find((i) => i.id === targetId);
-      if (!sourceItem || !targetItem) return;
+      const sourceIndex = watchlist.findIndex((i) => i.id === sourceId);
+      const targetIndex = watchlist.findIndex((i) => i.id === targetId);
+      if (sourceIndex === -1 || targetIndex === -1) return;
+
+      const sourceItem = watchlist[sourceIndex];
+      const targetItem = watchlist[targetIndex];
 
       const statusChanged = sourceItem.status !== targetItem.status;
       const movedItem = statusChanged
@@ -125,8 +128,15 @@ export const useWatchlist = (user) => {
         : sourceItem;
 
       const listWithoutSource = watchlist.filter((i) => i.id !== sourceId);
-      const insertIndex = listWithoutSource.findIndex((i) => i.id === targetId);
-      if (insertIndex === -1) return;
+      const targetIndexInList = listWithoutSource.findIndex(
+        (i) => i.id === targetId
+      );
+      if (targetIndexInList === -1) return;
+
+      const insertIndex =
+        !statusChanged && sourceIndex < targetIndex
+          ? targetIndexInList + 1
+          : targetIndexInList;
 
       const newList = [...listWithoutSource];
       newList.splice(insertIndex, 0, movedItem);
