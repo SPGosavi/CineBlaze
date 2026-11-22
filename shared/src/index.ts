@@ -63,11 +63,15 @@ export interface Ratings {
   imdbId?: string | null;
 }
 
-/** TMDB detail extras (genres, director, cast) from /movie|tv/{id}?append_to_response=credits */
+/** TMDB detail extras (genres, director, cast, runtime/seasons) from /movie|tv/{id}?append_to_response=credits */
 export interface TmdbDetails {
   genres: string[];
   director: string;
   cast: string[];
+  /** Runtime in minutes (movies only). */
+  runtime?: number | null;
+  /** Number of seasons (TV series only). */
+  number_of_seasons?: number | null;
 }
 
 /** Fully enriched media item — the "final form" returned to the frontend */
@@ -80,6 +84,10 @@ export interface EnrichedMedia extends BasicTmdbResult {
   providers?: WatchProvider[];
   /** YouTube video key for the official trailer, if available */
   trailer_key?: string | null;
+  /** Runtime in minutes (movies only). */
+  runtime?: number | null;
+  /** Number of seasons (TV series only). */
+  number_of_seasons?: number | null;
 }
 
 /** Partial enrichment returned by fetchEnrichedDataById (no ratings/poster/overview) */
@@ -117,6 +125,8 @@ export interface WatchlistItem extends EnrichedMedia {
   overview: string;
   vote_average: number;
   original_language: string;
+  runtime: number | null;
+  number_of_seasons: number | null;
 }
 
 /**

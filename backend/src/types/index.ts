@@ -119,6 +119,10 @@ export interface TmdbDetailResponse {
       official: boolean;
     }[];
   };
+  /** Runtime in minutes (movies only). */
+  runtime?: number;
+  /** Number of seasons (TV series only). */
+  number_of_seasons?: number;
 }
 
 /** Raw TMDB collection response (`/collection/{id}`) */

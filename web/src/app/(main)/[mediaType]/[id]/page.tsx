@@ -24,6 +24,8 @@ import {
   sanitizeMediaList,
   isInTheatres,
   isUpcomingMovie,
+  formatRuntime,
+  formatSeasons,
 } from "@/lib/sanitize";
 import { getLanguageName } from "@/lib/language";
 import {
@@ -260,6 +262,18 @@ export default async function MediaDetailPage(
             </span>
 
             {year && <Figure value={year} size="sm" className="text-muted" />}
+
+            {item.media_type === "movie" && item.runtime && (
+              <span className="text-xs text-muted">
+                {formatRuntime(item.runtime)}
+              </span>
+            )}
+
+            {item.media_type === "tv" && item.number_of_seasons && (
+              <span className="text-xs text-muted">
+                {formatSeasons(item.number_of_seasons)}
+              </span>
+            )}
 
             {imdbNum != null && (
               <Rating score={imdbNum} maxScore={10} source="IMDb" size="md" />

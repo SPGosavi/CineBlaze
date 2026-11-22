@@ -85,6 +85,11 @@ export function sanitizeMedia(input: unknown): SanitizedMedia | null {
     status: asStatus(item.status),
     addedAt: typeof item.addedAt === "number" ? item.addedAt : 0,
     trailer_key: asString(item.trailer_key) || null,
+    runtime: typeof item.runtime === "number" ? item.runtime : null,
+    number_of_seasons:
+      typeof item.number_of_seasons === "number"
+        ? item.number_of_seasons
+        : null,
   };
 }
 
@@ -106,6 +111,24 @@ export function releaseYear(
 /** OMDb writes the literal string "N/A" rather than omitting the field. */
 export function displayRating(value: string | null | undefined): string | null {
   return value && value !== "N/A" ? value : null;
+}
+
+/** Formats runtime in minutes to human readable string (e.g. 135 -> "2h 15m", 45 -> "45m"). */
+export function formatRuntime(
+  minutes: number | null | undefined
+): string | null {
+  if (!minutes || minutes <= 0) return null;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+}
+
+/** Formats number of seasons (e.g. 1 -> "1 Season", 3 -> "3 Seasons"). */
+export function formatSeasons(
+  seasons: number | null | undefined
+): string | null {
+  if (!seasons || seasons <= 0) return null;
+  return `${seasons} ${seasons === 1 ? "Season" : "Seasons"}`;
 }
 
 /** Days a movie is assumed to still be in cinemas after release. */
