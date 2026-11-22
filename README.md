@@ -59,7 +59,7 @@
 - 🧠 **AI Semantic Search** — Find movies and series using natural language descriptions powered by Groq
 - 📋 **Kanban Watchlist** — Drag & drop content across watch states ("Want to Watch", "Watching Now", "Watched")
 - 🔥 **Trending & Platform Discovery** — Netflix, Prime Video, Hotstar, Indian & Global content
-- 📺 **Watch Now** — Know where to watch instantly with platform logos, or if it's still in theatres
+- 📺 **Watch Now** — Know where to watch instantly with platform logos, if it's still in theatres, or an upcoming movie
 - ⭐ **Unified Ratings** — IMDb, Rotten Tomatoes & TMDB in one place
 - 📱 **Fully Responsive Design** — Mobile-first UX with touch and swipe-friendly carousels
 - 🔐 **Authentication** — Secure Email/Password login, prefilled Demo access, and Guest login powered by Firebase Auth

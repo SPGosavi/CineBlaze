@@ -123,7 +123,8 @@ const THEATRICAL_WINDOW_DAYS = 45;
  * Movies only — a TV series has no theatrical run.
  */
 export function isInTheatres(
-  item: Pick<SanitizedMedia, "media_type" | "release_date" | "providers">
+  item: Pick<SanitizedMedia, "media_type" | "release_date" | "providers">,
+  now: number = Date.now()
 ): boolean {
   if (item.media_type !== "movie") return false;
   // If subscription streaming is already available, it is not in theatres
@@ -136,6 +137,41 @@ export function isInTheatres(
   const released = Date.parse(item.release_date);
   if (Number.isNaN(released)) return false;
 
-  const ageDays = (Date.now() - released) / 86_400_000;
+  const ageDays = (now - released) / 86_400_000;
   return ageDays >= 0 && ageDays <= THEATRICAL_WINDOW_DAYS;
 }
+
+/**
+ * True when a movie has a future release date and has not premiered yet.
+ *
+ * Like `isInTheatres`, this is a heuristic that avoids extra upstream calls.
+ * If subscription streaming is already available, it cannot be upcoming.
+ *
+ * Movies only — a TV series does not follow theatrical release scheduling.
+ */
+export function isUpcomingMovie(
+  item: Pick<SanitizedMedia, "media_type" | "release_date"> & {
+    providers?: WatchProvider[];
+  },
+  now: number = Date.now()
+): boolean {
+  if (item.media_type !== "movie") return false;
+  const hasStreaming = item.providers?.some(
+    (p) => p.type === "flatrate" || !p.type
+  );
+  if (hasStreaming) return false;
+  if (!item.release_date) return false;
+
+  const released = Date.parse(item.release_date);
+  if (Number.isNaN(released)) return false;
+
+  if (/^\d{4}$/.test(item.release_date)) {
+    const year = Number(item.release_date);
+    const currentYear = new Date(now).getFullYear();
+    return year >= currentYear;
+  }
+
+  return released > now;
+}
+
+export const isUpcoming = isUpcomingMovie;
