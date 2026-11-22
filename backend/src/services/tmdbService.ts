@@ -439,8 +439,9 @@ export async function enrichWithDeepData(
       cast: details.cast,
       genres: details.genres,
       providers,
-      runtime: details.runtime,
-      number_of_seasons: details.number_of_seasons,
+      runtime: details.runtime ?? ratings.runtime ?? null,
+      number_of_seasons:
+        details.number_of_seasons ?? ratings.totalSeasons ?? null,
     } satisfies EnrichedMedia;
   });
 
@@ -555,8 +556,9 @@ export async function fetchEnrichedData(
     rotten_tomatoes: omdbData.rt,
     imdb_id: imdbId,
     providers: providers,
-    runtime: details.runtime,
-    number_of_seasons: details.number_of_seasons,
+    runtime: details.runtime ?? omdbData.runtime ?? null,
+    number_of_seasons:
+      details.number_of_seasons ?? omdbData.totalSeasons ?? null,
   } as EnrichedMedia;
 }
 
@@ -851,13 +853,32 @@ function parseTmdbDetails(
   const cast = data.credits?.cast?.slice(0, castLimit).map((c) => c.name) ?? [];
 
   const runtime =
-    mediaType === "movie" && typeof data.runtime === "number"
+    mediaType === "movie" &&
+    typeof data.runtime === "number" &&
+    data.runtime > 0
       ? data.runtime
       : null;
-  const number_of_seasons =
-    mediaType === "tv" && typeof data.number_of_seasons === "number"
-      ? data.number_of_seasons
-      : null;
+
+  let number_of_seasons: number | null = null;
+  if (mediaType === "tv") {
+    if (
+      typeof data.number_of_seasons === "number" &&
+      data.number_of_seasons > 0
+    ) {
+      number_of_seasons = data.number_of_seasons;
+    } else if (
+      Array.isArray((data as any).seasons) &&
+      (data as any).seasons.length > 0
+    ) {
+      const positiveSeasons = (data as any).seasons.filter(
+        (s: any) => s.season_number > 0
+      );
+      number_of_seasons =
+        positiveSeasons.length > 0
+          ? positiveSeasons.length
+          : (data as any).seasons.length;
+    }
+  }
 
   return { genres, director, cast, runtime, number_of_seasons };
 }
@@ -898,19 +919,33 @@ async function fetchTmdbDetails(
   mediaType: MediaType
 ): Promise<TmdbDetails> {
   const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits`;
-  try {
-    const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
-    const data = (await res.json()) as TmdbDetailResponse;
-    return parseTmdbDetails(data, mediaType);
-  } catch {
-    return {
-      genres: [],
-      director: "Unknown",
-      cast: [],
-      runtime: null,
-      number_of_seasons: null,
-    };
+  for (let attempt = 1; attempt <= TMDB_MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
+      if (!res.ok) {
+        if (isRetryableStatus(res.status) && attempt < TMDB_MAX_RETRIES) {
+          await sleep(backoffDelay(attempt));
+          continue;
+        }
+        break;
+      }
+      const data = (await res.json()) as TmdbDetailResponse;
+      return parseTmdbDetails(data, mediaType);
+    } catch {
+      if (attempt < TMDB_MAX_RETRIES) {
+        await sleep(backoffDelay(attempt));
+        continue;
+      }
+      break;
+    }
   }
+  return {
+    genres: [],
+    director: "Unknown",
+    cast: [],
+    runtime: null,
+    number_of_seasons: null,
+  };
 }
 
 /**
@@ -936,18 +971,33 @@ export async function fetchFullDetailsById(
   if (!id || !mediaType) return null;
 
   const url = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=credits,videos,external_ids`;
-  let data: TmdbDetailResponse;
-  try {
-    const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
-    if (!res.ok) return null;
-    data = (await res.json()) as TmdbDetailResponse;
-  } catch (e) {
-    log.warn(
-      { err: String(e), mediaType, id },
-      "[TMDB] Full detail fetch failed"
-    );
-    return null;
+  let data: TmdbDetailResponse | undefined;
+  for (let attempt = 1; attempt <= TMDB_MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, TMDB_TIMEOUT_MS);
+      if (!res.ok) {
+        if (isRetryableStatus(res.status) && attempt < TMDB_MAX_RETRIES) {
+          await sleep(backoffDelay(attempt));
+          continue;
+        }
+        return null;
+      }
+      data = (await res.json()) as TmdbDetailResponse;
+      break;
+    } catch (e) {
+      if (attempt < TMDB_MAX_RETRIES) {
+        await sleep(backoffDelay(attempt));
+        continue;
+      }
+      log.warn(
+        { err: String(e), mediaType, id },
+        "[TMDB] Full detail fetch failed"
+      );
+      return null;
+    }
   }
+
+  if (!data) return null;
 
   const title = data.title || data.name || "";
   if (!title) return null;
@@ -988,13 +1038,19 @@ export async function fetchFullDetailsById(
   const rawRuntime =
     typeof (data as any).runtime === "number" && (data as any).runtime > 0
       ? (data as any).runtime
-      : details.runtime;
+      : (details.runtime ?? ratings.runtime ?? null);
 
   const rawSeasons =
     typeof (data as any).number_of_seasons === "number" &&
     (data as any).number_of_seasons > 0
       ? (data as any).number_of_seasons
-      : details.number_of_seasons;
+      : (details.number_of_seasons ??
+        (Array.isArray((data as any).seasons)
+          ? (data as any).seasons.filter((s: any) => s.season_number > 0)
+              .length || (data as any).seasons.length
+          : null) ??
+        ratings.totalSeasons ??
+        null);
 
   return {
     id,
@@ -1104,7 +1160,25 @@ export async function fetchOmdbRatings(
         ? data.imdbID.trim()
         : null;
 
-    return { imdb, rt, imdbId: foundId };
+    let omdbRuntime: number | null = null;
+    if (data.Runtime && data.Runtime !== "N/A") {
+      const match = data.Runtime.match(/^(\d+)/);
+      if (match) omdbRuntime = parseInt(match[1], 10);
+    }
+
+    let omdbSeasons: number | null = null;
+    if (data.totalSeasons && data.totalSeasons !== "N/A") {
+      const match = data.totalSeasons.match(/^(\d+)/);
+      if (match) omdbSeasons = parseInt(match[1], 10);
+    }
+
+    return {
+      imdb,
+      rt,
+      imdbId: foundId,
+      runtime: omdbRuntime,
+      totalSeasons: omdbSeasons,
+    };
   };
 
   const executeOmdbQuery = async (

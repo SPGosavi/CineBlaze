@@ -33,15 +33,11 @@ export const DEFAULT_REQUEST_TIMEOUT = 15_000;
 export const TRENDING_REVALIDATE_SECONDS = 600;
 
 /**
- * Detail pages change rarely — cast and providers are effectively static
- * once a title is released — but ratings do drift, so a day is the
- * compromise.
- *
- * Safe to keep long because these render on demand rather than at build
- * time, and a failed upstream call throws to `error.tsx` instead of being
- * cached.
+ * Detail pages revalidation window. 5 minutes keeps the Next.js data cache
+ * fresh when metadata is updated or corrected, while still shielding the
+ * backend from thundering herd traffic.
  */
-export const DETAIL_REVALIDATE_SECONDS = 86_400;
+export const DETAIL_REVALIDATE_SECONDS = 300;
 
 /** Canonical origin, used for Open Graph URLs, sitemap and robots. */
 export const SITE_URL =
