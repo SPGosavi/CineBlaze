@@ -263,17 +263,19 @@ export default async function MediaDetailPage(
 
             {year && <Figure value={year} size="sm" className="text-muted" />}
 
-            {item.media_type === "movie" && item.runtime && (
-              <span className="text-xs text-muted">
-                {formatRuntime(item.runtime)}
-              </span>
-            )}
-
-            {item.media_type === "tv" && item.number_of_seasons && (
-              <span className="text-xs text-muted">
-                {formatSeasons(item.number_of_seasons)}
-              </span>
-            )}
+            {!isTv && item.runtime ? (
+              <Figure
+                value={formatRuntime(item.runtime) || ""}
+                size="sm"
+                className="text-muted"
+              />
+            ) : isTv && item.number_of_seasons ? (
+              <Figure
+                value={formatSeasons(item.number_of_seasons) || ""}
+                size="sm"
+                className="text-muted"
+              />
+            ) : null}
 
             {imdbNum != null && (
               <Rating score={imdbNum} maxScore={10} source="IMDb" size="md" />

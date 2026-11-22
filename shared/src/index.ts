@@ -98,6 +98,10 @@ export interface PartialEnrichedMedia {
   director: string;
   cast: string[];
   providers?: WatchProvider[];
+  /** Runtime in minutes (movies only). */
+  runtime?: number | null;
+  /** Number of seasons (TV series only). */
+  number_of_seasons?: number | null;
 }
 
 // ─── Watchlist ──────────────────────────────────────────────────────────────
