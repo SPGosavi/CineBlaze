@@ -5,6 +5,8 @@ import {
   isUpcoming,
   releaseYear,
   displayRating,
+  formatRuntime,
+  formatSeasons,
   sanitizeMedia,
 } from "./sanitize";
 
@@ -157,6 +159,27 @@ describe("sanitize utilities", () => {
     });
   });
 
+  describe("formatRuntime and formatSeasons", () => {
+    it("formats minutes into hours and minutes correctly", () => {
+      expect(formatRuntime(135)).toBe("2h 15m");
+      expect(formatRuntime(120)).toBe("2h");
+      expect(formatRuntime(45)).toBe("45m");
+      expect(formatRuntime(0)).toBe(null);
+      expect(formatRuntime(-10)).toBe(null);
+      expect(formatRuntime(null)).toBe(null);
+      expect(formatRuntime(undefined)).toBe(null);
+    });
+
+    it("formats number of seasons correctly", () => {
+      expect(formatSeasons(1)).toBe("1 Season");
+      expect(formatSeasons(3)).toBe("3 Seasons");
+      expect(formatSeasons(0)).toBe(null);
+      expect(formatSeasons(-1)).toBe(null);
+      expect(formatSeasons(null)).toBe(null);
+      expect(formatSeasons(undefined)).toBe(null);
+    });
+  });
+
   describe("sanitizeMedia", () => {
     it("normalises media fields properly", () => {
       const raw = {
@@ -164,6 +187,7 @@ describe("sanitize utilities", () => {
         title: "Avengers: Doomsday",
         release_date: "2026-12-18",
         media_type: "movie",
+        runtime: 150,
       };
       const sanitized = sanitizeMedia(raw);
       expect(sanitized).not.toBeNull();
@@ -171,6 +195,26 @@ describe("sanitize utilities", () => {
       expect(sanitized?.title).toBe("Avengers: Doomsday");
       expect(sanitized?.release_date).toBe("2026-12-18");
       expect(sanitized?.media_type).toBe("movie");
+      expect(sanitized?.runtime).toBe(150);
+      expect(sanitized?.number_of_seasons).toBe(null);
+    });
+
+    it("normalises TV series fields properly", () => {
+      const raw = {
+        id: 67890,
+        name: "Stranger Things",
+        first_air_date: "2016-07-15",
+        media_type: "tv",
+        number_of_seasons: 4,
+      };
+      const sanitized = sanitizeMedia(raw);
+      expect(sanitized).not.toBeNull();
+      expect(sanitized?.id).toBe(67890);
+      expect(sanitized?.title).toBe("Stranger Things");
+      expect(sanitized?.release_date).toBe("2016-07-15");
+      expect(sanitized?.media_type).toBe("tv");
+      expect(sanitized?.runtime).toBe(null);
+      expect(sanitized?.number_of_seasons).toBe(4);
     });
 
     it("returns null for non-object or missing id", () => {

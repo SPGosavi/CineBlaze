@@ -174,6 +174,8 @@ export function useWatchlist(user: User | null): WatchlistState {
         status,
         addedAt: Date.now(),
         trailer_key: item.trailer_key ?? null,
+        runtime: item.runtime ?? null,
+        number_of_seasons: item.number_of_seasons ?? null,
       };
 
       const previous = watchlistRef.current;

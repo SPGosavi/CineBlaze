@@ -2,7 +2,7 @@ import SlidingTitle from "@/components/ui/SlidingTitle";
 import SlidingRatings from "@/components/ui/SlidingRatings";
 import Link from "next/link";
 import type { SanitizedMedia } from "@cineblaze/shared";
-import { releaseYear } from "@/lib/sanitize";
+import { formatRuntime, formatSeasons, releaseYear } from "@/lib/sanitize";
 import Poster from "@/components/ui/Poster";
 import Frame from "@/components/ui/Frame";
 import Rating from "@/components/ui/Rating";
@@ -62,9 +62,27 @@ export default function PosterTile({
           className="font-body font-medium text-sm text-ink hover:text-accent transition-colors"
         />
 
-        {year && (
-          <div className="text-xs font-body text-muted">
-            <Figure value={year} size="sm" className="text-muted" />
+        {(year || item.runtime || item.number_of_seasons) && (
+          <div className="flex items-center gap-1.5 text-xs font-body text-muted">
+            {year && <Figure value={year} size="sm" className="text-muted" />}
+            {((item.media_type === "movie" && item.runtime) ||
+              (item.media_type === "tv" && item.number_of_seasons)) && (
+              <>
+                {year && (
+                  <span
+                    className="text-muted/40 text-[10px] select-none"
+                    aria-hidden="true"
+                  >
+                    ·
+                  </span>
+                )}
+                <span>
+                  {item.media_type === "movie"
+                    ? formatRuntime(item.runtime)
+                    : formatSeasons(item.number_of_seasons)}
+                </span>
+              </>
+            )}
           </div>
         )}
 
