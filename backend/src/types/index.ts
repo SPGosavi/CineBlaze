@@ -163,6 +163,8 @@ export interface OmdbResponse {
   imdbRating?: string;
   imdbID?: string;
   Ratings?: { Source: string; Value: string }[];
+  Runtime?: string;
+  totalSeasons?: string;
 }
 
 /** Raw TMDB person search result */

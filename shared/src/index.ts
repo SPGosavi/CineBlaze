@@ -61,6 +61,10 @@ export interface Ratings {
   imdb: string | null;
   rt: string | null;
   imdbId?: string | null;
+  /** Fallback runtime in minutes from OMDb, if present */
+  runtime?: number | null;
+  /** Fallback total seasons count from OMDb, if present */
+  totalSeasons?: number | null;
 }
 
 /** TMDB detail extras (genres, director, cast, runtime/seasons) from /movie|tv/{id}?append_to_response=credits */
