@@ -182,12 +182,10 @@ describe("API Integration Tests (6B.4)", () => {
 
     it("returns results when given valid body", async () => {
       const res = await withAuth(
-        request(app)
-          .post("/api/find-movies")
-          .send({
-            description: "space exploration with black holes",
-            mode: "ai",
-          })
+        request(app).post("/api/find-movies").send({
+          description: "space exploration with black holes",
+          mode: "ai",
+        })
       );
 
       expect(res.status).toBe(200);

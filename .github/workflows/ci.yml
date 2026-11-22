@@ -1,0 +1,174 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check code formatting
+        run: npm run format:check
+
+      - name: Run ESLint
+        run: npm run lint
+
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck shared, backend, and web
+        run: npm run typecheck
+
+  test:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      GROQ_API_KEY: dummy_groq_api_key_for_ci
+      TMDB_API_KEY: dummy_tmdb_api_key_for_ci
+      OMDB_API_KEY: dummy_omdb_api_key_for_ci
+      RATE_LIMIT_DISABLED: "true"
+      ENABLE_BACKGROUND_JOBS: "false"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite with coverage
+        run: npm run test:ci
+
+      - name: Upload backend coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-coverage
+          path: backend/coverage
+          if-no-files-found: ignore
+
+      - name: Upload web coverage artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-coverage
+          path: web/coverage
+          if-no-files-found: ignore
+
+  build:
+    name: Build Workspaces
+    needs: [lint, typecheck, test]
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      BACKEND_API_URL: http://localhost:5001
+      GROQ_API_KEY: dummy_groq_api_key_for_ci
+      TMDB_API_KEY: dummy_tmdb_api_key_for_ci
+      OMDB_API_KEY: dummy_omdb_api_key_for_ci
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --include=dev
+
+      - name: Build workspaces
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Verify build artifacts
+        run: |
+          test -d backend/dist || (echo "backend/dist output missing" && exit 1)
+          test -d web/.next || (echo "web/.next output missing" && exit 1)
+
+  e2e:
+    name: Playwright E2E Tests
+    needs: [build]
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+      GROQ_API_KEY: dummy_groq_api_key_for_ci
+      TMDB_API_KEY: dummy_tmdb_api_key_for_ci
+      OMDB_API_KEY: dummy_omdb_api_key_for_ci
+      INTERNAL_API_KEY: dummy_internal_key_for_ci
+      PORT: "5001"
+      BACKEND_API_URL: http://localhost:5001
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers and system dependencies
+        run: npx playwright install --with-deps
+
+      - name: Build workspaces for production E2E
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright test report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore

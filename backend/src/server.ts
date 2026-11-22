@@ -6,7 +6,7 @@ import { closeDatabase, isDatabaseEnabled } from "./db/index.js";
 import { logger } from "./utils/logger.js";
 import { CORS_ORIGINS } from "./config.js";
 
-const PORT: number = Number(process.env.PORT) || 8000;
+const PORT: number = Number(process.env.PORT) || 5001;
 
 const server: Server = app.listen(PORT, "0.0.0.0", () => {
   logger.info(

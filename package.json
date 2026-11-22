@@ -19,7 +19,9 @@
   "scripts": {
     "dev": "concurrently -n shared,api,web -c gray,cyan,magenta \"npm run dev -w @cineblaze/shared\" \"npm run dev -w movie-finder-backend\" \"npm run dev -w web\"",
     "dev:legacy": "concurrently -n vite,api -c yellow,cyan \"npm run dev --prefix frontend\" \"npm run dev -w movie-finder-backend\"",
-    "lint": "npm run lint -w web && npm run lint --prefix frontend",
+    "start": "concurrently -n api,web -c cyan,magenta \"npm run start -w movie-finder-backend\" \"npm run start -w web\"",
+    "lint": "npm run lint -w web",
+    "lint:legacy": "npm run lint --prefix frontend",
     "typecheck": "npm run build -w @cineblaze/shared && npm run typecheck -w movie-finder-backend && npm run typecheck -w web",
     "build": "npm run build -w @cineblaze/shared && npm run build -w movie-finder-backend && npm run build -w web",
     "build:legacy": "npm run build --prefix frontend",
@@ -31,7 +33,7 @@
     "test:web": "npm run test -w web",
     "test:e2e": "playwright test",
     "test:coverage": "npm run test -w movie-finder-backend -- --coverage && npm run test -w web -- --coverage",
-    "test:ci": "npm run test"
+    "test:ci": "npm run test:coverage"
   },
   "repository": {
     "type": "git",
