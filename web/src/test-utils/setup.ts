@@ -2,6 +2,9 @@ import "@testing-library/jest-dom/vitest";
 import React from "react";
 import { vi } from "vitest";
 
+// Mock server-only so Server Components can be tested in Vitest JSDOM
+vi.mock("server-only", () => ({}));
+
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
