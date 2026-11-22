@@ -30,54 +30,57 @@ interface Dependency {
  * Only a degraded *configured* dependency fails the check, because the API can
  * genuinely serve search and discovery without either.
  */
-router.get("/health", async (_req: Request, res: Response): Promise<void> => {
-  const dependencies: Record<string, Dependency> = {};
+router.get(
+  ["/health", "/api/health"],
+  async (_req: Request, res: Response): Promise<void> => {
+    const dependencies: Record<string, Dependency> = {};
 
-  const backend = cacheBackend();
-  if (backend === "redis") {
-    const reachable = await cache.ping();
-    dependencies.cache = {
-      status: reachable ? "ok" : "degraded",
-      detail: reachable ? "redis" : "redis unreachable — serving uncached",
-    };
-  } else {
-    dependencies.cache = {
-      status: "ok",
-      detail: "in-process (not shared, lost on restart)",
-    };
+    const backend = cacheBackend();
+    if (backend === "redis") {
+      const reachable = await cache.ping();
+      dependencies.cache = {
+        status: reachable ? "ok" : "degraded",
+        detail: reachable ? "redis" : "redis unreachable — serving uncached",
+      };
+    } else {
+      dependencies.cache = {
+        status: "ok",
+        detail: "in-process (not shared, lost on restart)",
+      };
+    }
+
+    if (isDatabaseEnabled()) {
+      const reachable = await pingDatabase();
+      dependencies.database = {
+        status: reachable ? "ok" : "degraded",
+        detail: reachable ? "postgres" : "postgres unreachable",
+      };
+    } else {
+      dependencies.database = {
+        status: "disabled",
+        detail: "DATABASE_URL unset",
+      };
+    }
+
+    dependencies.auth = isAuthConfigured()
+      ? { status: "ok", detail: "firebase token verification enabled" }
+      : { status: "disabled", detail: "FIREBASE_PROJECT_ID unset" };
+
+    dependencies.apiKey = isApiKeyEnforced()
+      ? { status: "ok", detail: "enforced" }
+      : { status: "disabled", detail: "INTERNAL_API_KEY unset — API is open" };
+
+    const degraded = Object.values(dependencies).some(
+      (dependency) => dependency.status === "degraded"
+    );
+
+    res.status(degraded ? 503 : 200).json({
+      status: degraded ? "degraded" : "ok",
+      uptimeSeconds: Math.round(process.uptime()),
+      dependencies,
+    });
   }
-
-  if (isDatabaseEnabled()) {
-    const reachable = await pingDatabase();
-    dependencies.database = {
-      status: reachable ? "ok" : "degraded",
-      detail: reachable ? "postgres" : "postgres unreachable",
-    };
-  } else {
-    dependencies.database = {
-      status: "disabled",
-      detail: "DATABASE_URL unset",
-    };
-  }
-
-  dependencies.auth = isAuthConfigured()
-    ? { status: "ok", detail: "firebase token verification enabled" }
-    : { status: "disabled", detail: "FIREBASE_PROJECT_ID unset" };
-
-  dependencies.apiKey = isApiKeyEnforced()
-    ? { status: "ok", detail: "enforced" }
-    : { status: "disabled", detail: "INTERNAL_API_KEY unset — API is open" };
-
-  const degraded = Object.values(dependencies).some(
-    (dependency) => dependency.status === "degraded"
-  );
-
-  res.status(degraded ? 503 : 200).json({
-    status: degraded ? "degraded" : "ok",
-    uptimeSeconds: Math.round(process.uptime()),
-    dependencies,
-  });
-});
+);
 
 /**
  * Response-time and error-rate summary.

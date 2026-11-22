@@ -59,6 +59,7 @@ const tmdbLimiter = rateLimit({
 
 // ─── Trending ───────────────────────────────────────────────────────────────
 router.get("/trending/all", tmdbLimiter, getTrendingAll);
+router.get("/trending/global", tmdbLimiter, getTrendingAll);
 router.get("/trending/indian", tmdbLimiter, getTrendingIndian);
 router.get(
   "/trending/platform/:platform",
