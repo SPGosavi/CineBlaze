@@ -1,7 +1,14 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Film, MonitorPlay, Ticket, ExternalLink, Play } from "lucide-react";
+import {
+  Film,
+  MonitorPlay,
+  Ticket,
+  ExternalLink,
+  Play,
+  Calendar,
+} from "lucide-react";
 import Image from "next/image";
 import type {
   EnrichedMedia,
@@ -16,6 +23,7 @@ import {
   sanitizeMedia,
   sanitizeMediaList,
   isInTheatres,
+  isUpcomingMovie,
 } from "@/lib/sanitize";
 import { getLanguageName } from "@/lib/language";
 import {
@@ -182,6 +190,7 @@ export default async function MediaDetailPage(
     : null;
 
   const inTheatres = isInTheatres(item);
+  const isUpcoming = isUpcomingMovie(item);
   const flatrateProviders = item.providers.filter(
     (p) => p.type === "flatrate" || !p.type
   );
@@ -347,6 +356,13 @@ export default async function MediaDetailPage(
               <div className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3.5 py-1.5 text-xs font-medium text-accent">
                 <Ticket size={14} aria-hidden="true" />
                 <span>In theatres now</span>
+              </div>
+            )}
+
+            {isUpcoming && (
+              <div className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3.5 py-1.5 text-xs font-medium text-accent">
+                <Calendar size={14} aria-hidden="true" />
+                <span>Upcoming Movie</span>
               </div>
             )}
 
