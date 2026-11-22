@@ -45,6 +45,17 @@ const asStatus = (value: unknown): WatchlistStatus =>
 const asMediaType = (value: unknown): MediaType =>
   isMediaType(value) ? value : "movie";
 
+const asNumber = (value: unknown): number | null => {
+  if (typeof value === "number" && !Number.isNaN(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = parseInt(value, 10);
+    if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+};
+
 /**
  * Normalises a media item so components can rely on every field being present
  * and correctly typed.
@@ -85,11 +96,8 @@ export function sanitizeMedia(input: unknown): SanitizedMedia | null {
     status: asStatus(item.status),
     addedAt: typeof item.addedAt === "number" ? item.addedAt : 0,
     trailer_key: asString(item.trailer_key) || null,
-    runtime: typeof item.runtime === "number" ? item.runtime : null,
-    number_of_seasons:
-      typeof item.number_of_seasons === "number"
-        ? item.number_of_seasons
-        : null,
+    runtime: asNumber(item.runtime),
+    number_of_seasons: asNumber(item.number_of_seasons),
   };
 }
 

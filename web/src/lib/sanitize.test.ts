@@ -217,6 +217,19 @@ describe("sanitize utilities", () => {
       expect(sanitized?.number_of_seasons).toBe(4);
     });
 
+    it("parses numeric strings for runtime and number_of_seasons", () => {
+      const raw = {
+        id: 11111,
+        title: "String Runtime Movie",
+        media_type: "movie",
+        runtime: "105",
+        number_of_seasons: "3",
+      };
+      const sanitized = sanitizeMedia(raw);
+      expect(sanitized?.runtime).toBe(105);
+      expect(sanitized?.number_of_seasons).toBe(3);
+    });
+
     it("returns null for non-object or missing id", () => {
       expect(sanitizeMedia(null)).toBeNull();
       expect(sanitizeMedia({ title: "No ID" })).toBeNull();

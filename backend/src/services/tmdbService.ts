@@ -80,6 +80,8 @@ export async function fetchEnrichedDataById(
     director: details.director,
     cast: details.cast,
     providers,
+    runtime: details.runtime,
+    number_of_seasons: details.number_of_seasons,
   };
 }
 
@@ -983,6 +985,17 @@ export async function fetchFullDetailsById(
     );
   }
 
+  const rawRuntime =
+    typeof (data as any).runtime === "number" && (data as any).runtime > 0
+      ? (data as any).runtime
+      : details.runtime;
+
+  const rawSeasons =
+    typeof (data as any).number_of_seasons === "number" &&
+    (data as any).number_of_seasons > 0
+      ? (data as any).number_of_seasons
+      : details.number_of_seasons;
+
   return {
     id,
     title,
@@ -1000,8 +1013,8 @@ export async function fetchFullDetailsById(
     rotten_tomatoes: ratings.rt,
     imdb_id: imdbId,
     trailer_key: pickTrailerKey(data.videos),
-    runtime: details.runtime,
-    number_of_seasons: details.number_of_seasons,
+    runtime: rawRuntime ?? null,
+    number_of_seasons: rawSeasons ?? null,
   };
 }
 
