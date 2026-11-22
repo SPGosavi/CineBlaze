@@ -7,10 +7,9 @@ test.describe("Search to Detail Flow (6B.3)", () => {
     await page.goto("/");
 
     const searchInput = page
-      .getByRole("textbox", {
-        name: /search/i,
-      })
-      .or(page.locator("input[type='text']"))
+      .locator("input[name='q']")
+      .or(page.getByRole("searchbox"))
+      .or(page.locator("input[type='search'], input[type='text']"))
       .first();
 
     await expect(searchInput).toBeVisible();
