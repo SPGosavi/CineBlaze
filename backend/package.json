@@ -1,7 +1,7 @@
 {
   "name": "movie-finder-backend",
   "version": "1.0.0",
-  "description": "Backend server for the Movie Finder app.",
+  "description": "Backend API server for CineBlaze with AI semantic retrieval, multi-tier caching, and personalization.",
   "main": "dist/server.js",
   "type": "module",
   "engines": {

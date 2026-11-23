@@ -1,154 +1,127 @@
-<h1 align="center">🔥CineBlaze</h1>
+<h1 align="center">🔥 CineBlaze</h1>
 
 <p align="center">
-    <img src="https://img.shields.io/badge/Tech-Generative%20AI-blueviolet.svg" alt="Generative AI">
-    <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-blue.svg" alt="React + Vite">
-    <img src="https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-green.svg" alt="Node.js">
-    <img src="https://img.shields.io/badge/Database-Firebase-orange.svg" alt="Firebase">
-    <img src="https://img.shields.io/badge/Status-Completed-brightgreen.svg" alt="Project Status">
+    <a href="https://github.com/SPGosavi/CineBlaze/actions/workflows/ci.yml"><img src="https://github.com/SPGosavi/CineBlaze/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
+    <img src="https://img.shields.io/badge/Next.js-16%20App%20Router-black.svg" alt="Next.js 16">
+    <img src="https://img.shields.io/badge/TypeScript-5.x-blue.svg" alt="TypeScript">
+    <img src="https://img.shields.io/badge/Backend-Express%20%2B%20Node%2022-green.svg" alt="Node.js">
+    <img src="https://img.shields.io/badge/AI-Groq%20LLaMA%203.3-orange.svg" alt="Groq LLaMA">
+    <img src="https://img.shields.io/badge/Database-PostgreSQL%20%2B%20pgvector-336791.svg" alt="PostgreSQL">
+    <img src="https://img.shields.io/badge/Cache-Redis%206%2B-red.svg" alt="Redis">
+    <img src="https://img.shields.io/badge/License-MIT-brightgreen.svg" alt="License: MIT">
 </p>
 
 <h3 align="center">
-    AI-Powered Movie & TV Series Discovery Platform
+    AI-Powered Semantic Movie & TV Series Discovery Platform
 </h3>
 
-<h2>📜 Project Overview</h2>
-
-<p>
-    CineBlaze is designed to simplify content discovery by allowing users to search for movies and television series using descriptive inputs such as plot summaries, genres, moods, actors, or release periods. Instead of relying on exact titles, the system utilizes Generative AI to interpret user intent and return accurate, context-aware results.
-    <br><br>
-    The platform follows a decoupled client-server architecture, where a React-based frontend communicates with a Node.js backend that processes semantic queries using Groq (powered by ultra-fast LLM inference). Additional metadata, including cast details, ratings, and streaming availability, is enriched through third-party APIs (TMDB and OMDb), while user watchlists are synchronized in real time using Firebase Cloud Firestore.
+<p align="center">
+  CineBlaze bridges the gap between vague human memory and concrete media metadata. Users discover entertainment using natural-language descriptions, emotional moods, actor combinations, or plot fragments rather than rigid exact titles.
 </p>
-
-<h2>🚀 Live Deployment</h2>
-
-<p>
-    The application is deployed using modern cloud platforms to ensure scalability and performance.
-</p>
-
-<ul>
-    <li><strong>Vercel Link:</strong> 
-        <a href="https://cine-blaze-movie-finder-web-app.vercel.app/" target="_blank">
-            https://cine-blaze-movie-finder-web-app.vercel.app/
-        </a>
-    </li>
-</ul>
-
-<p>
-    <em>Note: Guest login is enabled for quick access. AI-based search responses take minimal time thanks to low-latency Groq inference.</em>
-</p>
-
-## 🧠 Skills & Concepts Demonstrated
-
-- GenAI Integration & Prompt Engineering
-- RAG & Grounded Context Pipelines
-- Semantic Search & Natural Language Processing
-- Full-Stack Web Development
-- Client–Server Architecture
-- REST API Design
-- Real-Time Database Synchronization
-- Authentication & Authorization
-- Responsive UI / Mobile-First Design
-- Performance Optimization & Multi-tier In-Memory Caching
-- Cloud Deployment (Vercel, Render, Firebase)
 
 ---
 
-## 🚀 Key Features
+## 🚀 Live Demo & Deployment
 
-- 🧠 **AI Semantic Search** — Find movies and series using natural language descriptions powered by Groq
-- 📋 **Kanban Watchlist** — Drag & drop content across watch states ("Want to Watch", "Watching Now", "Watched")
-- 🔥 **Trending & Platform Discovery** — Netflix, Prime Video, Hotstar, Indian & Global content
-- 📺 **Watch Now** — Know where to watch instantly with platform logos, if it's still in theatres, or an upcoming movie
-- ⭐ **Unified Ratings** — IMDb, Rotten Tomatoes & TMDB in one place
-- 📱 **Fully Responsive Design** — Mobile-first UX with touch and swipe-friendly carousels
-- 🔐 **Authentication** — Secure Email/Password login, prefilled Demo access, and Guest login powered by Firebase Auth
+- **Web Application**: [https://cine-blaze-movie-finder-web-app.vercel.app/](https://cine-blaze-movie-finder-web-app.vercel.app/)
+- **Backend API**: Deployed on Render with zero-cold-start health checks.
+- _Guest access is enabled by default. Natural-language search queries resolve in sub-seconds powered by Groq's high-throughput LPU inference._
 
 ---
 
-## 📸 Screenshots
+## 💡 System Design Highlights
 
-<h3>Home / Discover</h3>
-<img src="images/Screenshot%201.png" alt="CineBlaze Home Page" width="800"/>
-
-<h3>AI Search Result</h3>
-<img src="images/Screenshot%202.png" alt="AI Search Result" width="800"/>
-
-<h3>Movie / Series Details</h3>
-<img src="images/Screenshot%203.png" alt="Movie / Series Details" width="800"/>
-
-<h3>My Watchlist</h3>
-<img src="images/Screenshot%204.png" alt="My Watchlist" width="800"/>
+1. **Multi-Tier Caching Architecture**:
+   - Four-level cache hierarchy: Browser/CDN $\to$ Next.js Data Cache & ISR $\to$ Distributed Redis cache $\to$ In-process memory fallback.
+   - Transparent stale-while-revalidate (SWR) background refresh prevents cache stampedes on viral titles.
+2. **Atomic Token-Bucket Rate Limiting**:
+   - Backed by atomic Redis Lua scripts to throttle abuse while maintaining fair quotas.
+   - Dual-bucket design: dedicated budget for high-compute Groq LLM queries (30/hr) and a generous ceiling for cached metadata lookups (300/hr).
+3. **Retrieval-Augmented Generation (RAG) & Grounding Pipeline**:
+   - Two-phase query understanding: decomposes natural language into structured constraints (`{ language, genres, actors, era }`), retrieves live grounding context from Wikipedia and DuckDuckGo Lite, and feeds a constrained JSON generation prompt to Groq.
+   - Fuzzy matching with Levenshtein and token distance resolves LLM outputs to canonical TMDB records.
+4. **Bayesian Click-Feedback Priors**:
+   - Search result re-ranking incorporates historical user click and watchlist interactions to continually boost search relevance.
+5. **Fail-Open Graceful Degradation**:
+   - Every infrastructure dependency (Redis, PostgreSQL, Firebase Auth, Sentry, internal secret) is independently optional. If any backing service goes offline, the system degrades seamlessly without crashing or blocking core search.
 
 ---
 
-## 🏗️ Architecture & Workflow
+## 🏗️ System Architecture
 
-CineBlaze follows a **decoupled Client–Server architecture** for scalability, security, and performance.
+CineBlaze is architected as an npm-workspaces monorepo enforcing a strict TypeScript contract across all tiers:
 
-<img src="images/CineBlaze_Workflow.png" alt="CineBlaze Workflow" width="600"/>
+```mermaid
+flowchart LR
+    subgraph Web["Next.js 16 App Router (web/)"]
+        RSC["Server Components<br/>(Discover ISR, Details SSR)"]
+        CSR["Client Islands<br/>(Watchlist Kanban, SearchBar)"]
+        BFF["BFF Route Handler<br/>/api/[...path]"]
+    end
 
-Client (React 19 + Vite)  
-→ Backend (Node.js + Express)  
-→ Groq API (High-Speed Semantic Query Parsing & Grounded Recommendations)  
-→ TMDB & OMDb (Metadata, Credits, Providers & Ratings)  
-→ Firebase Firestore (Real-time Watchlist Sync)
+    subgraph Contract["@cineblaze/shared"]
+        Types["Type Definitions & Guards<br/>EnrichedMedia, WatchlistItem"]
+    end
+
+    subgraph Backend["Express API (backend/)"]
+        Gateway["Router, Auth & Rate Limiter"]
+        Controllers["Search, Trending, Personalization"]
+        AI["aiService (Groq LLaMA)"]
+        TMDB["tmdbService & OMDb"]
+        Drizzle["Drizzle ORM & Repositories"]
+    end
+
+    subgraph Storage["Data Tier"]
+        Redis["Redis (Cache + Rate Limits)"]
+        Postgres["PostgreSQL + pgvector"]
+        Firestore["Firebase Firestore (Watchlist)"]
+    end
+
+    CSR -->|"Realtime Sync"| Firestore
+    CSR -->|"Browser API Requests"| BFF
+    RSC -->|"Server-side Fetch"| Gateway
+    BFF -->|"Secure Proxy with Secret"| Gateway
+    Types -.-> Web
+    Types -.-> Backend
+    Gateway --> Controllers
+    Controllers <--> Redis
+    Controllers --> Drizzle --> Postgres
+    Controllers --> AI
+    Controllers --> TMDB
+```
+
+> 📖 **Deep Dive Documentation**:
+>
+> - [ARCHITECTURE.md](ARCHITECTURE.md) — Comprehensive technical architecture, data flows, and infrastructure models.
+> - [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) — System design interview specification (capacities, scalability, failure modes).
+> - [BUNDLE_ANALYSIS.md](docs/BUNDLE_ANALYSIS.md) — Client bundle composition, chunk analysis, and tree-shaking metrics.
+> - [BRANCH_PROTECTION.md](docs/BRANCH_PROTECTION.md) — Repository branch protection and CI enforcement policies.
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Web app (`web/`)
+### Web Application (`web/`)
 
-- Next.js 16 (App Router, Server Components, Turbopack)
-- TypeScript
-- Tailwind CSS v4
-- Lucide Icons
-- Axios
-- Firebase SDK (Auth & Firestore)
-- Native HTML5 Drag & Drop API
+- **Framework**: Next.js 16 (App Router, Server Components, Turbopack)
+- **Language**: TypeScript 5
+- **Styling**: Tailwind CSS v4
+- **Icons**: Lucide React (tree-shaken named imports)
+- **State & Real-time**: React 19 Contexts, Firebase Cloud Firestore SDK
+- **Telemetry**: Sentry Next.js SDK, Core Web Vitals production sink (`navigator.sendBeacon`)
 
-### Backend (`backend/`)
+### Backend Service (`backend/`)
 
-- Node.js + Express + TypeScript
-- Groq API (High-throughput, low-latency LLM inference)
-- TMDB API & OMDb API
-- Drizzle ORM + PostgreSQL (search history, taste profiles)
-- Redis (distributed cache, token-bucket rate limiting)
-- Zod (request validation) · Pino (structured JSON logging) · Sentry
+- **Runtime**: Node.js 22, Express 4, TypeScript (native ESM)
+- **AI & RAG**: Groq Cloud SDK (LLaMA 3.3 70B & 3.1 8B), Wikipedia API, DuckDuckGo Lite
+- **Metadata**: TMDB API (credits, providers, trailers), OMDb API (IMDb, Rotten Tomatoes)
+- **Database & Vectors**: PostgreSQL 16, `pgvector`, Drizzle ORM
+- **Cache & Throttling**: Redis 6+ (`ioredis`) with atomic Lua scripts, `node-cache` fallback
+- **Validation & Reliability**: Zod schemas, Pino structured logging, Sentry error tracking
 
-### Shared (`shared/`)
+### Shared Package (`shared/`)
 
-- `@cineblaze/shared` — the request/response types both sides import, so the
-  API contract is enforced by the compiler rather than by convention
-
-### Rendering strategy
-
-| Route                   | Strategy                                             |
-| ----------------------- | ---------------------------------------------------- |
-| `/` — Discover          | ISR (trending shelves stream in behind Suspense)     |
-| `/search?q=`            | SSR — shareable, refreshable search URLs             |
-| `/movie/:id`, `/tv/:id` | SSR with Open Graph tags + JSON-LD structured data   |
-| `/watchlist`            | CSR — live Firestore sync, drag-and-drop, auth-gated |
-
-### Infrastructure is optional
-
-Redis, PostgreSQL, Firebase token verification, the internal API key and
-Sentry are each independently optional. With only the three API keys the app
-runs end to end: the cache falls back to an in-process one, history becomes a
-no-op, and requests are anonymous.
-
-`GET /health` reports which dependencies are actually live, and distinguishes
-**disabled** (a deployment choice) from **degraded** (an incident) — because a
-missing env var fails open, and silently losing a layer is worse than not
-having it.
-
-### Deployment & Services
-
-- **Web**: Vercel
-- **Backend**: Render
-- **Database / Auth**: Firebase Cloud Firestore & Firebase Auth
-- **External APIs**: Groq, TMDB, OMDb
+- `@cineblaze/shared` — Strict TypeScript types and type guards (`isMediaType`, `isSearchMode`, `isMoodTag`) shared across backend and frontend to eliminate runtime API contract drift.
 
 ---
 
@@ -156,102 +129,104 @@ having it.
 
 ### Prerequisites
 
-- Node.js v22.19.0 (see `.nvmrc`)
-- npm v10+ (workspaces)
-- API keys for:
-  - Groq API (`GROQ_API_KEY`)
-  - TMDB API (`TMDB_API_KEY`)
-  - OMDb API (`OMDB_API_KEY`)
-  - Firebase Project Configuration
+- **Node.js**: `v22.19.0` or higher (see `.nvmrc`)
+- **npm**: `v10+` (npm workspaces enabled)
+- **API Keys**:
+  - [Groq API Key](https://console.groq.com/)
+  - [TMDB API Key](https://www.themoviedb.org/settings/api)
+  - [OMDb API Key](https://www.omdbapi.com/apikey.aspx)
+  - Firebase Project Configuration (optional for guest browsing)
 
-### Setup & Run Locally
+### Local Setup
 
-1. **Clone and install.** One install at the root covers `shared`, `backend`
-   and `web` — they are npm workspaces.
+1. **Clone the repository and install dependencies**:
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/cineblaze.git
-   cd cineblaze
+   git clone https://github.com/SPGosavi/CineBlaze.git
+   cd CineBlaze
    npm install
    ```
 
-2. **Backend environment** — copy `backend/.env.example` to `backend/.env`.
-   Only the three API keys are required; everything else is optional and
-   documented inline.
-
-   ```env
-   PORT=5001
-   GROQ_API_KEY=your_groq_api_key
-   TMDB_API_KEY=your_tmdb_api_key
-   OMDB_API_KEY=your_omdb_api_key
-
-   # Optional — see backend/.env.example
-   # REDIS_URL=            # unset: in-process cache
-   # DATABASE_URL=         # unset: history disabled
-   # FIREBASE_PROJECT_ID=  # unset: requests are anonymous
-   # INTERNAL_API_KEY=     # unset: API is open
-   ```
-
-3. **Web environment** — copy `web/.env.example` to `web/.env.local` and fill
-   in the Firebase values. Leave them blank to run without auth: discovery,
-   search and detail pages all work signed out, only the watchlist is disabled.
-
-   ```env
-   BACKEND_API_URL=http://localhost:5001
-   NEXT_PUBLIC_SITE_URL=http://localhost:3000
-   NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_key
-   # ...see web/.env.example for the full list
-   ```
-
-   The browser never calls the backend directly. Client requests go to the
-   Next.js Route Handler at `src/app/api/[...path]/route.ts`, which forwards
-   them to `BACKEND_API_URL` and attaches `INTERNAL_API_KEY` server-side — so
-   there is no CORS setup, and neither the API origin nor the shared secret
-   reaches the client bundle.
-
-4. **Run everything:**
+2. **Configure environment variables**:
 
    ```bash
-   npm run dev          # shared (watch) + Express API + Next.js
+   # Root / Backend environment
+   cp backend/.env.example backend/.env
+   # Web environment
+   cp web/.env.example web/.env.local
    ```
 
-   Then open http://localhost:3000.
+   _Only `GROQ_API_KEY`, `TMDB_API_KEY`, and `OMDB_API_KEY` are mandatory. All infrastructure services (Redis, Postgres, Firebase) fail open gracefully if omitted._
 
-5. **Optional — set up the database.** Only needed for search history and
-   taste profiles.
+3. **Run the development environment**:
+
    ```bash
-   # with DATABASE_URL set in backend/.env
+   npm run dev
+   ```
+
+   This concurrently launches:
+   - `@cineblaze/shared` in TypeScript watch mode
+   - `movie-finder-backend` on `http://localhost:5001`
+   - `web` on `http://localhost:3000`
+
+4. **(Optional) Run database migrations**:
+   ```bash
    npm run db:migrate -w movie-finder-backend
    ```
 
-### Useful scripts
+---
 
-| Command                                       | What it does                                      |
-| --------------------------------------------- | ------------------------------------------------- |
-| `npm run dev`                                 | Shared types watcher + Express API + Next.js      |
-| `npm run dev:legacy`                          | The Phase 2 React + Vite app + Express API        |
-| `npm run build`                               | Builds shared, backend and web                    |
-| `npm run typecheck`                           | Type-checks every workspace                       |
-| `npm run lint`                                | Lints `web/` and `frontend/`                      |
-| `npm run format`                              | Prettier across the repo                          |
-| `npm run db:generate -w movie-finder-backend` | Generates a SQL migration from the Drizzle schema |
-| `npm run db:migrate -w movie-finder-backend`  | Applies pending migrations                        |
-| `npm run db:studio -w movie-finder-backend`   | Drizzle Studio                                    |
+## 🧪 Testing & Quality Assurance
 
-### Operational endpoints
+The project enforces quality and performance gates automated via GitHub Actions CI:
 
-| Endpoint   | Purpose                                                           |
-| ---------- | ----------------------------------------------------------------- |
-| `/health`  | Per-dependency status; 503 when a _configured_ dependency is down |
-| `/metrics` | Request counts, error rates and p50/p95 latency per route         |
+```bash
+# Run unit & integration tests across backend and web
+npm test
 
-> `frontend/` is the previous React + Vite client, kept for reference. It is
-> not an npm workspace, so it keeps its own `package-lock.json` — install it
-> separately with `npm install --prefix frontend` if you want to run it.
+# Run backend unit & integration tests with coverage
+npm run test:backend
 
-<h2>📄 License</h2>
+# Run web React component & hook tests with Vitest/JSDOM
+npm run test:web
 
-<p>
-    This project is licensed under the <strong>MIT License</strong>.  
-    You are free to use, modify, and distribute this software with proper attribution.
-</p>
+# Run end-to-end Playwright tests (Chromium, Firefox, Mobile Chrome)
+npm run test:e2e
+
+# Run typechecks across all workspaces
+npm run typecheck
+
+# Check and enforce formatting with Prettier
+npm run format:check
+
+# Run Webpack Bundle Analysis
+npm run analyze:web
+
+# Run automated Lighthouse CI audits
+npm run lighthouse
+```
+
+---
+
+## 🛡️ Infrastructure & Graceful Degradation
+
+CineBlaze is designed so that no single auxiliary infrastructure service is a hard dependency:
+
+| Service        | When Configured                                   | When Missing / Degraded                         | Health Check Status                   |
+| -------------- | ------------------------------------------------- | ----------------------------------------------- | ------------------------------------- |
+| **Redis**      | Distributed cache-aside & atomic rate limits      | In-memory `MemoryStore` cache; fail-open limits | `redis: "healthy"` vs `"disabled"`    |
+| **PostgreSQL** | Search logging, taste profiles, vector embeddings | Search runs without history; events dropped     | `database: "healthy"` vs `"disabled"` |
+| **Firebase**   | Cloud sync for Kanban watchlist                   | Guest search & detail viewing 100% active       | `auth: "healthy"` vs `"disabled"`     |
+| **Sentry**     | Distributed exception tracing                     | Local console error logging                     | `sentry: "healthy"` vs `"disabled"`   |
+
+Check the live runtime dependency status anytime via:
+
+```bash
+curl http://localhost:5001/health
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License**. Feel free to use, modify, and distribute with attribution.

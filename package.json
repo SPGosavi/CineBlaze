@@ -1,7 +1,7 @@
 {
   "name": "movie-finder",
   "version": "1.0.0",
-  "description": "<h1 align=\"center\">🔥CineBlaze</h1>",
+  "description": "CineBlaze — AI-powered semantic movie and TV series discovery platform.",
   "main": "index.js",
   "//workspaces": "frontend/ is deliberately NOT a workspace. It is the Phase 2 React+Vite app, kept as a reference and still deployed from its own directory with its own lockfile; pulling it in here would change how Vercel installs it. Use the *:legacy scripts to run it.",
   "workspaces": [
