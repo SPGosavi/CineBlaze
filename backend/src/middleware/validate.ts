@@ -144,3 +144,12 @@ export const mediaByIdParamsSchema = z.object({
 export const trendingPlatformParamsSchema = z.object({
   platform: z.enum(["netflix", "prime", "hotstar"]),
 });
+
+export const webVitalsSchema = z.object({
+  name: z.enum(["CLS", "FCP", "FID", "INP", "LCP", "TTFB"]),
+  value: z.number(),
+  rating: z.enum(["good", "needs-improvement", "poor"]).optional(),
+  delta: z.number().optional(),
+  id: z.string().max(100).optional(),
+  navigationType: z.string().max(100).optional(),
+});

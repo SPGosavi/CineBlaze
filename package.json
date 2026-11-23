@@ -27,6 +27,8 @@
     "build:legacy": "npm run build --prefix frontend",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "analyze:web": "npm run analyze -w web",
+    "lighthouse": "lhci autorun",
     "prepare": "husky || true",
     "test": "npm run test:backend && npm run test:web",
     "test:backend": "npm run test -w movie-finder-backend",

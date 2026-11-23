@@ -1,4 +1,36 @@
 import type { NextConfig } from "next";
+import bundleAnalyzer from "@next/bundle-analyzer";
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
+
+const securityHeaders = [
+  {
+    key: "X-Content-Type-Options",
+    value: "nosniff",
+  },
+  {
+    key: "X-Frame-Options",
+    value: "DENY",
+  },
+  {
+    key: "X-XSS-Protection",
+    value: "1; mode=block",
+  },
+  {
+    key: "Referrer-Policy",
+    value: "strict-origin-when-cross-origin",
+  },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=()",
+  },
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=31536000; includeSubDomains; preload",
+  },
+];
 
 const nextConfig: NextConfig = {
   /**
@@ -6,6 +38,8 @@ const nextConfig: NextConfig = {
    * than a published tarball, so Next has to compile it alongside app code.
    */
   transpilePackages: ["@cineblaze/shared"],
+
+  poweredByHeader: false,
 
   images: {
     remotePatterns: [
@@ -16,16 +50,14 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  /*
-   * The `/api/:path*` rewrite that used to live here is now a Route Handler
-   * at `src/app/api/[...path]/route.ts`.
-   *
-   * A rewrite proxies the request untouched, which was fine when the API was
-   * open. Phase 4 put a shared secret in front of Express, and that header has
-   * to be attached on the server — a rewrite has nowhere to do it, and a key
-   * added in the browser would not be a secret. The Route Handler is the same
-   * hop with somewhere to put credentials.
-   */
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
+  },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);
