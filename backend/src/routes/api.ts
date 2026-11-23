@@ -31,8 +31,10 @@ import {
   searchSelectionSchema,
   userEventSchema,
   trendingPlatformParamsSchema,
+  webVitalsSchema,
 } from "../middleware/validate.js";
 import { RATE_LIMIT_AI_PER_HOUR, RATE_LIMIT_TMDB_PER_HOUR } from "../config.js";
+import { logger } from "../utils/logger.js";
 
 const router: Router = express.Router();
 
@@ -125,5 +127,11 @@ router.post(
   postUserEvent
 );
 router.get("/for-you", tmdbLimiter, requireUser, getForYou);
+
+// ─── Observability ──────────────────────────────────────────────────────────
+router.post("/vitals", validateBody(webVitalsSchema), (req, res) => {
+  logger.info({ vital: req.body }, "Web Vital reported");
+  res.status(204).end();
+});
 
 export default router;

@@ -217,4 +217,31 @@ describe("API Integration Tests (6B.4)", () => {
       expect(res.body).toHaveProperty("title", "Inception");
     });
   });
+
+  describe("POST /api/vitals", () => {
+    it("validates and accepts Web Vitals metric payload", async () => {
+      const res = await withAuth(
+        request(app).post("/api/vitals").send({
+          name: "LCP",
+          value: 1250,
+          rating: "good",
+          delta: 1250,
+          id: "v3-12345",
+        })
+      );
+
+      expect(res.status).toBe(204);
+    });
+
+    it("rejects invalid Web Vitals metric payload", async () => {
+      const res = await withAuth(
+        request(app).post("/api/vitals").send({
+          name: "INVALID_METRIC",
+          value: "not-a-number",
+        })
+      );
+
+      expect(res.status).toBe(400);
+    });
+  });
 });
