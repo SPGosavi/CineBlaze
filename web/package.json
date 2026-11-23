@@ -1,6 +1,7 @@
 {
   "name": "web",
   "version": "0.1.1",
+  "description": "Next.js 16 web application for CineBlaze with App Router, Server Components, and real-time watchlist.",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",

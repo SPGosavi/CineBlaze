@@ -153,10 +153,13 @@ export const SEARCH_MODES = ["ai", "direct", "recommend"] as const;
 
 export type SearchMode = (typeof SEARCH_MODES)[number];
 
+/**
+ * Narrows an untrusted value to a valid SearchMode ("ai", "direct", "recommend").
+ */
 export function isSearchMode(value: unknown): value is SearchMode {
   return (
     typeof value === "string" &&
-    (SEARCH_MODES as readonly string[]).includes(value)
+    (SEARCH_MODES as readonly string[]).includes(value as SearchMode)
   );
 }
 
@@ -176,6 +179,16 @@ export const MOOD_TAGS = [
 ] as const;
 
 export type MoodTag = (typeof MOOD_TAGS)[number];
+
+/**
+ * Narrows an untrusted value to a valid MoodTag.
+ */
+export function isMoodTag(value: unknown): value is MoodTag {
+  return (
+    typeof value === "string" &&
+    (MOOD_TAGS as readonly string[]).includes(value as MoodTag)
+  );
+}
 
 /** Output of extractStructuredParams — decomposed user query */
 export interface StructuredParams {
