@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, Flame, Lock, Mail, User } from "lucide-react";
+import Image from "next/image";
+import { AlertTriangle, Lock, Mail, User } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import PosterMarquee from "./PosterMarquee";
 import Button from "@/components/ui/Button";
@@ -79,9 +80,16 @@ export default function LoginForm() {
           <div className="text-center pb-2">
             <Link
               href="/"
-              className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-paper-3 border border-rule text-ink focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px]"
+              className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 active:translate-y-[1px]"
             >
-              <Flame size={28} className="text-ink" aria-hidden="true" />
+              <Image
+                src="/logo.svg"
+                alt=""
+                width={56}
+                height={56}
+                aria-hidden="true"
+                className="rounded-xl"
+              />
             </Link>
             <h1 className="font-display text-2xl font-medium tracking-tight text-ink">
               CineBlaze
