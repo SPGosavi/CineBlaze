@@ -1,5 +1,5 @@
+import Image from "next/image";
 import Link from "next/link";
-import { Flame } from "lucide-react";
 import NavLinks from "./NavLinks";
 import AccountPanel from "./AccountPanel";
 import MobileAccountButton from "./MobileAccountButton";
@@ -16,9 +16,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           href="/"
           className="flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 rounded-lg"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-paper-3 border border-rule text-ink">
-            <Flame size={18} className="text-ink" aria-hidden="true" />
-          </span>
+          <Image
+            src="/logo.svg"
+            alt=""
+            width={32}
+            height={32}
+            aria-hidden="true"
+            className="rounded-lg"
+          />
           <span className="font-display text-lg font-medium tracking-tight text-ink">
             CineBlaze
           </span>
@@ -32,9 +37,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           href="/"
           className="flex items-center gap-3 p-6 focus-visible:outline-2 focus-visible:outline-focus focus-visible:outline-offset-2 rounded-xl"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-paper-3 border border-rule text-ink">
-            <Flame size={20} className="text-ink" aria-hidden="true" />
-          </span>
+          <Image
+            src="/logo.svg"
+            alt=""
+            width={36}
+            height={36}
+            aria-hidden="true"
+            className="rounded-xl"
+          />
           <span className="font-display text-xl font-medium tracking-tight text-ink">
             CineBlaze
           </span>

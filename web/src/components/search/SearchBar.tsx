@@ -4,14 +4,14 @@ import { SearchMode } from "@cineblaze/shared";
 import { useState } from "react";
 import Form from "next/form";
 import { useFormStatus } from "react-dom";
-import { Search, Sparkles, Wand2 } from "lucide-react";
+import { Clapperboard, Flame, Search } from "lucide-react";
 import Button from "@/components/ui/Button";
 
 const SEARCH_MODE_META = [
   {
     mode: "ai",
     label: "Describe it",
-    Icon: Sparkles,
+    Icon: Clapperboard,
     placeholder: "e.g. A noir detective movie set in 2049...",
     hint: "Describe a plot, a scene, or a vibe.",
   },
@@ -25,7 +25,7 @@ const SEARCH_MODE_META = [
   {
     mode: "recommend",
     label: "Recommend me",
-    Icon: Wand2,
+    Icon: Flame,
     placeholder: "What are you in the mood for?",
     hint: "Share a mood, genre, language, or era.",
   },
